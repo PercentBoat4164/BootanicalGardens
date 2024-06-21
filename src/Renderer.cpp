@@ -18,7 +18,7 @@ Renderer::PerFrameData::PerFrameData(const GraphicsDevice& device) : device(devi
       .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = device.queueFamilyIndex
   };
-  vkCreateCommandPool(device.device, &commandPoolCreateInfo, nullptr, &commandPool);  // @todo Error checking.
+  GraphicsInstance::showError(vkCreateCommandPool(device.device, &commandPoolCreateInfo, nullptr, &commandPool), "Failed to create command pool.");
   const VkCommandBufferAllocateInfo commandBufferAllocateInfo{
       .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext              = nullptr,
@@ -26,7 +26,7 @@ Renderer::PerFrameData::PerFrameData(const GraphicsDevice& device) : device(devi
       .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1
   };
-  vkAllocateCommandBuffers(device.device, &commandBufferAllocateInfo, &commandBuffer);  // @todo Error checking.
+  GraphicsInstance::showError(vkAllocateCommandBuffers(device.device, &commandBufferAllocateInfo, &commandBuffer), "Failed to allocate command buffers.");
 
   /*****************************************
    * Initialize Synchronization Objections *
@@ -36,14 +36,14 @@ Renderer::PerFrameData::PerFrameData(const GraphicsDevice& device) : device(devi
       .pNext = nullptr,
       .flags = 0
   };
-  vkCreateSemaphore(device.device, &semaphoreCreateInfo, nullptr, &swapchainSemaphore);  // @todo Error checking.
-  vkCreateSemaphore(device.device, &semaphoreCreateInfo, nullptr, &renderSemaphore);  // @todo Error checking.
+  GraphicsInstance::showError(vkCreateSemaphore(device.device, &semaphoreCreateInfo, nullptr, &swapchainSemaphore), "Failed to create semaphore.");
+  GraphicsInstance::showError(vkCreateSemaphore(device.device, &semaphoreCreateInfo, nullptr, &renderSemaphore), "Failed to create semaphore.");
   constexpr VkFenceCreateInfo fenceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_FENCE_CREATE_SIGNALED_BIT
   };
-  vkCreateFence(device.device, &fenceCreateInfo, nullptr, &renderFence);  // @todo Error checking.
+  GraphicsInstance::showError(vkCreateFence(device.device, &fenceCreateInfo, nullptr, &renderFence), "Failed to create fence");
 }
 
 Renderer::PerFrameData::~PerFrameData() {
