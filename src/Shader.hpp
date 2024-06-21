@@ -3,7 +3,7 @@
 #include "GraphicsDevice.hpp"
 
 #include <shaderc/shaderc.hpp>
-#include <spirv-reflect/spirv_reflect.h>
+#include <spirv_reflect.h>
 
 #include <filesystem>
 

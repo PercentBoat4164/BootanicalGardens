@@ -72,19 +72,12 @@ Image& Image::operator=(const Image& other) {
 }
 
 Image::~Image() {
-  if (view != VK_NULL_HANDLE) {
-    vkDestroyImageView(device.device, view, nullptr);
-    view = VK_NULL_HANDLE;
-  }
-  if (allocation == VK_NULL_HANDLE && image != VK_NULL_HANDLE) {
-    vkDestroyImage(device.device, image, nullptr);
-    image = VK_NULL_HANDLE;
-  }
-  if (allocation != VK_NULL_HANDLE) {
-    vmaDestroyImage(device.allocator, image, allocation);
-    image = VK_NULL_HANDLE;
-    allocation = VK_NULL_HANDLE;
-  }
+  vkDestroyImageView(device.device, view, nullptr);
+  view = VK_NULL_HANDLE;
+  if (allocation == VK_NULL_HANDLE) vkDestroyImage(device.device, image, nullptr);
+  else vmaDestroyImage(device.allocator, image, allocation);
+  image = VK_NULL_HANDLE;
+  allocation = VK_NULL_HANDLE;
 }
 void* Image::getObject() {
   return image;
