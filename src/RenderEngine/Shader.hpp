@@ -2,8 +2,8 @@
 
 #include "GraphicsDevice.hpp"
 
+#include "external/spirv-reflect/7eb5db58882afa602ffe790c1183057596a2dab1/spirv_reflect.h"
 #include <shaderc/shaderc.hpp>
-#include <spirv_reflect.h>
 
 #include <filesystem>
 

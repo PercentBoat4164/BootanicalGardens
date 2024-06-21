@@ -17,30 +17,36 @@ CPMAddPackage("gh:zeux/volk#vulkan-sdk-${Vulkan_VERSION}.0")
 CPMAddPackage("gh:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator#v3.1.0")
 
 add_executable(GarDEADner
-        src/DescriptorAllocator.cpp
-        src/DescriptorAllocator.hpp
-        src/GraphicsDevice.cpp
-        src/GraphicsDevice.hpp
-        src/GraphicsInstance.cpp
-        src/GraphicsInstance.hpp
-        src/Image.cpp
-        src/Image.hpp
-        src/Pipeline.cpp
-        src/Pipeline.hpp
-        src/RenderPass.cpp
-        src/RenderPass.hpp
-        src/Renderer.cpp
-        src/Renderer.hpp
-        src/Resource.cpp
-        src/Resource.hpp
-        src/Shader.cpp
-        src/Shader.hpp
-        src/ShaderUsage.cpp
-        src/ShaderUsage.hpp
-        src/Window.cpp
-        src/Window.hpp
+        src/RenderEngine/DescriptorAllocator.cpp
+        src/RenderEngine/DescriptorAllocator.hpp
+        src/RenderEngine/GraphicsDevice.cpp
+        src/RenderEngine/GraphicsDevice.hpp
+        src/RenderEngine/GraphicsInstance.cpp
+        src/RenderEngine/GraphicsInstance.hpp
+        src/RenderEngine/Image.cpp
+        src/RenderEngine/Image.hpp
+        src/RenderEngine/Pipeline.cpp
+        src/RenderEngine/Pipeline.hpp
+        src/RenderEngine/RenderPass.cpp
+        src/RenderEngine/RenderPass.hpp
+        src/RenderEngine/Renderer.cpp
+        src/RenderEngine/Renderer.hpp
+        src/RenderEngine/Resource.cpp
+        src/RenderEngine/Resource.hpp
+        src/RenderEngine/Shader.cpp
+        src/RenderEngine/Shader.hpp
+        src/RenderEngine/ShaderUsage.cpp
+        src/RenderEngine/ShaderUsage.hpp
+        src/RenderEngine/Window.cpp
+        src/RenderEngine/Window.hpp
 
         ${SPIRV-Reflect_SOURCE_DIR}/spirv_reflect.c
+        src/Component.cpp
+        src/Component.hpp
+        src/Entity.cpp
+        src/Entity.hpp
+        src/Game/Level.cpp
+        src/Game/Level.hpp
 )
 target_sources(GarDEADner PRIVATE main.cpp)
 target_compile_definitions(GarDEADner PRIVATE VK_NO_PROTOTYPES NO_SDL_VULKAN_TYPEDEFS)

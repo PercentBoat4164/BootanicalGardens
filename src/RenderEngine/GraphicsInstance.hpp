@@ -1,9 +1,9 @@
 #pragma once
 #include <VkBootstrap.h>
 
-#include <chrono>
+#include "external/magic_enum/bbebfcc046f45da95aaf482cd5baa9d7246ea6cd/include/magic_enum/magic_enum.hpp"
 #include <SDL3/SDL_messagebox.h>
-#include <magic_enum/magic_enum.hpp>
+#include <chrono>
 
 class GraphicsDevice;
 
