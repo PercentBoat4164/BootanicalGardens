@@ -69,7 +69,6 @@ class Renderer {
   std::vector<ShaderUsage> shaderUsages;
   std::vector<Pipeline> pipelines;
   std::vector<RenderPass> renderPasses;
-  uint32_t renderPassIndex{};
   Image drawImage;
 
 public:

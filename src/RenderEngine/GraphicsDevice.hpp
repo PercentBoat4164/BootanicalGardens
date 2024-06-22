@@ -11,4 +11,6 @@ public:
 
   explicit GraphicsDevice();
   ~GraphicsDevice();
+
+  void destroy();
 };

@@ -2,8 +2,8 @@
 
 #include "GraphicsDevice.hpp"
 
-#include "external/spirv-reflect/7eb5db58882afa602ffe790c1183057596a2dab1/spirv_reflect.h"
 #include <shaderc/shaderc.hpp>
+#include <spirv_reflect.h>
 
 #include <filesystem>
 
@@ -16,7 +16,7 @@ class Shader {
   const GraphicsDevice& device;
 
   std::string contents;
-  spv_reflect::ShaderModule* reflection;
+  spv_reflect::ShaderModule* reflection{nullptr};
 
 public:
   std::filesystem::path path;

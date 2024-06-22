@@ -13,11 +13,12 @@
 
 class Entity {
   std::unordered_map<std::string, std::shared_ptr<Component>> components;
+
+public:
   glm::vec3 position;
   glm::quat rotation;
   glm::vec3 scale;
 
-public:
   /**
    * Add a Component to the map of Components
    *

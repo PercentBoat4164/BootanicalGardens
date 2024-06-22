@@ -60,10 +60,15 @@ GraphicsDevice::GraphicsDevice() {
 }
 
 GraphicsDevice::~GraphicsDevice() {
+  destroy();
+}
+
+void GraphicsDevice::destroy() {
+  if (!device) return;
   vkDeviceWaitIdle(device);
-  if (device) destroy_device(device);
   if (allocator != VK_NULL_HANDLE) {
     vmaDestroyAllocator(allocator);
     allocator = VK_NULL_HANDLE;
   }
+  destroy_device(device);
 }

@@ -1,3 +1,5 @@
+# What Does a `Component` Do?
+
 # Outline
 ```
 res
@@ -8,7 +10,7 @@ res
 |   |-- boo.wav
 |
 |-- levels
-|-- japanese.level  // JSON that can be used to generate a group of Entities
+    |-- japanese.level  // JSON that can be used to generate a group of Entities
 
 src
 |-- Component.cpp

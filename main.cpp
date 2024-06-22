@@ -1,10 +1,9 @@
 #include "src/Entity.hpp"
+#include "src/Game/Time.hpp"
 #include "src/InputEngine/KeyboardController.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Window.hpp"
-
-#include <SDL3/SDL.h>
 
 void buildEntities() {
   Entity entity{};
@@ -14,17 +13,14 @@ void buildEntities() {
 int main() {
   GraphicsInstance::create({});
   {
-    buildEntities();
-
     const GraphicsDevice graphicsDevice{};
-    Window window{graphicsDevice};
+    {
+      Window window{graphicsDevice};
 
-    SDL_Event e;
-    do {
-      while (SDL_PollEvent(&e)) if (e.type == SDL_EVENT_QUIT) break;
-
-      window.draw();
-    } while(e.type != SDL_EVENT_QUIT);
+      do {
+        window.draw();
+      } while (Time::tick());
+    }
   }
   GraphicsInstance::destroy();
   return 0;

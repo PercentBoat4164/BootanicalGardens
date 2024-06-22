@@ -99,7 +99,7 @@ VkFence Renderer::OneTimeSubmit::CommandBuffer::finish() {
   return fence;
 }
 
-Renderer::OneTimeSubmit::CommandBuffer::operator VkCommandBuffer_T*() const {
+Renderer::OneTimeSubmit::CommandBuffer::operator VkCommandBuffer() const {
   return commandBuffer;
 }
 
@@ -122,25 +122,25 @@ Renderer::OneTimeSubmit::CommandBuffer Renderer::OneTimeSubmit::get() {
 
 Renderer::OneTimeSubmit::OneTimeSubmit(const GraphicsDevice& device) : device(device) {}
 
-Renderer::Renderer(const GraphicsDevice& device) : device(device), oneTimeSubmit(device), drawImage(device), descriptorAllocator(device) {
+Renderer::Renderer(const GraphicsDevice& device) : device(device), oneTimeSubmit(device), drawImage(device, "drawImage"), descriptorAllocator(device) {
   frames.reserve(FRAME_OVERLAP);
   for (uint32_t i{}; i < FRAME_OVERLAP; ++i)
     frames.emplace_back(device);
 }
 
 void Renderer::setup(const std::vector<Image>& swapchainImages) {
-  drawImage = Image(device, "drawImage", VK_FORMAT_R16G16B16A16_SFLOAT, {swapchainImages.back().extent}, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+  drawImage.buildInPlace(VK_FORMAT_R16G16B16A16_SFLOAT, {swapchainImages.back().extent()}, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
   shaders.emplace_back(device, "../res/gradient.comp");
-  shaderUsages.emplace_back(device, shaders.back(), std::unordered_map<std::string, Resource*>{{"image", &drawImage}}, *this);
+  shaderUsages.emplace_back(device, shaders.back(), std::unordered_map<std::string, Resource&>{{"image", drawImage}}, *this);
   pipelines.emplace_back(device, std::vector{&shaderUsages.back()});
   renderPasses.emplace_back(device, std::vector{&pipelines.back()});
 
   OneTimeSubmit::CommandBuffer commandBuffer = oneTimeSubmit.get();
-  // std::vector<VkImageMemoryBarrier> imageMemoryBarriers;
-  // imageMemoryBarriers.reserve(swapchainImages.size());
-  // for (const Image& image : swapchainImages)
-  //   imageMemoryBarriers.emplace_back(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, device.queueFamilyIndex, device.queueFamilyIndex, image.image, VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
-  // vkCmdPipelineBarrier(static_cast<VkCommandBuffer>(commandBuffer), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, imageMemoryBarriers.size(), imageMemoryBarriers.data());
+  std::vector<VkImageMemoryBarrier> imageMemoryBarriers;
+  imageMemoryBarriers.reserve(swapchainImages.size());
+  for (const Image& image : swapchainImages)
+    imageMemoryBarriers.emplace_back(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, device.queueFamilyIndex, device.queueFamilyIndex, image.image(), VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+  vkCmdPipelineBarrier(static_cast<VkCommandBuffer>(commandBuffer), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, imageMemoryBarriers.size(), imageMemoryBarriers.data());
   commandBuffer.finish();
 }
 
@@ -162,7 +162,7 @@ std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex) const {
 };
   GraphicsInstance::showError(vkBeginCommandBuffer(frameData.commandBuffer, &commandBufferBeginInfo), "Failed to begin commandbuffer recording.");
   for (const auto& renderPass : renderPasses)
-    renderPass.render(frameData.commandBuffer, {{0, 0}, drawImage.extent}, {{0.0F, static_cast<float>(std::sin(static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000000.0)) / 2.0F + 0.5F, 0.0F, 0.0F}}, swapchainIndex);
+    renderPass.render(frameData.commandBuffer, {{0, 0}, drawImage.extent()}, {{0.0F, static_cast<float>(std::sin(static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000000.0)) / 2.0F + 0.5F, 0.0F, 0.0F}}, swapchainIndex);
   GraphicsInstance::showError(vkEndCommandBuffer(frameData.commandBuffer), "Failed to end commandbuffer recording.");
   std::array<VkPipelineStageFlags, 1> stageMasks{VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
   const VkSubmitInfo submitInfo {

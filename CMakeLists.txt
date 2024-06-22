@@ -22,10 +22,16 @@ add_executable(GarDEADner
         src/Component.hpp
         src/Entity.cpp
         src/Entity.hpp
-        src/InputEngine/KeyboardController.cpp
-        src/InputEngine/KeyboardController.hpp
         src/Game/Level.cpp
         src/Game/Level.hpp
+        src/Game/Time.cpp
+        src/Game/Time.hpp
+        src/InputEngine/Input.cpp
+        src/InputEngine/Input.hpp
+        src/InputEngine/KeyboardController.cpp
+        src/InputEngine/KeyboardController.hpp
+        src/RenderEngine/CommandBuffer.cpp
+        src/RenderEngine/CommandBuffer.hpp
         src/RenderEngine/DescriptorAllocator.cpp
         src/RenderEngine/DescriptorAllocator.hpp
         src/RenderEngine/GraphicsDevice.cpp

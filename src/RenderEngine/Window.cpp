@@ -4,9 +4,12 @@
 
 #include <SDL3/SDL_vulkan.h>
 #include <SDL3/SDL_init.h>
+#include <magic_enum/magic_enum.hpp>
+
+#include <chrono>
 
 uint32_t Window::getImage(VkSemaphore swapchainSemaphore) {
-  vkAcquireNextImageKHR(device.device, swapchain.swapchain, std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1)).count(), swapchainSemaphore, VK_NULL_HANDLE, &swapchainIndex);
+  vkAcquireNextImageKHR(device.device, swapchain.swapchain, std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1U)).count(), swapchainSemaphore, VK_NULL_HANDLE, &swapchainIndex);
   return swapchainIndex;
 }
 
@@ -28,7 +31,8 @@ Window::Window(const GraphicsDevice& device) : device{device}, renderer{device} 
   window = SDL_CreateWindow("Example Engine", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
   GraphicsInstance::showError(window, "Failed to create the SDL window.");
   GraphicsInstance::showError(SDL_Vulkan_CreateSurface(window, GraphicsInstance::instance, nullptr, &surface), "SDL failed to create the Vulkan surface.");
-  const vkb::SwapchainBuilder builder{device.device, surface};
+  vkb::SwapchainBuilder builder{device.device, surface};
+  builder.add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   const vkb::Result<vkb::Swapchain> swapchainResult = builder.build();
   GraphicsInstance::showError(swapchainResult, "Failed to create the Vulkan swapchain.");
   swapchain = swapchainResult.value();

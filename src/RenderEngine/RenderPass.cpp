@@ -11,7 +11,7 @@
 
 RenderPass::RenderPass(const GraphicsDevice& device, const std::vector<Pipeline*>& pipelines) : device(device), pipelines(pipelines) {
   // attachmentDescriptions.push_back({
-  //   .format = swapchainImages.back().format,
+  //   ._format = swapchainImages.back()._format,
   //   .samples = VK_SAMPLE_COUNT_1_BIT,
   //   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
   //   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -54,13 +54,13 @@ RenderPass::RenderPass(const GraphicsDevice& device, const std::vector<Pipeline*
   //   .flags = 0,
   //   .renderPass = renderPass,
   //   .attachmentCount = 1,
-  //   .width = swapchainImages.back().extent.width,
-  //   .height = swapchainImages.back().extent.height,
+  //   .width = swapchainImages.back()._extent.width,
+  //   .height = swapchainImages.back()._extent.height,
   //   .layers = 1
   // };
   // framebuffers.reserve(swapchainImages.size());
   // for (const Image& swapchainImage : swapchainImages) {
-  //   framebufferCreateInfo.pAttachments = &swapchainImage.view;
+  //   framebufferCreateInfo.pAttachments = &swapchainImage._view;
   //   VkFramebuffer framebuffer;
   //   vkCreateFramebuffer(device.device, &framebufferCreateInfo, nullptr, &framebuffer);
   //   framebuffers.push_back(framebuffer);
