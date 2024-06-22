@@ -2,6 +2,9 @@
 
 #include "Component.hpp"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -10,7 +13,11 @@
 
 class Entity {
   std::unordered_map<std::string, std::shared_ptr<Component>> components;
+  glm::vec3 position;
+  glm::quat rotation;
+  glm::vec3 scale;
 
+public:
   /**
    * Add a Component to the map of Components
    *
@@ -18,7 +25,7 @@ class Entity {
    * @param component The Component to be added
    */
   template<typename T> requires std::derived_from<T, Component> void addComponent(std::shared_ptr<T> component) {
-    components.emplace(component->name, component);
+    components.emplace(component->getName(), component);
   }
 
   /**
