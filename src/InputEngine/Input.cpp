@@ -2,6 +2,7 @@
 
 #include "../Game/Time.hpp"
 
+#include <SDL3/SDL.h>
 #include <ranges>
 
 std::unordered_map<Input::KeyCode, float> Input::keys{};
@@ -14,7 +15,7 @@ std::unordered_map<Input::KeyCode, float> Input::keys{};
  */
 void Input::onEvent(SDL_Event& event) {
   KeyCode code;
-  switch (event.key.keysym.sym) {
+  switch (event.key.key) {
       case SDLK_UNKNOWN: code = UNKNOWN; break;
       case SDLK_RETURN: code = RETURN; break;
       case SDLK_ESCAPE: code = ESCAPE; break;
@@ -24,8 +25,8 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_EXCLAIM: code = EXCLAIM; break;
       case SDLK_DBLAPOSTROPHE: code = DOUBLE_APOSTROPHE; break;
       case SDLK_HASH: code = HASH; break;
-      case SDLK_PERCENT: code = PERCENT; break;
       case SDLK_DOLLAR: code = DOLLAR; break;
+      case SDLK_PERCENT: code = PERCENT; break;
       case SDLK_AMPERSAND: code = AMPERSAND; break;
       case SDLK_APOSTROPHE: code = APOSTROPHE; break;
       case SDLK_LEFTPAREN: code = LEFT_PARENTHESIS; break;
@@ -48,11 +49,37 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_9: code = NINE; break;
       case SDLK_COLON: code = COLON; break;
       case SDLK_SEMICOLON: code = SEMICOLON; break;
-      case SDLK_LESS: code = LESS_THAN; break;
+      case SDLK_LESS: code = LESS; break;
       case SDLK_EQUALS: code = EQUALS; break;
-      case SDLK_GREATER: code = GREATER_THAN; break;
+      case SDLK_GREATER: code = GREATER; break;
       case SDLK_QUESTION: code = QUESTION; break;
       case SDLK_AT: code = AT; break;
+      case SDLK_A: code = A; break;
+      case SDLK_B: code = B; break;
+      case SDLK_C: code = C; break;
+      case SDLK_D: code = D; break;
+      case SDLK_E: code = E; break;
+      case SDLK_F: code = F; break;
+      case SDLK_G: code = G; break;
+      case SDLK_H: code = H; break;
+      case SDLK_I: code = I; break;
+      case SDLK_J: code = J; break;
+      case SDLK_K: code = K; break;
+      case SDLK_L: code = L; break;
+      case SDLK_M: code = M; break;
+      case SDLK_N: code = N; break;
+      case SDLK_O: code = O; break;
+      case SDLK_P: code = P; break;
+      case SDLK_Q: code = Q; break;
+      case SDLK_R: code = R; break;
+      case SDLK_S: code = S; break;
+      case SDLK_T: code = T; break;
+      case SDLK_U: code = U; break;
+      case SDLK_V: code = V; break;
+      case SDLK_W: code = W; break;
+      case SDLK_X: code = X; break;
+      case SDLK_Y: code = Y; break;
+      case SDLK_Z: code = Z; break;
       case SDLK_LEFTBRACKET: code = LEFT_BRACKET; break;
       case SDLK_BACKSLASH: code = BACKSLASH; break;
       case SDLK_RIGHTBRACKET: code = RIGHT_BRACKET; break;
@@ -85,6 +112,11 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_x: code = X; break;
       case SDLK_y: code = Y; break;
       case SDLK_z: code = Z; break;
+      case SDLK_LEFTBRACE: code = LEFT_BRACE; break;
+      case SDLK_PIPE: code = PIPE; break;
+      case SDLK_RIGHTBRACE: code = RIGHT_BRACE; break;
+      case SDLK_TILDE: code = TILDE; break;
+      case SDLK_DELETE: code = DELETE; break;
       case SDLK_CAPSLOCK: code = CAPSLOCK; break;
       case SDLK_F1: code = F1; break;
       case SDLK_F2: code = F2; break;
@@ -104,7 +136,6 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_INSERT: code = INSERT; break;
       case SDLK_HOME: code = HOME; break;
       case SDLK_PAGEUP: code = PAGEUP; break;
-      case SDLK_DELETE: code = DELETE; break;
       case SDLK_END: code = END; break;
       case SDLK_PAGEDOWN: code = PAGEDOWN; break;
       case SDLK_RIGHT: code = RIGHT; break;
@@ -169,7 +200,7 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_OUT: code = OUT; break;
       case SDLK_OPER: code = OPER; break;
       case SDLK_CLEARAGAIN: code = CLEAR_AGAIN; break;
-      case SDLK_CRSEL: code = CURSOR_SELECT; break;
+      case SDLK_CRSEL: code = CRSEL; break;
       case SDLK_EXSEL: code = EXSEL; break;
       case SDLK_KP_00: code = KEYPAD_00; break;
       case SDLK_KP_000: code = KEYPAD_000; break;
@@ -202,7 +233,7 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_KP_HASH: code = KEYPAD_HASH; break;
       case SDLK_KP_SPACE: code = KEYPAD_SPACE; break;
       case SDLK_KP_AT: code = KEYPAD_AT; break;
-      case SDLK_KP_EXCLAM: code = KEYPAD_EXCLAMATION; break;
+      case SDLK_KP_EXCLAM: code = KEYPAD_EXCLAIMATION_POINT; break;
       case SDLK_KP_MEMSTORE: code = KEYPAD_MEM_STORE; break;
       case SDLK_KP_MEMRECALL: code = KEYPAD_MEM_RECALL; break;
       case SDLK_KP_MEMCLEAR: code = KEYPAD_MEM_CLEAR; break;
@@ -221,21 +252,33 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_LSHIFT: code = LEFT_SHIFT; break;
       case SDLK_LALT: code = LEFT_ALT; break;
       case SDLK_LGUI: code = LEFT_GUI; break;
-      case SDLK_RCTRL: code = RIGHT_CTRL; break;
+      case SDLK_RCTRL: code = RIGHT_CONTROL; break;
       case SDLK_RSHIFT: code = RIGHT_SHIFT; break;
       case SDLK_RALT: code = RIGHT_ALT; break;
       case SDLK_RGUI: code = RIGHT_GUI; break;
       case SDLK_MODE: code = MODE; break;
-      case SDLK_AUDIONEXT: code = AUDIO_NEXT; break;
-      case SDLK_AUDIOPREV: code = AUDIO_PREVIOUS; break;
-      case SDLK_AUDIOSTOP: code = AUDIO_STOP; break;
-      case SDLK_AUDIOPLAY: code = AUDIO_PLAY; break;
-      case SDLK_AUDIOMUTE: code = AUDIO_MUTE; break;
-      case SDLK_MEDIASELECT: code = MEDIA_SELECT; break;
-      case SDLK_WWW: code = WWW; break;
-      case SDLK_MAIL: code = MAIL; break;
-      case SDLK_CALCULATOR: code = CALCULATOR; break;
-      case SDLK_COMPUTER: code = COMPUTER; break;
+      case SDLK_SLEEP: code = SLEEP; break;
+      case SDLK_WAKE: code = WAKE; break;
+      case SDLK_CHANNEL_INCREMENT: code = CHANNEL_INCREMENT; break;
+      case SDLK_CHANNEL_DECREMENT: code = CHANNEL_DECREMENT; break;
+      case SDLK_MEDIA_PLAY: code = MEDIA_PLAY; break;
+      case SDLK_MEDIA_PAUSE: code = MEDIA_PAUSE; break;
+      case SDLK_MEDIA_RECORD: code = MEDIA_RECORD; break;
+      case SDLK_MEDIA_FAST_FORWARD: code = MEDIA_FAST_FORWARD; break;
+      case SDLK_MEDIA_REWIND: code = MEDIA_REWIND; break;
+      case SDLK_MEDIA_NEXT_TRACK: code = MEDIA_NEXT_TRACK; break;
+      case SDLK_MEDIA_PREVIOUS_TRACK: code = MEDIA_PREVIOUS_TRACK; break;
+      case SDLK_MEDIA_STOP: code = MEDIA_STOP; break;
+      case SDLK_MEDIA_EJECT: code = MEDIA_EJECT; break;
+      case SDLK_MEDIA_PLAY_PAUSE: code = MEDIA_PLAY_PAUSE; break;
+      case SDLK_MEDIA_SELECT: code = MEDIA_SELECT; break;
+      case SDLK_AC_NEW: code = BROWSER_NEW; break;
+      case SDLK_AC_OPEN: code = BROWSER_OPEN; break;
+      case SDLK_AC_CLOSE: code = BROWSER_CLOSE; break;
+      case SDLK_AC_EXIT: code = BROWSER_EXIT; break;
+      case SDLK_AC_SAVE: code = BROWSER_SAVE; break;
+      case SDLK_AC_PRINT: code = BROWSER_PRINT; break;
+      case SDLK_AC_PROPERTIES: code = BROWSER_PROPERTIES; break;
       case SDLK_AC_SEARCH: code = BROWSER_SEARCH; break;
       case SDLK_AC_HOME: code = BROWSER_HOME; break;
       case SDLK_AC_BACK: code = BROWSER_BACK; break;
@@ -243,18 +286,6 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_AC_STOP: code = BROWSER_STOP; break;
       case SDLK_AC_REFRESH: code = BROWSER_REFRESH; break;
       case SDLK_AC_BOOKMARKS: code = BROWSER_BOOKMARKS; break;
-      case SDLK_BRIGHTNESSDOWN: code = BRIGHTNESS_DOWN; break;
-      case SDLK_BRIGHTNESSUP: code = BRIGHTNESS_UP; break;
-      case SDLK_DISPLAYSWITCH: code = DISPLAY_SWITCH; break;
-      case SDLK_KBDILLUMTOGGLE: code = KEYBOARD_ILLUMINATION_TOGGLE; break;
-      case SDLK_KBDILLUMDOWN: code = KEYBOARD_ILLUMINATION_DOWN; break;
-      case SDLK_KBDILLUMUP: code = KEYBOARD_ILLUMINATION_UP; break;
-      case SDLK_EJECT: code = EJECT; break;
-      case SDLK_SLEEP: code = SLEEP; break;
-      case SDLK_APP1: code = APP1; break;
-      case SDLK_APP2: code = APP2; break;
-      case SDLK_AUDIOREWIND: code = AUDIO_REWIND; break;
-      case SDLK_AUDIOFASTFORWARD: code = AUDIO_FAST_FORWARD; break;
       case SDLK_SOFTLEFT: code = SOFT_LEFT; break;
       case SDLK_SOFTRIGHT: code = SOFT_RIGHT; break;
       case SDLK_CALL: code = CALL; break;
