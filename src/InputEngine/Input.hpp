@@ -4,7 +4,7 @@
 
 #include <unordered_map>
 
-struct Time;
+class Game;
 
 class Input {
 public:
@@ -256,7 +256,7 @@ public:
     SOFT_LEFT,
     SOFT_RIGHT,
     CALL,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    END_CALL
+    END_CALL
   };
 
 private:
@@ -264,7 +264,7 @@ private:
 
   static void onEvent(SDL_Event& event);
   static void onTick();
-  friend Time;
+  friend Game;
 
 public:
   Input() = delete;

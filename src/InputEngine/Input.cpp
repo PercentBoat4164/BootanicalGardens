@@ -1,6 +1,6 @@
 #include "Input.hpp"
 
-#include "../Game/Time.hpp"
+#include "src/Game/Game.hpp"
 
 #include <SDL3/SDL.h>
 #include <ranges>
@@ -299,7 +299,7 @@ void Input::onEvent(SDL_Event& event) {
  * Update input values that change every tick
  */
 void Input::onTick() {
-  for (float& key : std::ranges::views::values(keys)) key += Time::tickTime() * std::abs(key) == key ? 1 : -1;
+  for (float& key : std::ranges::views::values(keys)) key += Game::tickTime() * std::abs(key) == key ? 1 : -1;
 }
 
 /**
@@ -309,7 +309,7 @@ void Input::onTick() {
  * @return whether the key has been pressed
  */
 bool Input::keyPressed(KeyCode key) {
-  return keys[key] == Time::tickTime();
+  return keys[key] == Game::tickTime();
 }
 
 /**
@@ -331,7 +331,7 @@ float Input::keyDown(KeyCode key) {
  * @return whether the key has been released
  */
 bool Input::keyReleased(KeyCode key) {
-  return keys[key] == -Time::tickTime();
+  return keys[key] == -Game::tickTime();
 }
 
 /**

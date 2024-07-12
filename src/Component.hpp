@@ -2,6 +2,7 @@
 
 #include <string>
 #include <utility>
+#include <memory>
 
 class Entity;
 
@@ -10,10 +11,12 @@ private:
   std::string name;
 
 public:
-  explicit Component(std::string name) : name(std::move(name)) {}
+  std::shared_ptr<Entity> entity;
+
+  explicit Component(std::string name, std::shared_ptr<Entity>& entity) : name(std::move(name)), entity(std::move(entity)) {}
   virtual ~Component() = 0;
 
-  virtual void OnTick(Entity& entity) = 0;
+  virtual void onTick() = 0;
 
   std::string getName();
 };

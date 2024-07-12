@@ -58,6 +58,12 @@ public:
     return *it;
   }
 
+  template<typename T> requires std::derived_from<T, Component> std::shared_ptr<T> getComponentOfType() {
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+      if (dynamic_cast<T*>(component.get()) != nullptr) return component;
+    return nullptr;
+  }
+
   /**
    * Get a vector of shared pointers of all Components of a specific type in this Entity
    *

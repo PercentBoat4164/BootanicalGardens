@@ -1,14 +1,10 @@
 #include "src/Entity.hpp"
-#include "src/Game/Time.hpp"
-#include "src/InputEngine/KeyboardController.hpp"
+#include "src/Game/Components/PlayerController.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Window.hpp"
-
-void buildEntities() {
-  Entity entity{};
-  entity.addComponent(std::make_shared<KeyboardController>("MainCharacter"));
-}
+#include "src/Game/Game.hpp"
+#include "simdjson.h"
 
 int main() {
   GraphicsInstance::create({});
@@ -19,7 +15,7 @@ int main() {
 
       do {
         window.draw();
-      } while (Time::tick());
+      } while (Game::tick());
     }
   }
   GraphicsInstance::destroy();

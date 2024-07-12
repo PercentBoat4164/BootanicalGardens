@@ -1,3 +1,5 @@
+# Bootanical Gardens
+
 # What Does a `Component` Do?
 
 # Outline
@@ -22,7 +24,7 @@ src
 |   |-- Level.cpp  // Manages loading and storing data relevant to levels
 |   |-- Components
 |       |-- EnemyAi.cpp  // Controls behaviour of enemies | Inherits from Component.cpp
-|       |-- KeyboardController.cpp  // Controls behaviour of player | Inherits from Component.cpp
+|       |-- PlayerController.cpp  // Controls behaviour of player | Inherits from Component.cpp
 |       |-- NpcAi.cpp  // Controls behaviour of npcs | Inherits from Component.cpp
 |
 |-- Audio

@@ -1,13 +1,18 @@
-#include "Time.hpp"
+#include "Game.hpp"
 
 #include "src/InputEngine/Input.hpp"
 
-#include <chrono>
+std::vector<std::shared_ptr<Entity>> Game::entities;
+double Game::time;
 
-std::chrono::steady_clock::time_point Time::startTime{std::chrono::steady_clock::now()};
-double Time::time{};
+const std::chrono::steady_clock::time_point Game::startTime{std::chrono::steady_clock::now()};
 
-bool Time::tick() {
+std::shared_ptr<Entity> Game::addEntity() {
+  std::shared_ptr<Entity> entity = entities.emplace_back();
+  return entity;
+}
+
+bool Game::tick() {
   bool shouldQuit{};
   SDL_Event e;
   while (!shouldQuit && SDL_PollEvent(&e)) {
@@ -27,6 +32,6 @@ bool Time::tick() {
   return !shouldQuit;
 }
 
-double Time::tickTime() {
+double Game::tickTime() {
   return time;
 }
