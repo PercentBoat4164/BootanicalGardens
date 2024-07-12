@@ -10,7 +10,7 @@
 
 Shader::Shader(const GraphicsDevice& device, const std::filesystem::path& path) : device(device), path(absolute(path)) {
   std::ifstream stream(path, std::ios_base::ate | std::ios_base::binary);
-  const std::size_t size = stream.tellg();
+  const std::size_t size = static_cast<std::size_t>(stream.tellg());
   stream.seekg(0, std::ios_base::beg);
   contents.resize(size, '\0');
   stream.read(contents.data(), static_cast<std::streamsize>(size));
@@ -30,7 +30,7 @@ void Shader::compile() {
   const shaderc::Compiler compiler;
   const shaderc::CompileOptions options;
 
-  const shaderc::CompilationResult result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderc_glsl_default_compute_shader, path.c_str(), options);
+  const shaderc::CompilationResult result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderc_glsl_default_compute_shader, path.string().data(), options);
   if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
     GraphicsInstance::showError(false, "Failed to compile shader. Error: " + result.GetErrorMessage());
     return;

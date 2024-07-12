@@ -92,9 +92,9 @@ VkSampler Image::sampler() const {
 }
 
 void* Image::getObject() const {
-  return _image;
+  return reinterpret_cast<void*>(_image);
 }
 
 void* Image::getView() const {
-  return _view;
+  return reinterpret_cast<void*>(_view);
 }

@@ -6,7 +6,7 @@
 #include <VkBootstrap.h>
 
 class Image;
-class SDL_Window;
+struct SDL_Window;
 
 class Window {
   SDL_Window* window{nullptr};

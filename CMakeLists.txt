@@ -15,7 +15,12 @@ CPMAddPackage("gh:Neargye/magic_enum#dd6a39d0ba1852cf06907e0f0573a2a10d23c2ad")
 CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-${Vulkan_VERSION}.0")
 CPMAddPackage("gh:zeux/volk#vulkan-sdk-${Vulkan_VERSION}.0")
 CPMAddPackage("gh:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator#v3.1.0")
-CPMAddPackage("gh:g-truc/glm#1.0.1")
+CPMAddPackage(
+        NAME glm
+        GIT_TAG 1.0.1
+        GITHUB_REPOSITORY g-truc/glm
+        OPTIONS CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON # Workaround for glm bug #1279
+)
 CPMAddPackage("gh:simdjson/simdjson#v3.9.5")
 
 add_executable(GarDEADner
@@ -57,7 +62,6 @@ add_executable(GarDEADner
         src/RenderEngine/ShaderUsage.hpp
         src/RenderEngine/Window.cpp
         src/RenderEngine/Window.hpp
-
         ${SPIRV-Reflect_SOURCE_DIR}/spirv_reflect.c
         ${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp
 )
@@ -66,3 +70,11 @@ target_compile_definitions(GarDEADner PRIVATE VK_NO_PROTOTYPES NO_SDL_VULKAN_TYP
 target_include_directories(GarDEADner PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR} ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${simdjson_SOURCE_DIR}/singleheader)
 target_link_libraries(GarDEADner PRIVATE volk::volk_headers vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared GPUOpen::VulkanMemoryAllocator Vulkan::shaderc_combined glm::glm)
 target_link_options(GarDEADner PRIVATE -Wl,-rpath=$ORIGIN)
+
+# Move all .dlls to the exe
+if (WIN32)
+    add_custom_command(TARGET GarDEADner POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:GarDEADner> $<TARGET_RUNTIME_DLLS:GarDEADner>
+            COMMAND_EXPAND_LISTS
+    )
+endif ()

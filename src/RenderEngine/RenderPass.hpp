@@ -5,7 +5,7 @@
 
 class Pipeline;
 class GraphicsDevice;
-struct Image;
+class Image;
 
 class RenderPass {
   const GraphicsDevice& device;

@@ -93,7 +93,7 @@ void RenderPass::render(VkCommandBuffer commandBuffer, const VkRect2D area, cons
     };
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
   }
-  for (const Pipeline* pipeline : pipelines) pipeline->execute(commandBuffer, std::ceil(area.extent.width / 16.0), std::ceil(area.extent.height / 16.0), 1);
+  for (const Pipeline* pipeline : pipelines) pipeline->execute(commandBuffer, static_cast<uint32_t>(std::ceil(area.extent.width / 16.0)), static_cast<uint32_t>(std::ceil(area.extent.height / 16.0)), 1);
   if (renderPass != VK_NULL_HANDLE)
     vkCmdEndRenderPass(commandBuffer);
 }
