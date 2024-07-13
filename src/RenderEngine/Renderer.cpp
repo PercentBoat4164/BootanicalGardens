@@ -1,6 +1,5 @@
 #include "Renderer.hpp"
 
-#include "CommandBuffer.hpp"
 #include "GraphicsDevice.hpp"
 #include "Image.hpp"
 #include "Shader.hpp"
@@ -196,7 +195,5 @@ std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex, Image& 
     .pSignalSemaphores = &frameData.renderSemaphore
   };
   GraphicsInstance::showError(vkQueueSubmit(device.queue, 1, &submitInfo, frameData.renderFence), "Failed to submit recorded commandbuffer to queue.");
-  CommandBuffer commandBuffer;
-  commandBuffer.record<CommandBuffer::CopyImage>(swapchainImage, drawImage, VkExtent3D{1, 1, 1});
   return {frameData.renderSemaphore};
 }
