@@ -140,6 +140,7 @@ void Renderer::setup(const std::vector<Image>& swapchainImages) {
   imageMemoryBarriers.reserve(swapchainImages.size());
   for (const Image& image : swapchainImages)
     imageMemoryBarriers.emplace_back(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, device.queueFamilyIndex, device.queueFamilyIndex, image.image(), VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+  imageMemoryBarriers.emplace_back(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, VK_ACCESS_NONE, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, device.queueFamilyIndex, device.queueFamilyIndex, drawImage.image(), VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
   vkCmdPipelineBarrier(static_cast<VkCommandBuffer>(commandBuffer), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, imageMemoryBarriers.size(), imageMemoryBarriers.data());
   commandBuffer.finish();
 }
@@ -163,24 +164,42 @@ std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex, Image& 
   GraphicsInstance::showError(vkBeginCommandBuffer(frameData.commandBuffer, &commandBufferBeginInfo), "Failed to begin commandbuffer recording.");
   for (const auto& renderPass : renderPasses)
     renderPass.render(frameData.commandBuffer, {{0, 0}, drawImage.extent()}, {{0.0F, static_cast<float>(std::sin(static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000000.0)) / 2.0F + 0.5F, 0.0F, 0.0F}}, swapchainIndex);
-  const VkImageCopy imageCopy {
+  VkImageMemoryBarrier imageMemoryBarrier {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .pNext = nullptr,
+    .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+    .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .srcQueueFamilyIndex = device.queueFamilyIndex,
+    .dstQueueFamilyIndex = device.queueFamilyIndex,
+    .image = drawImage.image(),
+    .subresourceRange = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
+    }
+  };
+  vkCmdPipelineBarrier(frameData.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+  const VkImageBlit imageBlit {
       .srcSubresource = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .mipLevel = 0,
           .baseArrayLayer = 0,
           .layerCount = 1,
       },
-      .srcOffset = {0, 0, 0},
+      .srcOffsets = {{0, 0, 0}, {static_cast<int32_t>(drawImage.extent().width), static_cast<int32_t>(drawImage.extent().height), 1}},
       .dstSubresource = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .mipLevel = 0,
           .baseArrayLayer = 0,
           .layerCount = 1,
       },
-      .dstOffset = {0, 0, 0},
-      .extent = {std::min(drawImage.extent().width, swapchainImage.extent().width), std::min(drawImage.extent().height, swapchainImage.extent().height), 1},
+      .dstOffsets = {{0, 0, 0}, {static_cast<int32_t>(swapchainImage.extent().width), static_cast<int32_t>(swapchainImage.extent().height), 1}},
   };
-  vkCmdCopyImage(frameData.commandBuffer, drawImage.image(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchainImage.image(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, &imageCopy);
+  vkCmdBlitImage(frameData.commandBuffer, drawImage.image(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchainImage.image(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, &imageBlit, VK_FILTER_NEAREST);
   GraphicsInstance::showError(vkEndCommandBuffer(frameData.commandBuffer), "Failed to end commandbuffer recording.");
   std::array<VkPipelineStageFlags, 1> stageMasks{VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
   const VkSubmitInfo submitInfo {

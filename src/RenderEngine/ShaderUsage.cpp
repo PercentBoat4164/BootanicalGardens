@@ -24,7 +24,7 @@ ShaderUsage::ShaderUsage(const GraphicsDevice& device, const Shader& shader, con
     };
     if (resource.type == Resource::Image) {
       const auto& image = dynamic_cast<const Image&>(resource);
-      imageInfos.emplace_back(VK_NULL_HANDLE, image.view(), VK_IMAGE_LAYOUT_UNDEFINED);
+      imageInfos.emplace_back(VK_NULL_HANDLE, image.view(), VK_IMAGE_LAYOUT_GENERAL);
       writeDescriptorSet.pImageInfo = &imageInfos.back();
     }
     writeDescriptorSets.push_back(writeDescriptorSet);
