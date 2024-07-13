@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27.8)
-project(GarDEADner)
+project("Bootanical Gardens")
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -23,7 +23,7 @@ CPMAddPackage(
 )
 CPMAddPackage("gh:simdjson/simdjson#v3.9.5")
 
-add_executable(GarDEADner
+add_executable(BootanicalGardens
         src/Component.cpp
         src/Component.hpp
         src/Entity.cpp
@@ -65,16 +65,16 @@ add_executable(GarDEADner
         ${SPIRV-Reflect_SOURCE_DIR}/spirv_reflect.c
         ${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp
 )
-target_sources(GarDEADner PRIVATE main.cpp)
-target_compile_definitions(GarDEADner PRIVATE VK_NO_PROTOTYPES NO_SDL_VULKAN_TYPEDEFS)
-target_include_directories(GarDEADner PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR} ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${simdjson_SOURCE_DIR}/singleheader)
-target_link_libraries(GarDEADner PRIVATE volk::volk_headers vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared GPUOpen::VulkanMemoryAllocator Vulkan::shaderc_combined glm::glm)
-target_link_options(GarDEADner PRIVATE -Wl,-rpath=$ORIGIN)
+target_sources(BootanicalGardens PRIVATE main.cpp)
+target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES NO_SDL_VULKAN_TYPEDEFS)
+target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR} ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${simdjson_SOURCE_DIR}/singleheader)
+target_link_libraries(BootanicalGardens PRIVATE volk::volk_headers vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared GPUOpen::VulkanMemoryAllocator Vulkan::shaderc_combined glm::glm)
+target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
 
 # Move all .dlls to the exe
 if (WIN32)
-    add_custom_command(TARGET GarDEADner POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:GarDEADner> $<TARGET_RUNTIME_DLLS:GarDEADner>
+    add_custom_command(TARGET BootanicalGardens POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:BootanicalGardens> $<TARGET_RUNTIME_DLLS:BootanicalGardens>
             COMMAND_EXPAND_LISTS
     )
 endif ()
