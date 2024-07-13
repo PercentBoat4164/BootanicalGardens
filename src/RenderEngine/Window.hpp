@@ -18,7 +18,6 @@ class Window {
   const GraphicsDevice& device;
 
   uint32_t getImage(VkSemaphore swapchainSemaphore);
-  void present(const std::vector<VkSemaphore>& waitSemaphores) const;
 
 public:
   Renderer renderer;

@@ -79,5 +79,5 @@ public:
   void setup(const std::vector<Image>& swapchainImages);
 
   [[nodiscard]] VkSemaphore waitForFrameData() const;
-  [[nodiscard]] std::vector<VkSemaphore> render(uint32_t swapchainIndex) const;
+  [[nodiscard]] std::vector<VkSemaphore> render(uint32_t swapchainIndex, Image& swapchainImage) const;
 };

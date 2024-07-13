@@ -6,6 +6,8 @@
 #include "src/Game/Game.hpp"
 #include "simdjson.h"
 
+#include <source_location>
+
 int main() {
   GraphicsInstance::create({});
   {

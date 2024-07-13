@@ -2,6 +2,5 @@
 
 #include "RenderPass.hpp"
 
-void CommandBuffer::beginRenderPass(const std::shared_ptr<RenderPass>& renderPass) {
-  commands.emplace(Command::BeginRenderPass, std::vector<std::shared_ptr<void>>{renderPass});
-}
+CommandBuffer::BeginRenderPass::BeginRenderPass(const RenderPass& renderPass) : renderPass(renderPass) {}
+CommandBuffer::CopyImage::CopyImage(const Image& dst, const Image& src, VkExtent3D extent, VkOffset3D dstOffset, VkOffset3D srcOffset) : dst(dst), src(src), extent(extent), dstOffset(dstOffset), srcOffset(srcOffset) {}

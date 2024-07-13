@@ -13,20 +13,6 @@ uint32_t Window::getImage(VkSemaphore swapchainSemaphore) {
   return swapchainIndex;
 }
 
-void Window::present(const std::vector<VkSemaphore>& waitSemaphores) const {
-  const VkPresentInfoKHR presentInfo {
-    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-    .pNext = nullptr,
-    .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
-    .pWaitSemaphores = waitSemaphores.data(),
-    .swapchainCount = 1,
-    .pSwapchains = &swapchain.swapchain,
-    .pImageIndices = &swapchainIndex,
-    .pResults = nullptr
-  };
-  vkQueuePresentKHR(device.queue, &presentInfo);
-}
-
 Window::Window(const GraphicsDevice& device) : device{device}, renderer{device} {
   window = SDL_CreateWindow("Example Engine", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
   GraphicsInstance::showError(window, "Failed to create the SDL window.");
@@ -59,7 +45,18 @@ Window::~Window() {
 }
 
 void Window::draw() {
-  present(renderer.render(getImage(renderer.waitForFrameData())));
+  std::vector<VkSemaphore> waitSemaphores = renderer.render(getImage(renderer.waitForFrameData()), swapchainImages[swapchainIndex]);
+  const VkPresentInfoKHR presentInfo {
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .pNext = nullptr,
+      .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+      .pWaitSemaphores = waitSemaphores.data(),
+      .swapchainCount = 1,
+      .pSwapchains = &swapchain.swapchain,
+      .pImageIndices = &swapchainIndex,
+      .pResults = nullptr
+  };
+  vkQueuePresentKHR(device.queue, &presentInfo);
 }
 
 void Window::initialize() {

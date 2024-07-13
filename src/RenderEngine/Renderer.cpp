@@ -1,12 +1,13 @@
 #include "Renderer.hpp"
 
+#include "CommandBuffer.hpp"
 #include "GraphicsDevice.hpp"
 #include "Image.hpp"
 #include "Shader.hpp"
 #include "Window.hpp"
 
-#include <vector>
 #include <cmath>
+#include <vector>
 
 Renderer::PerFrameData::PerFrameData(const GraphicsDevice& device) : device(device) {
   /****************************************
@@ -151,10 +152,10 @@ VkSemaphore Renderer::waitForFrameData() const {
   return frameData.swapchainSemaphore;
 }
 
-std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex) const {
+std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex, Image& swapchainImage) const {
   const PerFrameData& frameData = getPerFrameData();
   GraphicsInstance::showError(vkResetCommandBuffer(frameData.commandBuffer, 0), "Failed to reset commandbuffer.");
-  constexpr VkCommandBufferBeginInfo commandBufferBeginInfo{
+  constexpr VkCommandBufferBeginInfo commandBufferBeginInfo {
     .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     .pNext            = nullptr,
     .flags            = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -163,6 +164,24 @@ std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex) const {
   GraphicsInstance::showError(vkBeginCommandBuffer(frameData.commandBuffer, &commandBufferBeginInfo), "Failed to begin commandbuffer recording.");
   for (const auto& renderPass : renderPasses)
     renderPass.render(frameData.commandBuffer, {{0, 0}, drawImage.extent()}, {{0.0F, static_cast<float>(std::sin(static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000000.0)) / 2.0F + 0.5F, 0.0F, 0.0F}}, swapchainIndex);
+  const VkImageCopy imageCopy {
+      .srcSubresource = {
+          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+          .mipLevel = 0,
+          .baseArrayLayer = 0,
+          .layerCount = 1,
+      },
+      .srcOffset = {0, 0, 0},
+      .dstSubresource = {
+          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+          .mipLevel = 0,
+          .baseArrayLayer = 0,
+          .layerCount = 1,
+      },
+      .dstOffset = {0, 0, 0},
+      .extent = {std::min(drawImage.extent().width, swapchainImage.extent().width), std::min(drawImage.extent().height, swapchainImage.extent().height), 1},
+  };
+  vkCmdCopyImage(frameData.commandBuffer, drawImage.image(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchainImage.image(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, &imageCopy);
   GraphicsInstance::showError(vkEndCommandBuffer(frameData.commandBuffer), "Failed to end commandbuffer recording.");
   std::array<VkPipelineStageFlags, 1> stageMasks{VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
   const VkSubmitInfo submitInfo {
@@ -177,5 +196,7 @@ std::vector<VkSemaphore> Renderer::render(const uint32_t swapchainIndex) const {
     .pSignalSemaphores = &frameData.renderSemaphore
   };
   GraphicsInstance::showError(vkQueueSubmit(device.queue, 1, &submitInfo, frameData.renderFence), "Failed to submit recorded commandbuffer to queue.");
+  CommandBuffer commandBuffer;
+  commandBuffer.record<CommandBuffer::CopyImage>(swapchainImage, drawImage, VkExtent3D{1, 1, 1});
   return {frameData.renderSemaphore};
 }
