@@ -16,6 +16,7 @@ public:
   VkPipelineBindPoint bindPoint;
 
   Pipeline(const GraphicsDevice& device, const std::vector<ShaderUsage*>& shaderUsages);
+  ~Pipeline();
 
   void execute(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z) const;
 };

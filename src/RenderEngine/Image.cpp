@@ -8,19 +8,18 @@
 
 #include <utility>
 
-Image::Image(const GraphicsDevice& device, std::string name) : Resource(Resource::Image), device(device), _name(std::move(name)), _image(VK_NULL_HANDLE), _format(VK_FORMAT_UNDEFINED), _extent(), _usage(), _view(VK_NULL_HANDLE){};
+Image::Image(const GraphicsDevice& device, std::string name) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(true), _image(VK_NULL_HANDLE), _format(VK_FORMAT_UNDEFINED), _extent(), _usage(), _view(VK_NULL_HANDLE){};
 
-Image::Image(const GraphicsDevice& device, std::string name, VkImage image, const VkFormat format, const VkExtent2D extent, const VkImageUsageFlags usage, VkImageView view) : Resource(Resource::Image), device(device), _name(std::move(name)), _image(image), _format(format), _extent(extent), _usage(usage), _view(view) {}
+Image::Image(const GraphicsDevice& device, std::string name, VkImage image, const VkFormat format, const VkExtent2D extent, const VkImageUsageFlags usage, VkImageView view) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _extent(extent), _usage(usage), _view(view) {}
 
-Image::Image(const GraphicsDevice& device, std::string name, const VkFormat format, const VkExtent2D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits samples) : Resource(Resource::Image), device(device), _name(std::move(name)), _image(VK_NULL_HANDLE), _format(format), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE) {
+Image::Image(const GraphicsDevice& device, std::string name, const VkFormat format, const VkExtent2D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits samples) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(true), _image(VK_NULL_HANDLE), _format(format), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE) {
   buildInPlace(format, extent, usage, mipLevels, samples);
 }
 
 Image::~Image() {
   vkDestroyImageView(device.device, _view, nullptr);
   _view = VK_NULL_HANDLE;
-  if (allocation == VK_NULL_HANDLE) vkDestroyImage(device.device, _image, nullptr);
-  else vmaDestroyImage(device.allocator, _image, allocation);
+  if (_shouldDestroy) vmaDestroyImage(device.allocator, _image, allocation);
   _image     = VK_NULL_HANDLE;
   allocation = VK_NULL_HANDLE;
 }

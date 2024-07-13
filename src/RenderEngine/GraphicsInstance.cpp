@@ -1,10 +1,12 @@
-#define VOLK_IMPLEMENTATION
 #include "GraphicsInstance.hpp"
+
+#define VOLK_IMPLEMENTATION
+#define VMA_IMPLEMENTATION
+
 #include "Window.hpp"
 
 #include <volk.h>
 
-#include <iostream>
 #include <SDL3/SDL_vulkan.h>
 
 vkb::Instance GraphicsInstance::instance{};
@@ -34,8 +36,8 @@ void GraphicsInstance::create(const std::vector<const char*>& extensions) {
 }
 
 void GraphicsInstance::destroy() {
-  vkDestroyDebugUtilsMessengerEXT(instance, instance.debug_messenger, nullptr);
-  vkDestroyInstance(instance, nullptr);
+  vkb::destroy_instance(instance);
+  instance = {};
   volkFinalize();
 }
 

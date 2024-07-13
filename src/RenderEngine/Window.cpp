@@ -30,18 +30,13 @@ Window::Window(const GraphicsDevice& device) : device{device}, renderer{device} 
 }
 
 Window::~Window() {
-  if (swapchain) {
-    destroy_swapchain(swapchain);
-    swapchainImages.clear();
-  }
-  if (surface != VK_NULL_HANDLE) {
-    vkDestroySurfaceKHR(GraphicsInstance::instance, surface, nullptr);
-    surface = VK_NULL_HANDLE;
-  }
-  if (window != nullptr) {
-    SDL_DestroyWindow(window);
-    window = nullptr;
-  }
+  destroy_swapchain(swapchain);
+  swapchainImages.clear();
+  swapchain = {};
+  vkDestroySurfaceKHR(GraphicsInstance::instance, surface, nullptr);
+  surface = VK_NULL_HANDLE;
+  SDL_DestroyWindow(window);
+  window = nullptr;
 }
 
 void Window::draw() {

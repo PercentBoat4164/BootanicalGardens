@@ -15,6 +15,7 @@ class Image : public Resource {
   VmaAllocation allocation{VK_NULL_HANDLE};
 
   std::string _name;
+  bool _shouldDestroy;
   VkImage _image;
   VkFormat _format;
   VkExtent2D _extent;

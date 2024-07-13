@@ -6,19 +6,15 @@
 #include "src/Game/Game.hpp"
 #include "simdjson.h"
 
-#include <source_location>
-
 int main() {
   GraphicsInstance::create({});
   {
     const GraphicsDevice graphicsDevice{};
-    {
-      Window window{graphicsDevice};
+    Window window{graphicsDevice};
 
-      do {
-        window.draw();
-      } while (Game::tick());
-    }
+    do {
+      window.draw();
+    } while (Game::tick());
   }
   GraphicsInstance::destroy();
   return 0;

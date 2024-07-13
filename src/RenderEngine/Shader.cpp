@@ -20,10 +20,10 @@ Shader::Shader(const GraphicsDevice& device, const std::filesystem::path& path) 
 Shader::~Shader() {
   delete reflection;
   reflection = nullptr;
-  if (layout != VK_NULL_HANDLE) {
-    vkDestroyDescriptorSetLayout(device.device, layout, nullptr);
-    layout = VK_NULL_HANDLE;
-  }
+  vkDestroyDescriptorSetLayout(device.device, layout, nullptr);
+  layout = VK_NULL_HANDLE;
+  vkDestroyShaderModule(device.device, module, nullptr);
+  module = VK_NULL_HANDLE;
 }
 
 void Shader::compile() {

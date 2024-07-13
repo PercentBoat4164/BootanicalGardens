@@ -80,7 +80,7 @@ Renderer::OneTimeSubmit::CommandBuffer Renderer::OneTimeSubmit::CommandBuffer::b
   return *this;
 }
 
-VkFence Renderer::OneTimeSubmit::CommandBuffer::finish() {
+void Renderer::OneTimeSubmit::CommandBuffer::finish() {
   vkEndCommandBuffer(commandBuffer);
   VkFence fence;
   constexpr VkFenceCreateInfo fenceCreateInfo{
@@ -96,7 +96,10 @@ VkFence Renderer::OneTimeSubmit::CommandBuffer::finish() {
       .pCommandBuffers    = &commandBuffer,
   };
   vkQueueSubmit(device.queue, 1, &submitInfo, fence);
-  return fence;
+  vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
+  vkDestroyFence(device.device, fence, nullptr);
+  vkResetCommandBuffer(commandBuffer, 0);
+  inUse = false;
 }
 
 Renderer::OneTimeSubmit::CommandBuffer::operator VkCommandBuffer() const {
@@ -122,10 +125,20 @@ Renderer::OneTimeSubmit::CommandBuffer Renderer::OneTimeSubmit::get() {
 
 Renderer::OneTimeSubmit::OneTimeSubmit(const GraphicsDevice& device) : device(device) {}
 
+Renderer::OneTimeSubmit::~OneTimeSubmit() {
+  vkDestroyCommandPool(device.device, commandPool, nullptr);
+  commandPool = VK_NULL_HANDLE;
+}
+
 Renderer::Renderer(const GraphicsDevice& device) : device(device), oneTimeSubmit(device), drawImage(device, "drawImage"), descriptorAllocator(device) {
   frames.reserve(FRAME_OVERLAP);
   for (uint32_t i{}; i < FRAME_OVERLAP; ++i)
     frames.emplace_back(device);
+}
+
+Renderer::~Renderer() {
+  const PerFrameData& frameData = getPerFrameData();
+  vkWaitForFences(device.device, 1, &frameData.renderFence, VK_TRUE, UINT64_MAX);
 }
 
 void Renderer::setup(const std::vector<Image>& swapchainImages) {

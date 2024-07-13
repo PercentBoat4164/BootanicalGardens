@@ -43,7 +43,7 @@ class Renderer {
       CommandBuffer(const GraphicsDevice& device, VkCommandPool commandPool);
 
       CommandBuffer begin();
-      VkFence finish();
+      void finish();
 
       explicit operator VkCommandBuffer() const;
       explicit operator bool() const;
@@ -58,6 +58,7 @@ class Renderer {
     CommandBuffer get();
 
     explicit OneTimeSubmit(const GraphicsDevice& device);
+    ~OneTimeSubmit();
   };
 
   const GraphicsDevice& device;
@@ -75,6 +76,7 @@ public:
   DescriptorAllocator descriptorAllocator;
 
   explicit Renderer(const GraphicsDevice& device);
+  ~Renderer();
 
   void setup(const std::vector<Image>& swapchainImages);
 

@@ -1,4 +1,3 @@
-#define VMA_IMPLEMENTATION
 #include "GraphicsDevice.hpp"
 
 #include "GraphicsInstance.hpp"
@@ -64,11 +63,11 @@ GraphicsDevice::~GraphicsDevice() {
 }
 
 void GraphicsDevice::destroy() {
-  if (!device) return;
-  vkDeviceWaitIdle(device);
-  if (allocator != VK_NULL_HANDLE) {
-    vmaDestroyAllocator(allocator);
-    allocator = VK_NULL_HANDLE;
+  if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
+  allocator = VK_NULL_HANDLE;
+  if (device) {
+    vkDeviceWaitIdle(device);
+    destroy_device(device);
   }
-  destroy_device(device);
+  device = {};
 }
