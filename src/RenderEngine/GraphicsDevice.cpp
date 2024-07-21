@@ -7,6 +7,7 @@
 GraphicsDevice::GraphicsDevice() {
   vkb::PhysicalDeviceSelector deviceSelector{GraphicsInstance::instance};
   deviceSelector.defer_surface_initialization();
+  deviceSelector.prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
   const vkb::DeviceBuilder deviceBuilder{deviceSelector.select().value()};
   const auto builderResult = deviceBuilder.build();
   GraphicsInstance::showError(builderResult, "Failed to create the Vulkan device.");
