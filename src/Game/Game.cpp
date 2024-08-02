@@ -32,6 +32,6 @@ bool Game::tick() {
   return !shouldQuit;
 }
 
-double Game::tickTime() {
+double Game::getTime() {
   return time;
 }

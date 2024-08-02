@@ -20,13 +20,7 @@ public:
   static bool tick();
 
   /**
-   * Get the length of time since the last tick
-   * @return the time in seconds
-   */
-  static double tickTime();
-
-  /**
-   * Get the total time the game has been running
+   * Get the total time the game has been running.
    * @return the time in seconds
    */
   static double getTime();

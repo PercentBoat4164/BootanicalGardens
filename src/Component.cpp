@@ -2,6 +2,6 @@
 
 Component::~Component() = default;
 
-std::string Component::getName() {
-    return name;
+std::uint64_t Component::getId() const {
+  return id;
 }

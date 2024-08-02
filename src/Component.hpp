@@ -7,16 +7,19 @@
 class Entity;
 
 class Component {
-private:
-  std::string name;
+protected:
+  std::uint64_t id;
+  const Entity& entity;
 
 public:
-  std::shared_ptr<Entity> entity;
-
-  explicit Component(std::string name, std::shared_ptr<Entity>& entity) : name(std::move(name)), entity(std::move(entity)) {}
-  virtual ~Component() = 0;
+  Component(std::uint64_t id, const Entity& entity);
+  Component(const Component& other)      = default;
+  Component(Component&& other) noexcept  = default;
+  Component& operator=(const Component&) = delete;
+  Component& operator=(Component&&)      = delete;
+  virtual ~Component()                   = 0;
 
   virtual void onTick() = 0;
 
-  std::string getName();
+  [[nodiscard]] std::uint64_t getId() const;
 };

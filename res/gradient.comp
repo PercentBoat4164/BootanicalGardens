@@ -14,7 +14,6 @@ bool isGridlinePixel() {
 
 void main() {
   ivec2 size = imageSize(image);
-  vec2 pixelID = vec2(gl_GlobalInvocationID.xy + 1) / pixelSize;
   if (!gridlines || isGridlinePixel()) {
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / size;
     vec2 uvOffset = mod(uv, float(pixelSize) / size);

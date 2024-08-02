@@ -34,8 +34,8 @@ add_executable(BootanicalGardens
         src/Game/Components/PlayerController.hpp
         src/Game/Game.cpp
         src/Game/Game.hpp
-        src/Game/Level.cpp
-        src/Game/Level.hpp
+        src/Game/LevelParser.cpp
+        src/Game/LevelParser.hpp
         src/InputEngine/Input.cpp
         src/InputEngine/Input.hpp
         src/RenderEngine/CommandBuffer.cpp

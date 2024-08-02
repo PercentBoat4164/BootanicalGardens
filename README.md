@@ -21,7 +21,8 @@ src
 |   |-- Renderable.cpp  // A model, material, textures, and other rendering parameters | Inherits from Component.cpp
 |
 |-- Game
-|   |-- Level.cpp  // Manages loading and storing data relevant to levels
+|   |-- Game.cpp  // Manages all entities
+|   |-- LevelParser.cpp  // Manages loading and storing data relevant to levels
 |   |-- Components
 |       |-- EnemyAi.cpp  // Controls behaviour of enemies | Inherits from Component.cpp
 |       |-- PlayerController.cpp  // Controls behaviour of player | Inherits from Component.cpp

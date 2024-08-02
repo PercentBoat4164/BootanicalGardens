@@ -20,13 +20,40 @@ public:
   glm::vec3 scale;
 
   /**
+   * Constructor an empty Entity with the given position, rotation, and scale.
+   * @param position the initial position of the entity
+   * @param rotation the initial orientation
+   * @param scale the initial scale
+   */
+  explicit Entity(std::uint64_t id, glm::vec3 position = glm::vec3(), glm::dquat rotation = glm::dquat(), glm::vec3 scale = glm::vec3());
+
+  /**
+   * Constructs an empty Entity with the same position, rotation, and scale as the given Entity.
+   * @param other the entity this is based on
+   */
+  explicit Entity(std::uint64_t id, const Entity& other);
+  Entity(const Entity& other)      = default;
+  Entity(Entity&& other) noexcept  = default;
+  Entity& operator=(const Entity&) = default;
+  Entity& operator=(Entity&&)      = default;
+  ~Entity()                        = default;
+
+  /**
    * Add a Component to the map of Components
    *
    * @tparam T Derives from Component
    * @param component The Component to be added
    */
-  template<typename T> requires std::derived_from<T, Component> void addComponent(std::shared_ptr<T> component) {
-    components.emplace(component->getName(), component);
+  Component* addComponent(simdjson::ondemand::object componentData);
+
+  /**
+   * Add a Component to the map of Components.
+   * @tparam T Derives from Component
+   * @param args The arguments for the Component's constructor
+   */
+  template<typename T, typename... Args> requires std::constructible_from<T, uint64_t, const Entity&, Args...> && std::derived_from<T, Component> void addComponent(Args&& ... args) {
+    std::unique_ptr<Component> component = reinterpret_cast<std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, Args...)>(componentConstructors.at(static_cast<std::string>(Tools::className<T>())))(++nextComponentId, *this, std::forward<Args>(args)...);
+    components.emplace(component->getId(), std::move(component));
   }
 
   /**
