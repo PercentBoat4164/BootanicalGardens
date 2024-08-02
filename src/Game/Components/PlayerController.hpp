@@ -6,8 +6,10 @@
 
 class PlayerController : public Component {
 public:
-  PlayerController(std::string name, std::shared_ptr<Entity>& entity);
+  explicit PlayerController(std::uint64_t id, const Entity& entity, simdjson::ondemand::object initializerObject);
   ~PlayerController() override = default;
+
+  static std::unique_ptr<Component> create(std::uint64_t id, const Entity& entity, simdjson::ondemand::object i);
 
   void onTick() override;
 };

@@ -1,18 +1,29 @@
 #pragma once
 
+#include "../Entity.hpp"
+
 #include <chrono>
 #include <memory>
-#include <vector>
-
-class Entity;
+#include <unordered_map>
+#include <utility>
 
 class Game {
-  static std::vector<std::shared_ptr<Entity>> entities;
+  static std::unordered_map<std::uint64_t, Entity> entities;
   static double time;
+  static std::uint64_t nextEntityId;
 
 public:
   static const std::chrono::steady_clock::time_point startTime;
-  static std::shared_ptr<Entity> addEntity();
+  /**
+   * Constructs an Entity given a set of arguments that Entity is constructible from.
+   * @tparam Args
+   * @param args
+   * @return The new Entity
+   */
+  template<typename... Args> requires std::constructible_from<Entity, std::uint64_t, Args...> static Entity& addEntity(Args&&... args) {
+    ++nextEntityId;
+    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(nextEntityId), std::forward_as_tuple(nextEntityId, std::forward<Args>(args)...)).first->second;
+  }
 
   /**
    * Move the game state forward one tick.

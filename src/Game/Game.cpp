@@ -2,15 +2,11 @@
 
 #include "src/InputEngine/Input.hpp"
 
-std::vector<std::shared_ptr<Entity>> Game::entities;
-double Game::time;
+std::unordered_map<std::uint64_t, Entity> Game::entities{};
+double Game::time{};
+std::uint64_t Game::nextEntityId{UINT64_MAX};
 
 const std::chrono::steady_clock::time_point Game::startTime{std::chrono::steady_clock::now()};
-
-std::shared_ptr<Entity> Game::addEntity() {
-  std::shared_ptr<Entity> entity = entities.emplace_back();
-  return entity;
-}
 
 bool Game::tick() {
   bool shouldQuit{};

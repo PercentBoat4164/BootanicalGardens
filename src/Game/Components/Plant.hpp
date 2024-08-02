@@ -8,8 +8,10 @@
 
 class Plant : public Component {
 public:
-  Plant(std::string name, std::shared_ptr<Entity>& entity);
+  Plant(std::uint64_t id, const Entity& entity);
   ~Plant() override = default;
+
+  static std::unique_ptr<Component> create(std::uint64_t id, const Entity& entity);
 
   void onTick() override;
 };

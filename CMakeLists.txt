@@ -62,6 +62,9 @@ add_executable(BootanicalGardens
         src/RenderEngine/ShaderUsage.hpp
         src/RenderEngine/Window.cpp
         src/RenderEngine/Window.hpp
+        src/Tools/StringHash.h
+        src/Tools/ClassName.h
+
         ${SPIRV-Reflect_SOURCE_DIR}/spirv_reflect.c
         ${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp
 )

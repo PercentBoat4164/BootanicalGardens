@@ -1,8 +1,11 @@
 # Bootanical Gardens
 
-# What Does a `Component` Do?
+## Component Entity System
+Entites carry a hash map of Component IDs to Components. All IDs are unsigned 64-bit integers.
+Components know their parent entity. Entities are constructed by calling `Game::addEntity`.
+Components are constructed by calling `entity.addComponent`.
 
-# Outline
+## Outline
 ```
 res
 |-- models
