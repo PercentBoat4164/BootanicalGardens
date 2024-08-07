@@ -4,6 +4,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <simdjson.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
