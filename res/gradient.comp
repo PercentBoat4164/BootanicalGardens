@@ -18,5 +18,7 @@ void main() {
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / size;
     vec2 uvOffset = mod(uv, float(pixelSize) / size);
     imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(uv - uvOffset, 0.0f, 1.0f));
+  } else {
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0f, 0.0f, 0.0f, 1.0f));
   }
 }
