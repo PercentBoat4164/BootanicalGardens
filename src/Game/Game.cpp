@@ -13,13 +13,10 @@ bool Game::tick() {
   SDL_Event e;
   while (!shouldQuit && SDL_PollEvent(&e)) {
     switch (e.type) {
-      case SDL_EVENT_QUIT: shouldQuit = true; break;
+      case SDL_QUIT: shouldQuit = true; break;
         // Input Events
-      case SDL_EVENT_KEYBOARD_ADDED:
-      case SDL_EVENT_KEYBOARD_REMOVED:
-      case SDL_EVENT_KEYMAP_CHANGED:
-      case SDL_EVENT_KEY_DOWN:
-      case SDL_EVENT_KEY_UP: Input::onEvent(e); break;
+      case SDL_KEYDOWN:
+      case SDL_KEYUP: Input::onEvent(e); break;
     }
   }
 

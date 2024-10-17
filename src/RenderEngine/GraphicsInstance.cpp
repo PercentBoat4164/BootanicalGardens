@@ -7,17 +7,18 @@
 
 #include <volk.h>
 
-#include <SDL3/SDL_vulkan.h>
+#include <SDL_vulkan.h>
 
 vkb::Instance GraphicsInstance::instance{};
 
 void GraphicsInstance::create(const std::vector<const char*>& extensions) {
   showError(volkInitialize(), "Failed to load Vulkan.");
-  Window::initialize();
+  SDL_Window* window = Window::initialize();
   uint32_t extensionCount;
   std::vector<const char*> SDLExtensions;
-  char const* const* const pSDLExtensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
-  SDLExtensions.assign(extensionCount, *pSDLExtensions);
+  SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
+  SDLExtensions.resize(extensionCount);
+  SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, SDLExtensions.data());
   vkb::InstanceBuilder builder;
   builder.enable_extensions(SDLExtensions);
   builder.enable_extensions(extensions);
@@ -42,6 +43,5 @@ void GraphicsInstance::destroy() {
 }
 
 void GraphicsInstance::showError(const VkResult result, const std::string& message) {
-  if (result == VK_SUCCESS) return;
-  (void)SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", (message + " | " + std::string(magic_enum::enum_name(result))).c_str(), nullptr);
+  if (result != VK_SUCCESS) std::cout << "Error: " << message << " | " << magic_enum::enum_name<VkResult>(result) << std::endl;
 }

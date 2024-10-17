@@ -1,0 +1,36 @@
+{
+  "shaders": [
+    {
+      "source": "res/basic.vert",
+      "code": [23473425],
+      "stage": 536234,
+      "entry points": [
+        {
+          "name": "main",
+          "descriptor layout": [
+            {
+              "binding": 0,
+              "type": 2438027,
+              "count": 378902
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "pipelines": [
+    {
+      "bind point": 43025,
+      "shaders": [0]
+    }
+  ],
+  "render passes": [
+    {
+      "subpasses": [
+        {
+
+        }
+      ]
+    }
+  ]
+}

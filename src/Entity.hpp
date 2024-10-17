@@ -12,6 +12,8 @@
 #include <ranges>
 #include <vector>
 
+struct yyjson_val;
+
 class Entity {
   static std::unordered_map<std::string, void*> componentConstructors;
 
@@ -48,7 +50,7 @@ public:
    * @tparam T Derives from Component
    * @param component The Component to be added
    */
-  Component* addComponent(simdjson::ondemand::object componentData);
+  Component* addComponent(yyjson_val* componentData);
 
   /**
    * Add a Component to the map of Components.

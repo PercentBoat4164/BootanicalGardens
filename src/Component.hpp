@@ -1,7 +1,5 @@
 #pragma once
 
-#include <simdjson.h>
-
 #include <string>
 #include <utility>
 #include <memory>

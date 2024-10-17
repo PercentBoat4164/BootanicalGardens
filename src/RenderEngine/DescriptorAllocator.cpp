@@ -6,8 +6,9 @@
 #include <volk.h>
 
 DescriptorAllocator::DescriptorAllocator(const GraphicsDevice& device) : device(device) {
-  std::vector<VkDescriptorPoolSize> sizes {
-      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10}
+  constexpr std::array sizes{
+      VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10},
+      VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
   };
   const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -38,6 +39,6 @@ std::vector<VkDescriptorSet> DescriptorAllocator::allocate(const std::vector<VkD
     .pSetLayouts = layouts.data()
   };
   std::vector<VkDescriptorSet> sets(layouts.size());
-  vkAllocateDescriptorSets(device.device, &descriptorSetAllocateInfo, sets.data());
+  GraphicsInstance::showError(vkAllocateDescriptorSets(device.device, &descriptorSetAllocateInfo, sets.data()), "Failed to allocate descriptor sets.");
   return sets;
-};
+}

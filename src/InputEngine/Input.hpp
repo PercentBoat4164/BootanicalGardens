@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL3/SDL_events.h>
+#include <SDL/SDL_events.h>
 
 #include <unordered_map>
 

@@ -6,7 +6,7 @@
 #include <utility>
 #include <ranges>
 
-ShaderUsage::ShaderUsage(const GraphicsDevice& device, const Shader& shader, const std::unordered_map<std::string, Resource&>& resources, const Renderer& renderer) : shader(shader), resources(resources), set(renderer.descriptorAllocator.allocate({shader.layout}).back()) {
+ShaderUsage::ShaderUsage(const GraphicsDevice& device, const Shader& shader, const std::unordered_map<std::string, Resource&>& resources, const Renderer& renderer) : shader(shader), resources(resources), set(renderer.descriptorAllocator.allocate(shader.layouts).back()) {
   std::vector<VkDescriptorImageInfo> imageInfos;
   imageInfos.reserve(resources.size());
   std::vector<VkWriteDescriptorSet> writeDescriptorSets;

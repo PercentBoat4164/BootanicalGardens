@@ -2,7 +2,6 @@
   "entities": [
     {
       "position": [1, 2, 3],
-      "rotation": [1, 2, 3, 4],
       "components": [
         {
           "type": "Renderable",

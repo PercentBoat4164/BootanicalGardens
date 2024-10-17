@@ -22,7 +22,8 @@ class Window {
 public:
   Renderer renderer;
 
-  static void initialize();
+  static SDL_Window* initialize();
+  static void cleanupInitialization(SDL_Window* window);
 
   explicit Window(const GraphicsDevice& device);
   ~Window();

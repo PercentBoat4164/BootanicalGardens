@@ -2,7 +2,6 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <simdjson.h>
 
 #include <filesystem>
 #include <memory>
@@ -10,6 +9,9 @@
 #include <utility>
 #include <unordered_map>
 #include <vector>
+
+struct yyjson_doc;
+struct yyjson_val;
 
 class Entity;
 class Component;
@@ -19,8 +21,7 @@ class Component;
  */
 class LevelParser {
 private:
-  static simdjson::ondemand::parser parser;
-
+    static yyjson_doc* doc;
 public:
   /**
    * Loads an entity from the .json file.
@@ -28,7 +29,7 @@ public:
    * @param name The name of the entity in the .json file
    * @return A pointer to the newly-loaded entity
    */
-  static Entity& loadEntity(simdjson::ondemand::object entityData);
+  static Entity& loadEntity(yyjson_val* entityData);
 
   /**
    * Loads an entire level from the .json file
