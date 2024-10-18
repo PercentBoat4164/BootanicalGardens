@@ -1,22 +1,23 @@
 #pragma once
 
-#include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/core.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
+
+#include <vulkan/vulkan.h>
 
 #include <vector>
 
+class Buffer;
 class GraphicsDevice;
 class Material;
+class Vertex;
 
 class Mesh {
-  std::vector<uint32_t> indices;
-  std::vector<glm::vec3> positions;
-  std::vector<glm::vec3> normals;
-  std::vector<glm::vec4> tangents;
-  std::vector<glm::vec2> textureCoordinates;
+  VkPrimitiveTopology topology{VK_PRIMITIVE_TOPOLOGY_MAX_ENUM};
+  std::vector<Vertex> vertices{};
+  std::vector<uint32_t> indices{};
   Material* material{nullptr};
+  Buffer* vertexBuffer{nullptr};
+  Buffer* indexBuffer{nullptr};
 
 public:
   Mesh(const GraphicsDevice& device, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);

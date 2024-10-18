@@ -33,10 +33,9 @@ template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void l
   std::size_t size;
   auto* bytes = const_cast<std::byte*>(handleDataSource(asset, image.data, &size));
   SDL_RWops* io = SDL_RWFromMem(bytes, static_cast<int>(size));
-  SDL_Surface* surface = IMG_Load_RW(io, false);
-  SDL_FreeRW(io);
+  SDL_Surface* surface = IMG_Load_RW(io, true);
   const std::vector textureBytes(static_cast<std::byte*>(surface->pixels), static_cast<std::byte*>(surface->pixels) + surface->w * surface->h * surface->format->BytesPerPixel);
-  const Buffer buffer{device, std::string{image.name + " upload buffer"}, textureBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT};
+  const Buffer buffer{device, std::string{image.name + " upload buffer"}, textureBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU};
   VkFormat format;
   switch (static_cast<SDL_PixelFormatEnum>(surface->format->format)) {
     case SDL_PIXELFORMAT_ARGB4444: format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT; break;
@@ -62,7 +61,7 @@ template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void l
   }
   *texture = new Texture(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   (*texture)->transitionToLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  buffer.copyToImage(*texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  buffer.copyTo(*texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   SDL_FreeSurface(surface);
 }
 
@@ -81,10 +80,11 @@ Material::Material(const GraphicsDevice& device, const fastgltf::Asset& asset, c
     anisotropyRotation(material.anisotropy ? material.anisotropy->anisotropyRotation : 0.f),
     metallicFactor(material.pbrData.metallicFactor),
     roughnessFactor(material.pbrData.roughnessFactor) {
-  /**@todo This could be immensely sped up using multi-threading, and by recording all appropriate commands to a single command buffer or submitting all command buffers at once, and by using a dedicated transfer queue for these operations.
+  /**@todo This could be immensely sped up using multi-threading, and by recording all commands to a single command buffer or submitting all command buffers at once, and by using a dedicated transfer queue for these operations.
    *    I refrained from doing these things for two reasons:
    *    - I do not know what the multi-threading of this game is going to look like yet, and I am not ready to make that decision (especially without Ethan).
    *    - I am aiming for speed of development. I just want to make this work for now, hence this comment reminding myself to improve this later.
+   *      - Fixing the way that command buffers are handled should be almost trivial. The only tricky part is retaining all the temporary buffers until the commands have finished then properly destroying them.
    */
   loadTexture<decltype(material.pbrData.baseColorTexture)::value_type>(device, asset,         &albedoTexture,            &material.pbrData.baseColorTexture);
   loadTexture<decltype(material.normalTexture)::value_type>(device, asset,                    &normalTexture,            &material.normalTexture);

@@ -48,6 +48,7 @@ add_executable(BootanicalGardens
         src/RenderEngine/Renderable/Mesh.cpp
         src/RenderEngine/Renderable/Renderable.cpp
         src/RenderEngine/Renderable/Texture.cpp
+        src/RenderEngine/Renderable/Vertex.cpp
         src/RenderEngine/Renderer.cpp
         src/RenderEngine/Resource.cpp
         src/RenderEngine/Shader.cpp
