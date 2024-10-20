@@ -9,11 +9,9 @@
 
 #include <utility>
 
-Image::Image(const GraphicsDevice& device, std::string name) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(true), _image(VK_NULL_HANDLE), _format(VK_FORMAT_UNDEFINED), _extent(), _usage(), _view(VK_NULL_HANDLE){};
+Image::Image(const GraphicsDevice& device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(Image::aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view) {}
 
-Image::Image(const GraphicsDevice& device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, VkImageView view) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _extent(extent), _usage(usage), _view(view) {}
-
-Image::Image(const GraphicsDevice& device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits samples) : Resource(Resource::Image), device(device), _name(std::move(name)), _shouldDestroy(true), _image(VK_NULL_HANDLE), _format(format), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE) {
+Image::Image(const GraphicsDevice& device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits samples) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(Image::aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE) {
   buildInPlace(format, extent, usage, mipLevels, samples);
 }
 
@@ -29,6 +27,7 @@ void Image::buildInPlace(const VkFormat format, const VkExtent3D extent, const V
   _format = format;
   _extent = VkExtent3D(extent.width, extent.height, extent.depth);
   _usage = usage;
+  _mipLevels = mipLevels;
   const VkImageCreateInfo imageCreateInfo{
       .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext         = nullptr,
@@ -131,6 +130,18 @@ VkImageView Image::view(const VkComponentMapping mapping, const VkImageSubresour
 
 VkFormat Image::format() const {
   return _format;
+}
+
+VkImageAspectFlags Image::aspect() const {
+    return _aspect;
+}
+
+uint32_t Image::mipLevels() const {
+  return _mipLevels;
+}
+
+uint32_t Image::layerCount() const {
+  return _layerCount;
 }
 
 void* Image::getObject() const {

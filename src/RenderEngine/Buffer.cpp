@@ -1,13 +1,10 @@
 #include "Buffer.hpp"
 
-#include <utility>
 #include <volk.h>
 
 #include "Image.hpp"
 
-Buffer::Buffer(const GraphicsDevice& device, std::string name) : device(device), _name(std::move(name)) {}
-
-Buffer::Buffer(const GraphicsDevice& device, std::string name, const std::size_t size, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage) : Buffer(device, std::move(name)) {
+Buffer::Buffer(const GraphicsDevice& device, const std::string& name, const std::size_t size, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage) : Resource(Resource::Buffer, device) {
   const VkBufferCreateInfo bufferCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext                 = nullptr,
@@ -22,17 +19,17 @@ Buffer::Buffer(const GraphicsDevice& device, std::string name, const std::size_t
       .usage = memoryUsage,
       .pUserData = this,
   };
-  GraphicsInstance::showError(vmaCreateBuffer(device.allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo), "Failed to create buffer [" + _name + "].");
-  vmaSetAllocationName(device.allocator, allocation, _name.c_str());
+  GraphicsInstance::showError(vmaCreateBuffer(device.allocator, &bufferCreateInfo, &allocationCreateInfo, &_buffer, &allocation, &allocationInfo), "Failed to create buffer [" + name + "].");
+  vmaSetAllocationName(device.allocator, allocation, name.c_str());
 }
 
 Buffer::~Buffer() {
-  vmaDestroyBuffer(device.allocator, buffer, allocation);
-  buffer     = VK_NULL_HANDLE;
+  vmaDestroyBuffer(device.allocator, _buffer, allocation);
+  _buffer     = VK_NULL_HANDLE;
   allocation = VK_NULL_HANDLE;
 }
 
-void Buffer::copyTo(const Image* image, const VkImageLayout imageLayout) const {
+void Buffer::copyTo(const class Image* image, const VkImageLayout imageLayout) const {
   VkCommandBuffer commandBuffer = device.getOneShotCommandBuffer();
   const VkBufferImageCopy wholeRegion {
     .bufferOffset      = 0,
@@ -51,7 +48,7 @@ void Buffer::copyTo(const Image* image, const VkImageLayout imageLayout) const {
     },
     .imageExtent = image->extent()
   };
-  vkCmdCopyBufferToImage(commandBuffer, buffer, image->image(), imageLayout, 1, &wholeRegion);
+  vkCmdCopyBufferToImage(commandBuffer, _buffer, image->image(), imageLayout, 1, &wholeRegion);
   VkFence fence = device.submitOneShotCommandBuffer(commandBuffer);
   vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
   vkFreeCommandBuffers(device.device, device.commandPool, 1, &commandBuffer);
@@ -60,14 +57,26 @@ void Buffer::copyTo(const Image* image, const VkImageLayout imageLayout) const {
 
 void Buffer::copyTo(const Buffer* other) const {
   VkCommandBuffer commandBuffer = device.getOneShotCommandBuffer();
-  const VkBufferCopy wholeRegion {
-    .srcOffset = 0,
-    .dstOffset = 0,
-    .size = allocationInfo.size
+  const VkBufferCopy wholeRegion{
+      .srcOffset = 0,
+      .dstOffset = 0,
+      .size      = allocationInfo.size
   };
-  vkCmdCopyBuffer(commandBuffer, buffer, other->buffer, 1, &wholeRegion);
+  vkCmdCopyBuffer(commandBuffer, _buffer, other->_buffer, 1, &wholeRegion);
   VkFence fence = device.submitOneShotCommandBuffer(commandBuffer);
   vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
   vkFreeCommandBuffers(device.device, device.commandPool, 1, &commandBuffer);
   vkDestroyFence(device.device, fence, nullptr);
+}
+
+VkBuffer Buffer::buffer() const {
+  return _buffer;
+}
+
+void* Buffer::getObject() const {
+  return _buffer;
+}
+
+void* Buffer::getView() const {
+  return _view;
 }

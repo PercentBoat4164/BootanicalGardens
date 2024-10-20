@@ -1,5 +1,7 @@
 #pragma once
 
+class GraphicsDevice;
+
 class Resource {
 public:
   enum Type {
@@ -7,7 +9,9 @@ public:
     Buffer
   } type;
 
-  explicit Resource(const Type type) : type(type) {}
+  const GraphicsDevice& device;
+
+  explicit Resource(const Type type, const GraphicsDevice& device) : type(type), device(device) {}
   virtual ~Resource();
 
   [[nodiscard]] virtual void* getObject() const = 0;

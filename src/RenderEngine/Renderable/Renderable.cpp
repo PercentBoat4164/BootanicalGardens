@@ -14,6 +14,7 @@ Renderable::Renderable(const GraphicsDevice& device, yyjson_val* val) : device(d
 }
 
 void Renderable::loadData(fastgltf::GltfDataGetter& dataGetter) {
+  fastgltf::Asset asset;
   {
     fastgltf::Parser parser(static_cast<fastgltf::Extensions>(0xffffff1));  // Enables all extensions because we do not know which extensions this file will require.
     fastgltf::Expected<fastgltf::Asset> gltfAsset = parser.loadGltf(dataGetter, std::filesystem::canonical("../res"), fastgltf::Options::GenerateMeshIndices);

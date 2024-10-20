@@ -26,8 +26,8 @@ class Shader {
       yyjson_mut_val* m;
       yyjson_val* i;
     } val;
-    ReadWriteJson(yyjson_mut_doc* const doc, yyjson_mut_val* val) : doc(doc), val(val), isMutable(true) {}
-    ReadWriteJson(yyjson_doc* const doc, yyjson_val* val) : doc(reinterpret_cast<yyjson_mut_doc* const>(doc)), val(reinterpret_cast<yyjson_mut_val*>(val)), isMutable(false) {}
+    ReadWriteJson(yyjson_mut_doc* const doc, yyjson_mut_val* val) : isMutable(true), doc(doc), val(val) {}
+    ReadWriteJson(yyjson_doc* const doc, yyjson_val* val) : isMutable(false), doc(reinterpret_cast<yyjson_mut_doc* const>(doc)), val(reinterpret_cast<yyjson_mut_val*>(val)) {}
   } json;
 
   std::string contents;

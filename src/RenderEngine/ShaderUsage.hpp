@@ -7,7 +7,7 @@
 
 
 class GraphicsDevice;
-class Renderer;
+class RenderGraph;
 class Shader;
 class Resource;
 
@@ -17,5 +17,5 @@ public:
   std::unordered_map<std::string, Resource&> resources;
   VkDescriptorSet set{VK_NULL_HANDLE};
 
-  explicit ShaderUsage(const GraphicsDevice& device, const Shader& shader, const std::unordered_map<std::string, Resource&>& resources, const Renderer& renderer);
+  explicit ShaderUsage(const GraphicsDevice& device, const Shader& shader, const std::unordered_map<std::string, Resource&>& resources, const RenderGraph& renderer);
 };

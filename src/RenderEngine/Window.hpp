@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GraphicsInstance.hpp"
-#include "Renderer.hpp"
+#include "RenderGraph.hpp"
 
 #include <VkBootstrap.h>
 
@@ -20,7 +20,7 @@ class Window {
   uint32_t getImage(VkSemaphore swapchainSemaphore);
 
 public:
-  Renderer renderer;
+  RenderGraph renderer;
 
   static SDL_Window* initialize();
   static void cleanupInitialization(SDL_Window* window);

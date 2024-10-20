@@ -13,8 +13,8 @@ class Vertex;
 
 class Mesh {
   VkPrimitiveTopology topology{VK_PRIMITIVE_TOPOLOGY_MAX_ENUM};
-  std::vector<Vertex> vertices{};
-  std::vector<uint32_t> indices{};
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
   Material* material{nullptr};
   Buffer* vertexBuffer{nullptr};
   Buffer* indexBuffer{nullptr};

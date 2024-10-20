@@ -11,7 +11,6 @@ class Light;
 
 class Renderable {
   const GraphicsDevice& device;
-  fastgltf::Asset asset;
   std::vector<Mesh*> meshes;
 
 public:
