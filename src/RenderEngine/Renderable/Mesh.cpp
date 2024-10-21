@@ -6,8 +6,9 @@
 #include "src/RenderEngine/Buffer.hpp"
 
 #include <fastgltf/glm_element_traits.hpp>
+#include <src/RenderEngine/CommandBuffer.hpp>
 
-Mesh::Mesh(const GraphicsDevice& device, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) : material(primitive.materialIndex.has_value() ? new Material(device, asset, asset.materials[primitive.materialIndex.value()]) : nullptr) {
+Mesh::Mesh(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) : material(primitive.materialIndex.has_value() ? new Material(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : nullptr) {
   // Determine this mesh's topology
   switch (primitive.type) {
     case fastgltf::PrimitiveType::Points: topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
@@ -37,26 +38,23 @@ Mesh::Mesh(const GraphicsDevice& device, const fastgltf::Asset& asset, const fas
       default: break;  /**@todo Log this unknown attribute.*/
     }
   }
-  const Buffer vertexBufferTemp{device, "vertex upload buffer", vertices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU};
-  vertexBuffer = new Buffer{device, "vertex buffer", vertices.size() * sizeof(Vertex), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY};
-  vertexBufferTemp.copyTo(vertexBuffer);
+  auto vertexBufferTemp = std::make_shared<Buffer>(device, "vertex upload buffer", vertices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  vertexBuffer = std::make_shared<Buffer>(device, "vertex buffer", vertexBufferTemp->size(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+  std::vector<VkBufferCopy> regions{{
+    .srcOffset = 0,
+    .dstOffset = 0,
+    .size      = vertexBuffer->size() - 8
+  }};
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(vertexBufferTemp, vertexBuffer, regions);
 
   // If this is an indexed mesh build the index buffer
   if (!primitive.indicesAccessor.has_value()) {
     auto& accessor = asset.accessors[primitive.indicesAccessor.value()];
     indices.resize(accessor.count);
     fastgltf::copyFromAccessor<decltype(indices)::value_type>(asset, accessor, indices.data());
-    const Buffer indexBufferTemp{device, "index upload buffer", indices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT};
-    indexBuffer = new Buffer{device, "index upload buffer", indices.size() * sizeof(Vertex), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY};
-    indexBufferTemp.copyTo(indexBuffer);
+    auto indexBufferTemp = std::make_shared<Buffer>(device, "index upload buffer", indices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    indexBuffer = std::make_shared<Buffer>(device, "index upload buffer", indexBufferTemp->size(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+    regions[0].size = indexBuffer->size() - 8;
+    commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
-}
-
-Mesh::~Mesh() {
-  delete material;
-  material = nullptr;
-  delete vertexBuffer;
-  vertexBuffer = nullptr;
-  delete indexBuffer;
-  indexBuffer = nullptr;
 }

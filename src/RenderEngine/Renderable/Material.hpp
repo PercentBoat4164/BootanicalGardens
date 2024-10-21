@@ -6,6 +6,7 @@
 
 class Texture;
 class GraphicsDevice;
+class CommandBuffer;
 
 class Material {
   bool doubleSided;
@@ -16,28 +17,27 @@ class Material {
   float ior;
   float dispersion;
 
-  Texture* albedoTexture{nullptr};
+  std::shared_ptr<Texture> albedoTexture{nullptr};
   glm::vec4 albedoFactor;
 
-  Texture* normalTexture{nullptr};
+  std::shared_ptr<Texture> normalTexture{nullptr};
   float normalFactor;
 
-  Texture* occlusionTexture{nullptr};
+  std::shared_ptr<Texture> occlusionTexture{nullptr};
   float occlusionFactor;
 
-  Texture* emissiveTexture{nullptr};
+  std::shared_ptr<Texture> emissiveTexture{nullptr};
   glm::vec3 emissiveFactor;
 
-  Texture* anisotropyTexture{nullptr};
+  std::shared_ptr<Texture> anisotropyTexture{nullptr};
   float anisotropyFactor;
   float anisotropyRotation;
 
-  Texture* metallicRoughnessTexture{nullptr};
+  std::shared_ptr<Texture> metallicRoughnessTexture{nullptr};
   float metallicFactor;
   float roughnessFactor;
 
 public:
-  Material(const GraphicsDevice& device, const fastgltf::Asset& asset, const fastgltf::Material& material);
-  ~Material();
+  Material(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
 };
 

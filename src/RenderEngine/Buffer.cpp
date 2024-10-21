@@ -1,7 +1,5 @@
 #include "Buffer.hpp"
 
-#include <volk.h>
-
 #include "Image.hpp"
 
 Buffer::Buffer(const GraphicsDevice& device, const std::string& name, const std::size_t size, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage) : Resource(Resource::Buffer, device) {
@@ -29,48 +27,12 @@ Buffer::~Buffer() {
   allocation = VK_NULL_HANDLE;
 }
 
-void Buffer::copyTo(const class Image* image, const VkImageLayout imageLayout) const {
-  VkCommandBuffer commandBuffer = device.getOneShotCommandBuffer();
-  const VkBufferImageCopy wholeRegion {
-    .bufferOffset      = 0,
-    .bufferRowLength   = 0,
-    .bufferImageHeight = 0,
-    .imageSubresource  = VkImageSubresourceLayers {
-      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-      .mipLevel       = 0,
-      .baseArrayLayer = 0,
-      .layerCount     = 1,
-    },
-    .imageOffset = VkOffset3D {
-      .x = 0,
-      .y = 0,
-      .z = 0,
-    },
-    .imageExtent = image->extent()
-  };
-  vkCmdCopyBufferToImage(commandBuffer, _buffer, image->image(), imageLayout, 1, &wholeRegion);
-  VkFence fence = device.submitOneShotCommandBuffer(commandBuffer);
-  vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
-  vkFreeCommandBuffers(device.device, device.commandPool, 1, &commandBuffer);
-  vkDestroyFence(device.device, fence, nullptr);
-}
-
-void Buffer::copyTo(const Buffer* other) const {
-  VkCommandBuffer commandBuffer = device.getOneShotCommandBuffer();
-  const VkBufferCopy wholeRegion{
-      .srcOffset = 0,
-      .dstOffset = 0,
-      .size      = allocationInfo.size
-  };
-  vkCmdCopyBuffer(commandBuffer, _buffer, other->_buffer, 1, &wholeRegion);
-  VkFence fence = device.submitOneShotCommandBuffer(commandBuffer);
-  vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
-  vkFreeCommandBuffers(device.device, device.commandPool, 1, &commandBuffer);
-  vkDestroyFence(device.device, fence, nullptr);
-}
-
 VkBuffer Buffer::buffer() const {
   return _buffer;
+}
+
+uint64_t Buffer::size() const {
+  return allocationInfo.size;
 }
 
 void* Buffer::getObject() const {

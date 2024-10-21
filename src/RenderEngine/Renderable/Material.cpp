@@ -6,6 +6,8 @@
 #include "Texture.hpp"
 #include "src/RenderEngine/Buffer.hpp"
 
+#include <src/RenderEngine/CommandBuffer.hpp>
+
 const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::DataSource& source, size_t* size) {
   return std::visit(fastgltf::visitor {
         [&size](const auto& arg) -> const std::byte* {
@@ -25,7 +27,7 @@ const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::
       }, source);
 }
 
-template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void loadTexture(const GraphicsDevice& device, const fastgltf::Asset& asset, Texture** texture, const fastgltf::Optional<T>* textureInfo) {
+template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void loadTexture(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
   if (!textureInfo->has_value()) return;
   const fastgltf::Optional<unsigned long>& imageIndex = asset.textures[textureInfo->value().textureIndex].imageIndex;
   if (!imageIndex.has_value()) return;
@@ -35,7 +37,7 @@ template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void l
   SDL_RWops* io = SDL_RWFromMem(bytes, static_cast<int>(size));
   SDL_Surface* surface = IMG_Load_RW(io, true);
   const std::vector textureBytes(static_cast<std::byte*>(surface->pixels), static_cast<std::byte*>(surface->pixels) + surface->w * surface->h * surface->format->BytesPerPixel);
-  const Buffer buffer{device, std::string{image.name + " upload buffer"}, textureBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU};
+  auto buffer = std::make_shared<Buffer>(device, std::string{image.name + " upload buffer"}, textureBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   VkFormat format;
   switch (static_cast<SDL_PixelFormatEnum>(surface->format->format)) {
     case SDL_PIXELFORMAT_ARGB4444: format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT; break;
@@ -59,13 +61,25 @@ template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void l
     case SDL_PIXELFORMAT_ARGB2101010: format = VK_FORMAT_A2R10G10B10_UNORM_PACK32; break;
     default: format = VK_FORMAT_UNDEFINED;
   }
-  *texture = new Texture(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  (*texture)->transitionToLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  buffer.copyTo(*texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  *texture = std::make_shared<Texture>(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  std::vector<VkBufferImageCopy> regions{{
+    .bufferOffset      = 0,
+    .bufferRowLength   = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource  = VkImageSubresourceLayers {
+      .aspectMask     = (*texture)->aspect(),
+      .mipLevel       = 0,
+      .baseArrayLayer = 0,
+      .layerCount     = (*texture)->layerCount(),
+    },
+    .imageOffset = {},
+    .imageExtent = (*texture)->extent()
+  }};
+  commandBuffer.record<CommandBuffer::CopyBufferToImage>(buffer, *texture, regions);
   SDL_FreeSurface(surface);
 }
 
-Material::Material(const GraphicsDevice& device, const fastgltf::Asset& asset, const fastgltf::Material& material) :
+Material::Material(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) :
     doubleSided(material.doubleSided),
     alphaMode(material.alphaMode),
     alphaCutoff(material.alphaCutoff),
@@ -80,31 +94,16 @@ Material::Material(const GraphicsDevice& device, const fastgltf::Asset& asset, c
     anisotropyRotation(material.anisotropy ? material.anisotropy->anisotropyRotation : 0.f),
     metallicFactor(material.pbrData.metallicFactor),
     roughnessFactor(material.pbrData.roughnessFactor) {
-  /**@todo This could be immensely sped up using multi-threading, and by recording all commands to a single command buffer or submitting all command buffers at once, and by using a dedicated transfer queue for these operations.
+  /**@todo This could be immensely sped up using multi-threading (most lucrative option because most time is spent on the CPU in loadTexture calls) and by using a dedicated transfer queue for these operations.
    *    I refrained from doing these things for two reasons:
    *    - I do not know what the multi-threading of this game is going to look like yet, and I am not ready to make that decision (especially without Ethan).
    *    - I am aiming for speed of development. I just want to make this work for now, hence this comment reminding myself to improve this later.
    *      - Fixing the way that command buffers are handled should be almost trivial. The only tricky part is retaining all the temporary buffers until the commands have finished then properly destroying them.
    */
-  loadTexture<decltype(material.pbrData.baseColorTexture)::value_type>(device, asset,         &albedoTexture,            &material.pbrData.baseColorTexture);
-  loadTexture<decltype(material.normalTexture)::value_type>(device, asset,                    &normalTexture,            &material.normalTexture);
-  loadTexture<decltype(material.occlusionTexture)::value_type>(device, asset,                 &occlusionTexture,         &material.occlusionTexture);
-  loadTexture<decltype(material.emissiveTexture)::value_type>(device, asset,                  &emissiveTexture,          &material.emissiveTexture);
-  if (material.anisotropy) loadTexture<decltype(material.anisotropy->anisotropyTexture)::value_type>(device, asset, &anisotropyTexture, &material.anisotropy->anisotropyTexture);
-  loadTexture<decltype(material.pbrData.metallicRoughnessTexture)::value_type>(device, asset, &metallicRoughnessTexture, &material.pbrData.metallicRoughnessTexture);
-}
-
-Material::~Material() {
-  delete albedoTexture;
-  albedoTexture = nullptr;
-  delete normalTexture;
-  normalTexture = nullptr;
-  delete occlusionTexture;
-  occlusionTexture = nullptr;
-  delete emissiveTexture;
-  emissiveTexture = nullptr;
-  delete anisotropyTexture;
-  anisotropyTexture = nullptr;
-  delete metallicRoughnessTexture;
-  metallicRoughnessTexture = nullptr;
+  loadTexture<decltype(material.pbrData.baseColorTexture)::value_type>(device, commandBuffer, asset, &albedoTexture, &material.pbrData.baseColorTexture);
+  loadTexture<decltype(material.normalTexture)::value_type>(device, commandBuffer, asset, &normalTexture, &material.normalTexture);
+  loadTexture<decltype(material.occlusionTexture)::value_type>(device, commandBuffer, asset, &occlusionTexture, &material.occlusionTexture);
+  loadTexture<decltype(material.emissiveTexture)::value_type>(device, commandBuffer, asset, &emissiveTexture, &material.emissiveTexture);
+  if (material.anisotropy) loadTexture<decltype(material.anisotropy->anisotropyTexture)::value_type>(device, commandBuffer, asset, &anisotropyTexture, &material.anisotropy->anisotropyTexture);
+  loadTexture<decltype(material.pbrData.metallicRoughnessTexture)::value_type>(device, commandBuffer, asset, &metallicRoughnessTexture, &material.pbrData.metallicRoughnessTexture);
 }

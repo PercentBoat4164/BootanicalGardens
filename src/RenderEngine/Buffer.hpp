@@ -29,10 +29,8 @@ public:
   template<typename T> explicit Buffer(const GraphicsDevice& device, std::string name, const std::vector<T>& data, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
   ~Buffer() override;
 
-  void copyTo(const class Image* image, VkImageLayout imageLayout) const;
-  void copyTo(const Buffer* other) const;
-
   [[nodiscard]] VkBuffer buffer() const;
+  [[nodiscard]] uint64_t size() const;
 
 private:
   [[nodiscard]] void* getObject() const override;
@@ -44,7 +42,7 @@ private:
 
 template <typename T> Buffer::Buffer(const GraphicsDevice& device, std::string name, const std::size_t size, const T* data, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage) : Buffer(device, std::move(name), size * sizeof(T), usage, memoryUsage) {
   void* memory;
-  GraphicsInstance::showError(vmaMapMemory(device.allocator, allocation, &memory), "Failed to map buffer [" + std::string(allocationInfo.pName) + "] memory.");
+  GraphicsInstance::showError(vmaMapMemory(device.allocator, allocation, &memory), "Failed to map buffer [" + name + "] memory.");
   std::memcpy(memory, data, size * sizeof(T));
   vmaUnmapMemory(device.allocator, allocation);
 }

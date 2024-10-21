@@ -73,33 +73,6 @@ void Image::buildInPlace(const VkFormat format, const VkExtent3D extent, const V
   GraphicsInstance::showError(vkCreateImageView(device.device, &imageViewCreateInfo, nullptr, &_view), "Failed to create image view.");
 }
 
-void Image::transitionToLayout(const VkImageLayout oldLayout, const VkImageLayout newLayout) const {
-  VkCommandBuffer commandBuffer = device.getOneShotCommandBuffer();
-  const VkImageMemoryBarrier imageMemoryBarrier {
-    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-    .pNext = nullptr,
-    .srcAccessMask = VK_ACCESS_NONE,
-    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .oldLayout = oldLayout,
-    .newLayout = newLayout,
-    .srcQueueFamilyIndex = device.globalQueueFamilyIndex,
-    .dstQueueFamilyIndex = device.globalQueueFamilyIndex,
-    .image = _image,
-    .subresourceRange = VkImageSubresourceRange {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel = 0,
-      .levelCount = 1,
-      .baseArrayLayer = 0,
-      .layerCount = 1
-    },
-  };
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-  VkFence fence = device.submitOneShotCommandBuffer(commandBuffer);
-  vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
-  vkFreeCommandBuffers(device.device, device.commandPool, 1, &commandBuffer);
-  vkDestroyFence(device.device, fence, nullptr);
-}
-
 VkImage Image::image() const {
   return _image;
 }

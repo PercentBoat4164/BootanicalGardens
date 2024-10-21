@@ -38,8 +38,6 @@ public:
 
   void buildInPlace(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits samples=VK_SAMPLE_COUNT_1_BIT);
 
-  void transitionToLayout(VkImageLayout oldLayout, VkImageLayout newLayout) const;
-
   [[nodiscard]] VkImage image() const;
   [[nodiscard]] VkExtent3D extent() const;
   [[nodiscard]] VkImageView view() const;
@@ -48,6 +46,10 @@ public:
   [[nodiscard]] VkImageAspectFlags aspect() const;
   [[nodiscard]] uint32_t mipLevels() const;
   [[nodiscard]] uint32_t layerCount() const;
+
+private:
+  [[nodiscard]] void* getObject() const override;
+  [[nodiscard]] void* getView() const override;
 
   static VkImageAspectFlags aspectFromFormat(VkFormat format) {
     switch (format) {
@@ -313,8 +315,4 @@ public:
         return VK_IMAGE_ASPECT_NONE;
     }
   }
-
-private:
-  [[nodiscard]] void* getObject() const override;
-  [[nodiscard]] void* getView() const override;
 };
