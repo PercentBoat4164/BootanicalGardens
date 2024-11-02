@@ -47,6 +47,6 @@ Entity& LevelParser::loadEntity(yyjson_val* entityData) {
 
 void LevelParser::loadLevel(const std::filesystem::path& filename) {
   yyjson_read_err error;
-  doc = yyjson_read_file(filename.c_str(), YYJSON_READ_ALLOW_INF_AND_NAN, nullptr, &error);
+  doc = yyjson_read_file(filename.string().c_str(), YYJSON_READ_ALLOW_INF_AND_NAN, nullptr, &error);
   if (doc == nullptr) { /**@todo Read `error`.*/ }
 }

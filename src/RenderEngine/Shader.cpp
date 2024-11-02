@@ -102,7 +102,7 @@ void Shader::buildBlob(const std::filesystem::path& sourcePath) {
   shaderc::CompileOptions options;
 
   shaderc_shader_kind shaderKind;
-  switch (Tools::hash(sourcePath.extension())) {
+  switch (Tools::hash(sourcePath.extension().string())) {
     case Tools::hash(".hlsl"):
     case Tools::hash(".glsl"): shaderKind = shaderc_glsl_infer_from_source; break;
     case Tools::hash(".vert"): shaderKind = shaderc_glsl_default_vertex_shader; break;

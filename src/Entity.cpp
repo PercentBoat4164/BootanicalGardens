@@ -10,6 +10,12 @@ std::unordered_map<std::string, void*> Entity::componentConstructors {
   {"Plant", reinterpret_cast<void*>(&Plant::create)},
 };
 
+bool Entity::registerComponentConstructor(const std::string& name, void* function) {
+  if (componentConstructors.find(name) != componentConstructors.end()) return false;
+  componentConstructors.insert({name, function});
+  return true;
+}
+
 Entity::Entity(std::uint64_t id, glm::vec3 position, glm::dquat rotation, glm::vec3 scale)
     : id(id), position(position), rotation(rotation), scale(scale) {}
 

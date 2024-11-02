@@ -30,7 +30,7 @@ CommandBuffer::CopyBufferToImage::CopyBufferToImage(std::shared_ptr<Buffer> src,
     regions(std::move(regions)) {}
 CommandBuffer::CopyBufferToImage* CommandBuffer::CopyBufferToImage::polymorphicCopy() { return new CopyBufferToImage{*this}; }
 void CommandBuffer::CopyBufferToImage::bake(VkCommandBuffer commandBuffer, States& states) {
-  vkCmdCopyBufferToImage(commandBuffer, src->buffer(), dst->image(), states[dst->image()].layout, regions.size(), regions.data());
+  vkCmdCopyBufferToImage(commandBuffer, src->buffer(), dst->image(), states[reinterpret_cast<void*>(dst->image())].layout, regions.size(), regions.data());
 }
 
 CommandBuffer::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<Image> src, std::shared_ptr<Buffer> dst, std::vector<VkBufferImageCopy> regions) :
@@ -41,7 +41,7 @@ CommandBuffer::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<Image> src, 
     regions(std::move(regions)) {}
 CommandBuffer::CopyImageToBuffer* CommandBuffer::CopyImageToBuffer::polymorphicCopy() { return new CopyImageToBuffer{*this}; }
 void CommandBuffer::CopyImageToBuffer::bake(VkCommandBuffer commandBuffer, States& states) {
-  vkCmdCopyImageToBuffer(commandBuffer, src->image(), states[src->image()].layout, dst->buffer(), regions.size(), regions.data());
+  vkCmdCopyImageToBuffer(commandBuffer, src->image(), states[reinterpret_cast<void*>(src->image())].layout, dst->buffer(), regions.size(), regions.data());
 }
 
 CommandBuffer::CopyImageToImage::CopyImageToImage(std::shared_ptr<Image> src, std::shared_ptr<Image> dst, std::vector<VkImageCopy> regions) :
@@ -54,7 +54,7 @@ CommandBuffer::CopyImageToImage::CopyImageToImage(std::shared_ptr<Image> src, st
     regions(std::move(regions)) {}
 CommandBuffer::CopyImageToImage* CommandBuffer::CopyImageToImage::polymorphicCopy() { return new CopyImageToImage{*this}; }
 void CommandBuffer::CopyImageToImage::bake(VkCommandBuffer commandBuffer, States& states) {
-  vkCmdCopyImage(commandBuffer, src->image(), states[src->image()].layout, dst->image(), states[dst->image()].layout, regions.size(), regions.data());
+  vkCmdCopyImage(commandBuffer, src->image(), states[reinterpret_cast<void*>(src->image())].layout, dst->image(), states[reinterpret_cast<void*>(dst->image())].layout, regions.size(), regions.data());
 }
 
 CommandBuffer::PipelineBarrier::PipelineBarrier(const VkPipelineStageFlags srcStageMask, const VkPipelineStageFlags dstStageMask, const VkDependencyFlags dependencyFlags, std::vector<VkMemoryBarrier> memoryBarriers, std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers, std::vector<VkImageMemoryBarrier> imageMemoryBarriers) :
@@ -68,7 +68,7 @@ CommandBuffer::PipelineBarrier::PipelineBarrier(const VkPipelineStageFlags srcSt
 CommandBuffer::PipelineBarrier* CommandBuffer::PipelineBarrier::polymorphicCopy() { return new PipelineBarrier{*this}; }
 void CommandBuffer::PipelineBarrier::bake(VkCommandBuffer commandBuffer, States& states) {
   for (const auto& imageMemoryBarrier: imageMemoryBarriers)
-    states[imageMemoryBarrier.image].layout = imageMemoryBarrier.newLayout;
+    states[reinterpret_cast<void*>(imageMemoryBarrier.image)].layout = imageMemoryBarrier.newLayout;
   vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarriers.size(), memoryBarriers.data(), bufferMemoryBarriers.size(), bufferMemoryBarriers.data(), imageMemoryBarriers.size(), imageMemoryBarriers.data());
 }
 

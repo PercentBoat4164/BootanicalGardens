@@ -2,7 +2,7 @@
 
 #include "src/Game/Game.hpp"
 
-#include <SDL/SDL.h>
+#include <SDL2/SDL.h>
 #include <ranges>
 
 std::unordered_map<Input::KeyCode, float> Input::keys{};
@@ -131,7 +131,7 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_F11: code = F11; break;
       case SDLK_F12: code = F12; break;
 //      case SDLK_PRINTSCREEN: code = PRINT_SCREEN; break;
-      case SDLK_SCROLLOCK: code = SCROLL_LOCK; break;
+//      case SDLK_SCROLLOCK: code = SCROLL_LOCK; break;
       case SDLK_PAUSE: code = PAUSE; break;
       case SDLK_INSERT: code = INSERT; break;
       case SDLK_HOME: code = HOME; break;
@@ -148,16 +148,16 @@ void Input::onEvent(SDL_Event& event) {
       case SDLK_KP_MINUS: code = KEYPAD_MINUS; break;
       case SDLK_KP_PLUS: code = KEYPAD_PLUS; break;
       case SDLK_KP_ENTER: code = KEYPAD_ENTER; break;
-      case SDLK_KP1: code = KEYPAD_1; break;
-      case SDLK_KP2: code = KEYPAD_2; break;
-      case SDLK_KP3: code = KEYPAD_3; break;
-      case SDLK_KP4: code = KEYPAD_4; break;
-      case SDLK_KP5: code = KEYPAD_5; break;
-      case SDLK_KP6: code = KEYPAD_6; break;
-      case SDLK_KP7: code = KEYPAD_7; break;
-      case SDLK_KP8: code = KEYPAD_8; break;
-      case SDLK_KP9: code = KEYPAD_9; break;
-      case SDLK_KP0: code = KEYPAD_0; break;
+//      case SDLK_KP1: code = KEYPAD_1; break;
+//      case SDLK_KP2: code = KEYPAD_2; break;
+//      case SDLK_KP3: code = KEYPAD_3; break;
+//      case SDLK_KP4: code = KEYPAD_4; break;
+//      case SDLK_KP5: code = KEYPAD_5; break;
+//      case SDLK_KP6: code = KEYPAD_6; break;
+//      case SDLK_KP7: code = KEYPAD_7; break;
+//      case SDLK_KP8: code = KEYPAD_8; break;
+//      case SDLK_KP9: code = KEYPAD_9; break;
+//      case SDLK_KP0: code = KEYPAD_0; break;
       case SDLK_KP_PERIOD: code = KEYPAD_PERIOD; break;
 //      case SDLK_APPLICATION: code = APPLICATION; break;
       case SDLK_POWER: code = POWER; break;

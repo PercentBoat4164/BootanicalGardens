@@ -36,9 +36,9 @@ uint64_t Buffer::size() const {
 }
 
 void* Buffer::getObject() const {
-  return _buffer;
+  return reinterpret_cast<void*>(_buffer);
 }
 
 void* Buffer::getView() const {
-  return _view;
+  return reinterpret_cast<void*>(_view);
 }

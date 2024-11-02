@@ -19,7 +19,6 @@ bool Game::tick() {
       case SDL_KEYUP: Input::onEvent(e); break;
     }
   }
-
   time = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
   Input::onTick();
   return !shouldQuit;
