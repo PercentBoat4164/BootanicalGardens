@@ -7,6 +7,6 @@ void Plant::onTick() {
   // Eats ghosts?
 }
 
-std::unique_ptr<Component> Plant::create(std::uint64_t id, const Entity& entity) {
+std::unique_ptr<Component> Plant::create(std::uint64_t id, const Entity& entity, yyjson_val* obj) {
   return std::make_unique<Plant>(id, entity);
 }

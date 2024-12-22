@@ -8,7 +8,8 @@ find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 set(CPM_SOURCE_CACHE external)
 include(cmake/CPM.cmake)
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap#v${Vulkan_VERSION}")
-CPMAddPackage("gh:libsdl-org/SDL#release-2.30.7")
+#@todo: Update SDL to version 3 when SDL_ttf has tags for a compatible version
+CPMAddPackage("gh:libsdl-org/SDL#release-2.30.10")
 CPMAddPackage("gh:libsdl-org/SDL_ttf#release-2.22.0")
 CPMAddPackage("gh:libsdl-org/SDL_image#release-2.8.2")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.6")
@@ -27,6 +28,7 @@ CPMAddPackage(
         OPTIONS CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON # Workaround for glm bug #1279
 )
 CPMAddPackage("gh:ibireme/yyjson#0.10.0")
+CPMAddPackage("gh:SpartanJ/efsw#1.4.0")
 
 add_executable(BootanicalGardens
         src/Component.cpp
@@ -60,11 +62,13 @@ add_executable(BootanicalGardens
         src/Tools/StringHash.h
 
         ${SPIRV-Reflect_SOURCE_DIR}/spirv_reflect.c
+        src/Filesystem/UpdateListener.cpp
+        src/Filesystem/UpdateListener.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
 target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR} ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR})
-target_link_libraries(BootanicalGardens PRIVATE volk::volk_headers vk-bootstrap::vk-bootstrap SDL2 SDL2_ttf SDL2_image GPUOpen::VulkanMemoryAllocator Vulkan::shaderc_combined glm::glm yyjson fastgltf)
+target_link_libraries(BootanicalGardens PRIVATE volk::volk_headers vk-bootstrap::vk-bootstrap SDL2 SDL2_ttf SDL2_image GPUOpen::VulkanMemoryAllocator Vulkan::shaderc_combined glm::glm yyjson fastgltf efsw)
 target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
 
 # Move all .dlls to the exe

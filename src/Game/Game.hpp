@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Entity.hpp"
+#include "src/Entity.hpp"
 
 #include <chrono>
 #include <memory>
@@ -22,7 +22,7 @@ public:
    */
   template<typename... Args> requires std::constructible_from<Entity, std::uint64_t, Args...> static Entity& addEntity(Args&&... args) {
     ++nextEntityId;
-    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(nextEntityId), std::forward_as_tuple(nextEntityId, std::forward<Args>(args)...)).first->second;
+    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(nextEntityId), std::forward_as_tuple(nextEntityId, std::forward<Args&&>(args)...)).first->second;
   }
 
   /**

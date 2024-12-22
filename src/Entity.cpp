@@ -5,12 +5,12 @@
 
 #include <yyjson.h>
 
-std::unordered_map<std::string, void*> Entity::componentConstructors {
-  {"PlayerController", reinterpret_cast<void*>(&PlayerController::create)},
-  {"Plant", reinterpret_cast<void*>(&Plant::create)},
+std::unordered_map<std::string, std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> Entity::componentConstructors {
+  {"PlayerController", &PlayerController::create},
+  {"Plant", &Plant::create},
 };
 
-bool Entity::registerComponentConstructor(const std::string& name, void* function) {
+bool Entity::registerComponentConstructor(const std::string& name, std::unique_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*)) {
   if (componentConstructors.find(name) != componentConstructors.end()) return false;
   componentConstructors.insert({name, function});
   return true;
@@ -25,7 +25,7 @@ Entity::Entity(std::uint64_t id, const Entity& other)
 Component* Entity::addComponent(yyjson_val* componentData) {
   auto it = componentConstructors.find(yyjson_get_str(yyjson_obj_get(componentData, "type")));
   if (it == componentConstructors.end()) return nullptr;
-  std::unique_ptr<Component> component = reinterpret_cast<std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)>(it->second)(++nextComponentId, *this, componentData);
+  std::unique_ptr<Component> component = (it->second)(++nextComponentId, *this, componentData);
   return components.emplace(component->getId(), std::move(component)).first->second.get();
 }
 

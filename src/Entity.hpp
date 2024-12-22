@@ -15,7 +15,7 @@
 struct yyjson_val;
 
 class Entity {
-  static std::unordered_map<std::string, void*> componentConstructors;
+  static std::unordered_map<std::string, std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> componentConstructors;
 
   std::unordered_map<uint64_t, std::unique_ptr<Component>> components;
   uint64_t nextComponentId{UINT64_MAX};
@@ -34,10 +34,10 @@ public:
    * @param function the functon to be called
    * @return <c>false</c> if a pre-existing Component Constructor would have been overridden, <c>true</c> otherwise.
    */
-  static bool registerComponentConstructor(const std::string& name, void* function);
+  static bool registerComponentConstructor(const std::string& name, std::unique_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*));
 
   /**
-   * Constructor an empty Entity with the given position, rotation, and scale.
+   * Construct an empty Entity with the given position, rotation, and scale.
    * @param position the initial position of the entity
    * @param rotation the initial orientation
    * @param scale the initial scale

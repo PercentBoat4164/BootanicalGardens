@@ -8,10 +8,10 @@ struct yyjson_val;
 
 class PlayerController : public Component {
 public:
-  explicit PlayerController(std::uint64_t id, const Entity& entity, yyjson_val* initializerObject);
+  explicit PlayerController(std::uint64_t id, const Entity& entity);
   ~PlayerController() override = default;
 
-  static std::unique_ptr<Component> create(std::uint64_t id, const Entity& entity, yyjson_val* i);
+  static std::unique_ptr<Component> create(std::uint64_t id, const Entity& entity, yyjson_val* obj);
 
   void onTick() override;
 };
