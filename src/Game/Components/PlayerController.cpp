@@ -15,6 +15,6 @@ void PlayerController::onTick() {
   }
 }
 
-std::unique_ptr<Component> PlayerController::create(std::uint64_t id, const Entity& entity, yyjson_val* obj) {
-  return std::make_unique<PlayerController>(id, entity);
+std::shared_ptr<Component> PlayerController::create(std::uint64_t id, const Entity& entity, yyjson_val* obj) {
+  return std::make_shared<PlayerController>(id, entity);
 }

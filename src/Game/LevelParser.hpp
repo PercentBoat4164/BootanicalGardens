@@ -33,6 +33,8 @@ public:
 
   /**
    * Loads an entire level from the .json file
+   *
+   * @param filename The path to the .json file
    */
   static void loadLevel(const std::filesystem::path& filename);
 };

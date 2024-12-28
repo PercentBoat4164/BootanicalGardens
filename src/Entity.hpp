@@ -15,9 +15,9 @@
 struct yyjson_val;
 
 class Entity {
-  static std::unordered_map<std::string, std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> componentConstructors;
+  static std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> componentConstructors;
 
-  std::unordered_map<uint64_t, std::unique_ptr<Component>> components;
+  std::unordered_map<uint64_t, std::shared_ptr<Component>> components;
   uint64_t nextComponentId{UINT64_MAX};
   std::uint64_t id;
 
@@ -34,7 +34,7 @@ public:
    * @param function the functon to be called
    * @return <c>false</c> if a pre-existing Component Constructor would have been overridden, <c>true</c> otherwise.
    */
-  static bool registerComponentConstructor(const std::string& name, std::unique_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*));
+  static bool registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*));
 
   /**
    * Construct an empty Entity with the given position, rotation, and scale.
@@ -68,7 +68,7 @@ public:
    * @param args The arguments for the Component's constructor
    */
   template<typename T, typename... Args> requires std::constructible_from<T, uint64_t, const Entity&, Args...> && std::derived_from<T, Component> void addComponent(Args&& ... args) {
-    std::unique_ptr<Component> component = reinterpret_cast<std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, Args...)>(componentConstructors.at(static_cast<std::string>(Tools::className<T>())))(++nextComponentId, *this, std::forward<Args>(args)...);
+    std::shared_ptr<Component> component = reinterpret_cast<std::shared_ptr<Component>(*)(std::uint64_t, const Entity&, Args...)>(componentConstructors.at(static_cast<std::string>(Tools::className<T>())))(++nextComponentId, *this, std::forward<Args>(args)...);
     components.emplace(component->getId(), std::move(component));
   }
 
@@ -99,7 +99,7 @@ public:
   }
 
   template<typename T> requires std::derived_from<T, Component> T* getComponentOfType() {
-    for (std::unique_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) return component;
     return nullptr;
   }
@@ -111,7 +111,7 @@ public:
    */
   template<typename T> requires std::derived_from<T, Component> std::vector<T*> getComponentsOfType() {
     std::vector<T*> requestedComponents;
-    for (std::unique_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) requestedComponents.push_back(component);
     return requestedComponents;
   }

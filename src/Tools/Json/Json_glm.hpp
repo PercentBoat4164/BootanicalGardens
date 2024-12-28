@@ -6,10 +6,11 @@
 #include <glm/gtc/quaternion.hpp>
 
 namespace Tools {
-template<glm::vec3>
+template<>
 glm::vec3 jsonGet(yyjson_val* jsonData, std::string_view key) {
   glm::vec3 out;
   jsonData = yyjson_obj_get(jsonData, key.data());
+  if (jsonData == nullptr) return {};
   assert(yyjson_arr_size(jsonData) == 3);
   out.x = static_cast<float>(yyjson_get_num(yyjson_arr_get(jsonData, 0)));
   out.y = static_cast<float>(yyjson_get_num(yyjson_arr_get(jsonData, 1)));
@@ -17,10 +18,11 @@ glm::vec3 jsonGet(yyjson_val* jsonData, std::string_view key) {
   return out;
 }
 
-template<glm::quat>
+template<>
 glm::quat jsonGet(yyjson_val* jsonData, std::string_view key) {
   glm::quat out;
   jsonData = yyjson_obj_get(jsonData, key.data());
+  if (jsonData == nullptr) return {};
   assert(yyjson_arr_size(jsonData) == 4);
   out.x = static_cast<float>(yyjson_get_num(yyjson_arr_get(jsonData, 0)));
   out.y = static_cast<float>(yyjson_get_num(yyjson_arr_get(jsonData, 1)));

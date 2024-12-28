@@ -11,7 +11,7 @@ public:
   Plant(std::uint64_t id, const Entity& entity);
   ~Plant() override = default;
 
-  static std::unique_ptr<Component> create(std::uint64_t id, const Entity& entity, yyjson_val* obj);
+  static std::shared_ptr<Component> create(std::uint64_t id, const Entity& entity, yyjson_val* obj);
 
   void onTick() override;
 };
