@@ -4,8 +4,9 @@
 
 #include <SDL2/SDL.h>
 #include <ranges>
+#include <iostream>
 
-std::unordered_map<Input::KeyCode, float> Input::keys{};
+std::array<float, Input::KeyCode::KEYCODE_MAX_ENUM> Input::keys{};
 
 /**
  * Handle an event. Should be called for every event
@@ -291,15 +292,22 @@ void Input::onEvent(SDL_Event& event) {
 //      case SDLK_CALL: code = CALL; break;
 //      case SDLK_ENDCALL: code = END_CALL; break;
   }
-  if (event.type == SDL_KEYDOWN) keys[code] = 0;
-  else if (event.type == SDL_KEYUP) keys[code] = -0;
+  if (event.type == SDL_KEYDOWN && !std::signbit(keys[code])) {
+    keys[code] = -0.0f;
+  }
+  else if (event.type == SDL_KEYUP && std::signbit(keys[code]))
+    keys[code] = 0.0f;
 }
 
 /**
  * Update input values that change every tick
  */
 void Input::onTick() {
-  for (float& key : std::ranges::views::values(keys)) key += Game::getTime() * std::abs(key) == key ? 1 : -1;
+  for (float& key : keys)
+    if (std::signbit(key))
+      key -= static_cast<float>(Game::getTickTime());
+    else
+      key += static_cast<float>(Game::getTickTime());
 }
 
 /**
@@ -309,7 +317,7 @@ void Input::onTick() {
  * @return whether the key has been pressed
  */
 bool Input::keyPressed(KeyCode key) {
-  return keys[key] == Game::getTime();
+  return keys[key] == -static_cast<float>(Game::getTickTime());
 }
 
 /**
@@ -321,7 +329,7 @@ bool Input::keyPressed(KeyCode key) {
  */
 float Input::keyDown(KeyCode key) {
   float value = keys[key];
-  return value >= 0 ? value : 0;
+  return value <= -0.0f ? -value : 0;
 }
 
 /**
@@ -331,7 +339,7 @@ float Input::keyDown(KeyCode key) {
  * @return whether the key has been released
  */
 bool Input::keyReleased(KeyCode key) {
-  return keys[key] == -Game::getTime();
+  return keys[key] == static_cast<float>(Game::getTickTime());
 }
 
 /**
@@ -342,5 +350,5 @@ bool Input::keyReleased(KeyCode key) {
  */
 float Input::keyUp(KeyCode key) {
   float value = keys[key];
-  return value <= -0 ? value : 0;
+  return value > 0.0f ? value : 0;
 }

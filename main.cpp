@@ -9,6 +9,8 @@
 #include "src/RenderEngine/Window.hpp"
 
 
+#include <chrono>
+
 int main() {
 
   LevelParser::loadLevel(std::filesystem::canonical("../res/levels/Level1.json"));
@@ -27,7 +29,7 @@ int main() {
       //std::this_thread::sleep_for(std::chrono::milliseconds(10));
    }
   }
-  GraphicsInstance::destroy();*/
+  GraphicsInstance::destroy();
 
   return 0;
 }

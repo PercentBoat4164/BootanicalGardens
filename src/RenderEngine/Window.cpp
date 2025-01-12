@@ -27,7 +27,7 @@ Window::Window(const GraphicsDevice& device) : device{device}, renderer{device} 
   std::vector<VkImage> images = swapchain.get_images().value();
   std::vector<VkImageView> views = swapchain.get_image_views().value();
   for (uint32_t i{}; i < swapchain.image_count; ++i) swapchainImages.emplace_back(device, "swapchainImage" + std::to_string(i), images[i], swapchain.image_format, VkExtent3D{swapchain.extent.width, swapchain.extent.height, 1}, swapchain.image_usage_flags, views[i]);
-  renderer.setup(swapchainImages);
+//  renderer.setup(swapchainImages);
 }
 
 Window::~Window() {

@@ -10,6 +10,7 @@
 class Game {
   static std::unordered_map<std::uint64_t, Entity> entities;
   static double time;
+  static double tickTime;
   static std::uint64_t nextEntityId;
 
 public:
@@ -29,6 +30,12 @@ public:
    * Move the game state forward one tick.
    */
   static bool tick();
+
+  /**
+   * Get the time the last tick took.
+   * @return the time in seconds
+   */
+  static double getTickTime();
 
   /**
    * Get the total time the game has been running.

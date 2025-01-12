@@ -256,11 +256,11 @@ public:
     SOFT_LEFT,
     SOFT_RIGHT,
     CALL,
-    END_CALL
+    END_CALL,
+    KEYCODE_MAX_ENUM
   };
 
 private:
-  static std::unordered_map<KeyCode, float> keys;
 
   static void onEvent(SDL_Event& event);
   static void onTick();
