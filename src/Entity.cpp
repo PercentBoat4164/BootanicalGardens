@@ -5,12 +5,12 @@
 
 #include <yyjson.h>
 
-std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> Entity::componentConstructors {
+std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Entity&, yyjson_val*)> Entity::componentConstructors {
   {"PlayerController", &PlayerController::create},
   {"Plant", &Plant::create},
 };
 
-bool Entity::registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*)) {
+bool Entity::registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*)) {
   if (componentConstructors.find(name) != componentConstructors.end()) return false;
   componentConstructors.insert({name, function});
   return true;

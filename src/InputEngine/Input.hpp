@@ -269,6 +269,7 @@ private:
 public:
   Input() = delete;
 
+  static std::array<float, KeyCode::KEYCODE_MAX_ENUM> keys;
   static bool keyPressed(KeyCode key);
   static float keyDown(KeyCode key);
   static bool keyReleased(KeyCode key);

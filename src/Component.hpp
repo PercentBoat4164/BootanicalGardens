@@ -9,10 +9,10 @@ class Entity;
 class Component {
 protected:
   std::uint64_t id;
-  const Entity& entity;
+  Entity& entity;
 
 public:
-  Component(std::uint64_t id, const Entity& entity);
+  Component(std::uint64_t id, Entity& entity);
   Component(const Component& other)      = default;
   Component(Component&& other) noexcept  = default;
   Component& operator=(const Component&) = delete;

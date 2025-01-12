@@ -21,6 +21,14 @@ bool Game::tick() {
   }
   time = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
   Input::onTick();
+
+  //call onTick for every component in the game
+  //todo: move to systems?
+  for (auto& entityPair : entities) {
+    for(const std::shared_ptr<Component>& component : entityPair.second.getComponents()) {
+      component->onTick();
+    }
+  }
   return !shouldQuit;
 }
 

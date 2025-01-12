@@ -15,7 +15,7 @@
 struct yyjson_val;
 
 class Entity {
-  static std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, const Entity&, yyjson_val*)> componentConstructors;
+  static std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Entity&, yyjson_val*)> componentConstructors;
 
   std::unordered_map<uint64_t, std::shared_ptr<Component>> components;
   uint64_t nextComponentId{UINT64_MAX};
@@ -34,7 +34,7 @@ public:
    * @param function the functon to be called
    * @return <c>false</c> if a pre-existing Component Constructor would have been overridden, <c>true</c> otherwise.
    */
-  static bool registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, const Entity&, yyjson_val*));
+  static bool registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*));
 
   /**
    * Construct an empty Entity with the given position, rotation, and scale.
@@ -114,5 +114,17 @@ public:
     for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) requestedComponents.push_back(component);
     return requestedComponents;
+  }
+
+  /**
+   * Get a vector of shared pointers of all Components in this Entity.
+   * @tparam T Derives from Component
+   * @return a Vector containing shared pointers of all Components of a specific type in this Entity
+   */
+  std::vector<std::shared_ptr<Component>> getComponents() {
+    std::vector<std::shared_ptr<Component>> out;
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+      out.push_back(component);
+    return out;
   }
 };
