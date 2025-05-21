@@ -1,14 +1,20 @@
-#include "Mesh.hpp"
+#include "src/RenderEngine/Renderable/Mesh.hpp"
 
-#include "Material.hpp"
-#include "Vertex.hpp"
-#include "src/Tools/StringHash.h"
 #include "src/RenderEngine/Buffer.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
+#include "src/RenderEngine/GraphicsDevice.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/Renderable/Texture.hpp"
+#include "src/RenderEngine/Renderable/Vertex.hpp"
+#include "src/RenderEngine/StagingBuffer.hpp"
+#include "src/Tools/StringHash.h"
 
 #include <fastgltf/glm_element_traits.hpp>
-#include <src/RenderEngine/CommandBuffer.hpp>
+#include <volk/volk.h>
 
-Mesh::Mesh(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) : material(primitive.materialIndex.has_value() ? new Material(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : nullptr) {
+Mesh::Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
+material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : std::make_shared<Material>()) {
   // Determine this mesh's topology
   switch (primitive.type) {
     case fastgltf::PrimitiveType::Points: topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
@@ -21,40 +27,67 @@ Mesh::Mesh(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fas
   }
 
   // Determine vertex count (GLTF spec states that "All attribute accessors for a given primitive <b>MUST</b> have the same <c>count</c>." Therefore, the count of the first accessor for this primitive is used to decide the vertex count)
-  vertices.resize(asset.accessors[primitive.attributes[0].accessorIndex].count + 40);  /**@todo Why must we add 40? I have looked into this and I cannot answer that question.*/
+  vertices.resize(asset.accessors[primitive.attributes[0].accessorIndex].count);
 
   // Copy each attribute into the vector of vertices
-  for (const fastgltf::Attribute& attribute : primitive.attributes) {
-    auto& attributeAccessor = asset.accessors[attribute.accessorIndex];
-    /**@todo Add support for other attributes (application specific, animations, more texture coordinates, more colors).*/
-    switch (Tools::hash(attribute.name)) {  /**@see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes */
-      case Tools::hash("POSITION"):   fastgltf::copyFromAccessor<decltype(Vertex::position),            sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, position));            break;
-      case Tools::hash("NORMAL"):     fastgltf::copyFromAccessor<decltype(Vertex::normal),              sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, normal));              break;
-      case Tools::hash("TANGENT"):    fastgltf::copyFromAccessor<decltype(Vertex::tangent),             sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, tangent));             break;
-      case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, textureCoordinates0)); break;
-      case Tools::hash("COLOR_0"):    fastgltf::copyFromAccessor<decltype(Vertex::color0),              sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, color0));              break;
-      // case Tools::hash("JOINTS_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, textureCoordinates0)); break;
-      // case Tools::hash("WEIGHTS_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, attributeAccessor, vertices.data() + offsetof(Vertex, textureCoordinates0)); break;
-      default: break;  /**@todo Log this unknown attribute.*/
+  for (const fastgltf::Attribute& attribute: primitive.attributes) {
+    /**@todo: Add support for other attributes (application specific, animations, more texture coordinates, more colors).*/
+    switch (Tools::hash(attribute.name)) { /**@see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes */
+      case Tools::hash("POSITION"): fastgltf::copyFromAccessor<decltype(Vertex::position), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, position)); break;
+      case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
+      case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
+      case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, textureCoordinates0)); break;
+      case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
+      default: GraphicsInstance::showError(std::string("unknown vertex attribute name: " + attribute.name)); break;
     }
   }
-  auto vertexBufferTemp = std::make_shared<Buffer>(device, "vertex upload buffer", vertices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  vertexBuffer = std::make_shared<Buffer>(device, "vertex buffer", vertexBufferTemp->size(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-  std::vector<VkBufferCopy> regions{{
-    .srcOffset = 0,
-    .dstOffset = 0,
-    .size      = vertexBuffer->size() - 8
-  }};
+
+  // for (Vertex& vertex : vertices) vertex.position.z *= -1;
+
+  auto vertexBufferTemp = std::make_shared<StagingBuffer>(device, "vertex upload buffer", vertices.data(), vertices.size());
+  vertexBuffer          = std::make_shared<Buffer>(device, "vertex buffer", vertexBufferTemp->getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  std::vector<VkBufferCopy> regions{{.srcOffset = 0, .dstOffset = 0, .size = vertexBuffer->getSize()}};
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(vertexBufferTemp, vertexBuffer, regions);
 
   // If this is an indexed mesh build the index buffer
-  if (!primitive.indicesAccessor.has_value()) {
+  if (primitive.indicesAccessor.has_value()) {
     auto& accessor = asset.accessors[primitive.indicesAccessor.value()];
     indices.resize(accessor.count);
     fastgltf::copyFromAccessor<decltype(indices)::value_type>(asset, accessor, indices.data());
-    auto indexBufferTemp = std::make_shared<Buffer>(device, "index upload buffer", indices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-    indexBuffer = std::make_shared<Buffer>(device, "index upload buffer", indexBufferTemp->size(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-    regions[0].size = indexBuffer->size() - 8;
+    auto indexBufferTemp = std::make_shared<StagingBuffer>(device, "index upload buffer", indices);
+    indexBuffer          = std::make_shared<Buffer>(device, "index buffer", indexBufferTemp->getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+    regions[0].size = indexBuffer->getSize();
     commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
+
+  descriptorSets = device->perObjectDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
 }
+
+void Mesh::update(const RenderGraph& graph) const {
+  const Texture& texture = *material->getAlbedoTexture();
+  VkDescriptorImageInfo imageInfo {
+      .sampler     = texture.getSampler(),
+      .imageView   = texture.view(),
+      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  };
+  const VkWriteDescriptorSet writeDescriptorSet {
+      .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext            = nullptr,
+      .dstSet           = *descriptorSets[graph.getFrameIndex()],
+      .dstBinding       = 0,
+      .dstArrayElement  = 0,
+      .descriptorCount  = 1,
+      .descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .pImageInfo       = &imageInfo,
+      .pBufferInfo      = nullptr,
+      .pTexelBufferView = nullptr
+  };
+  vkUpdateDescriptorSets(graph.device->device, 1, &writeDescriptorSet, 0, nullptr);
+}
+
+bool Mesh::isOpaque() const { return material->getAlphaMode() == fastgltf::AlphaMode::Opaque; }
+bool Mesh::isTransparent() const { return material->getAlphaMode() != fastgltf::AlphaMode::Opaque; }
+std::shared_ptr<Material> Mesh::getMaterial() const { return material; }
+std::shared_ptr<Buffer> Mesh::getVertexBuffer() const { return vertexBuffer; }
+std::shared_ptr<Buffer> Mesh::getIndexBuffer() const { return indexBuffer; }
+std::shared_ptr<VkDescriptorSet> Mesh::getDescriptorSet(const uint64_t frameIndex) const { return descriptorSets[frameIndex]; }

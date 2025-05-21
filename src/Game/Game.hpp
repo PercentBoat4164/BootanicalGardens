@@ -10,7 +10,7 @@
 class Game {
   static std::unordered_map<std::uint64_t, Entity> entities;
   static double time;
-  static std::uint64_t nextEntityId;
+  static std::uint64_t entityId;
 
 public:
   static const std::chrono::steady_clock::time_point startTime;
@@ -21,8 +21,8 @@ public:
    * @return The new Entity
    */
   template<typename... Args> requires std::constructible_from<Entity, std::uint64_t, Args...> static Entity& addEntity(Args&&... args) {
-    ++nextEntityId;
-    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(nextEntityId), std::forward_as_tuple(nextEntityId, std::forward<Args>(args)...)).first->second;
+    ++entityId;
+    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(entityId), std::forward_as_tuple(entityId, std::forward<Args>(args)...)).first->second;
   }
 
   /**

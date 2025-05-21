@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vertex.hpp"
+#include "src/RenderEngine/RenderGraph.hpp"
 
 #include <fastgltf/core.hpp>
 
@@ -20,7 +21,17 @@ class Mesh {
   std::shared_ptr<Material> material{nullptr};
   std::shared_ptr<Buffer> vertexBuffer{nullptr};
   std::shared_ptr<Buffer> indexBuffer{nullptr};
+  std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets{};
 
 public:
-  Mesh(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
+  Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
+
+  void update(const RenderGraph& graph) const;
+
+  [[nodiscard]] bool isOpaque() const;
+  [[nodiscard]] bool isTransparent() const;
+  [[nodiscard]] std::shared_ptr<Material> getMaterial() const;
+  [[nodiscard]] std::shared_ptr<Buffer> getVertexBuffer() const;
+  [[nodiscard]] std::shared_ptr<Buffer> getIndexBuffer() const;
+  [[nodiscard]] std::shared_ptr<VkDescriptorSet> getDescriptorSet(uint64_t frameIndex) const;
 };

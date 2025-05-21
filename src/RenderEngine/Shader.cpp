@@ -4,9 +4,10 @@
 #include "GraphicsInstance.hpp"
 #include "Pipeline.hpp"
 
-#include <volk.h>
+#include <SPIRV-Reflect/spirv_reflect.c>  // Should only be included in one file.
+#include <SPIRV-Reflect/spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
-#include <spirv_reflect.h>
+#include <volk/volk.h>
 #include <yyjson.h>
 
 #include <fstream>
@@ -14,7 +15,7 @@
 bool readFile(const std::filesystem::path& path, std::string& contents) {
   std::ifstream stream{path, std::ios_base::ate | std::ios_base::binary};
   if (!stream.is_open()) return false;
-  const std::size_t size = static_cast<std::size_t>(stream.tellg());
+  const std::size_t size = stream.tellg();
   stream.seekg(0, std::ios_base::beg);
   contents.resize(size);
   stream.read(contents.data(), static_cast<std::streamsize>(size));
@@ -34,7 +35,7 @@ bool readFile(const std::filesystem::path& path, char*& contents, std::streamsiz
 class Includer final : public shaderc::CompileOptions::IncluderInterface {
 public:
   shaderc_include_result* GetInclude(const char* requested_source, shaderc_include_type type, const char* requesting_source, size_t include_depth) override {
-    const std::filesystem::path path = std::filesystem::canonical(std::filesystem::canonical(requesting_source).parent_path()/requested_source);
+    const std::filesystem::path path = canonical(std::filesystem::canonical(requesting_source).parent_path()/requested_source);
     char* contents;
     std::streamsize contentSize;
     readFile(path, contents, contentSize);
@@ -51,21 +52,29 @@ public:
   }
 };
 
-Shader::Shader(const GraphicsDevice& device, yyjson_val* obj) : device(device), json(nullptr, obj) {}
+Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) : device(device) {
+  // Source file path
+  sourcePath = yyjson_get_str(yyjson_obj_get(obj, "source"));
 
-Shader::Shader(const GraphicsDevice& device, yyjson_mut_val* obj) : device(device), json(nullptr, obj) {
-  /**@todo Build Vulkan objects from JSON data*/
-  /*
+  // Compiled shader code
+  yyjson_val* json_code = yyjson_obj_get(obj, "code");
+  code.resize(yyjson_arr_size(json_code));
+  size_t idx, max;
+  yyjson_val * val;
+  yyjson_arr_foreach(json_code, idx, max, val) code[idx] = static_cast<uint32_t>(yyjson_get_int(val));
   const VkShaderModuleCreateInfo shaderModuleCreateInfo {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .codeSize = productionCode.size() * sizeof(uint32_t),
-      .pCode = productionCode.data()
+      .codeSize = code.size() * sizeof(uint32_t),
+      .pCode = code.data()
   };
-  GraphicsInstance::showError(vkCreateShaderModule(device.device, &shaderModuleCreateInfo, nullptr, &module), "Failed to create shader module.");
+  if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create shader module.");
 
-  switch (stage) {
+  // Shader stage and bind point
+  stage = static_cast<VkShaderStageFlagBits>(yyjson_get_int(yyjson_obj_get(obj, "stage")));
+
+  switch (static_cast<SpvReflectShaderStageFlagBits>(stage)) {
     case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
     case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
     case SPV_REFLECT_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
@@ -73,34 +82,35 @@ Shader::Shader(const GraphicsDevice& device, yyjson_mut_val* obj) : device(devic
     case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:
     case SPV_REFLECT_SHADER_STAGE_TASK_BIT_EXT:
     case SPV_REFLECT_SHADER_STAGE_MESH_BIT_EXT:
-     bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; break;
+      bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; break;
     case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:
-     bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE; break;
+      bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE; break;
     case SPV_REFLECT_SHADER_STAGE_RAYGEN_BIT_KHR:
     case SPV_REFLECT_SHADER_STAGE_ANY_HIT_BIT_KHR:
     case SPV_REFLECT_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
     case SPV_REFLECT_SHADER_STAGE_MISS_BIT_KHR:
     case SPV_REFLECT_SHADER_STAGE_INTERSECTION_BIT_KHR:
     case SPV_REFLECT_SHADER_STAGE_CALLABLE_BIT_KHR:
-     bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR; break;
+      bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR; break;
     default: return;
   }
-   */
+
+  // "main" entry point
+  bool has_main = false;
+  yyjson_val* entryPoints = yyjson_obj_get(obj, "entry points");
+  yyjson_val* mainEntryPoint;
+  yyjson_arr_foreach(entryPoints, idx, max, mainEntryPoint)
+    if (strcmp(yyjson_get_str(yyjson_obj_get(mainEntryPoint, "name")), "main") == 0) {
+      has_main = true;
+      break;
+    }
+  if (!has_main) return;
 }
 
-Shader::~Shader() {
-  for (const VkDescriptorSetLayout& layout : layouts)
-    vkDestroyDescriptorSetLayout(device.device, layout, nullptr);
-  layouts.clear();
-  vkDestroyShaderModule(device.device, module, nullptr);
-  module = VK_NULL_HANDLE;
-}
-
-void Shader::buildBlob(const std::filesystem::path& sourcePath) {
-  if (!json.isMutable) return;  /**@todo Log this control path.*/
+Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
   const shaderc::Compiler compiler;
   shaderc::CompileOptions options;
-
+  options.SetIncluder(std::make_unique<Includer>());
   shaderc_shader_kind shaderKind;
   switch (Tools::hash(sourcePath.extension())) {
     case Tools::hash(".hlsl"):
@@ -121,56 +131,64 @@ void Shader::buildBlob(const std::filesystem::path& sourcePath) {
     default: shaderKind = shaderc_glsl_infer_from_source; break;
   }
 
-  options.SetIncluder(std::make_unique<Includer>());
+  std::string contents;
+  if (!readFile(sourcePath, contents)) GraphicsInstance::showError("Failed to read file: '" + sourcePath.string() + "'.");
+
+  // Compile with optimal performance to build the pipeline with
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
   shaderc::CompilationResult result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
-  if (result.GetCompilationStatus() != shaderc_compilation_status_success) GraphicsInstance::showError(false, "Failed to compile production shader. Error: " + result.GetErrorMessage());
+  if (result.GetCompilationStatus() != shaderc_compilation_status_success) GraphicsInstance::showError("Failed to compile production shader. Error: " + result.GetErrorMessage());
+  code = {result.cbegin(), result.cend()};
 
-  yyjson_mut_val* codeStorage = yyjson_mut_obj_get(json.val.m, "code");
-  for (uint32_t i : result) yyjson_mut_arr_add_uint(json.doc.m, codeStorage, i);
+  const VkShaderModuleCreateInfo shaderModuleCreateInfo {
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .codeSize = code.size() * sizeof(decltype(code)::value_type),
+      .pCode = code.data()
+  };
+  if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create shader module.");
 
+  // Compile with debug info and no optimizations to get reflection data
   options.SetOptimizationLevel(shaderc_optimization_level_zero);
   options.SetGenerateDebugInfo();
   result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
-  std::vector code = {result.cbegin(), result.cend()};
+  std::vector<uint32_t> debugCode = {result.cbegin(), result.cend()};
 
-  const auto* reflectionData = new spv_reflect::ShaderModule{code.size() * sizeof(decltype(code)::value_type), code.data(), SPV_REFLECT_MODULE_FLAG_NO_COPY};
+  const auto* reflectionData = new spv_reflect::ShaderModule{debugCode.size() * sizeof(decltype(debugCode)::value_type), debugCode.data(), SPV_REFLECT_MODULE_FLAG_NO_COPY};
 
   stage      = static_cast<VkShaderStageFlagBits>(reflectionData->GetShaderStage());
   entryPoint = reflectionData->GetEntryPointName();
-
-  uint32_t count{};
-  // reflect the vertex format
-  GraphicsInstance::showError(reflectionData->EnumerateInputVariables(&count, nullptr) == SPV_REFLECT_RESULT_SUCCESS, "Failed to count input variables.");
-  std::vector<SpvReflectInterfaceVariable*> variables{count};
-  GraphicsInstance::showError(reflectionData->EnumerateInputVariables(&count, variables.data()) == SPV_REFLECT_RESULT_SUCCESS, "Failed to enumerate input variables.");
-  for (const auto variable : variables) {
-    if (variable->built_in > SpvBuiltInMax) ;
-  }
-
-  // reflect the descriptor layout
-  GraphicsInstance::showError(reflectionData->EnumerateDescriptorSets(&count, nullptr) == SPV_REFLECT_RESULT_SUCCESS, "Failed to count descriptor sets.");
-  std::vector<SpvReflectDescriptorSet*> reflectedSets{count};
-  GraphicsInstance::showError(reflectionData->EnumerateDescriptorSets(&count, reflectedSets.data()) == SPV_REFLECT_RESULT_SUCCESS, "Failed to enumerate descriptor sets.");
-  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-  };
-  layouts.resize(count, VK_NULL_HANDLE);
-  for (uint64_t i{}; i < count; ++i) {
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    for (uint32_t j{}; j < reflectedSets[i]->binding_count; ++j) {
-      bindings.emplace_back(reflectedSets[i]->bindings[j]->binding, static_cast<VkDescriptorType>(reflectedSets[i]->bindings[j]->descriptor_type), 1, stage);
-      for (uint32_t k{}; k < reflectedSets[i]->bindings[j]->array.dims_count; ++k)
-        bindings.back().descriptorCount *= reflectedSets[i]->bindings[j]->array.dims[k];
-    }
-    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    descriptorSetLayoutCreateInfo.pBindings    = bindings.data();
-    GraphicsInstance::showError(vkCreateDescriptorSetLayout(device.device, &descriptorSetLayoutCreateInfo, nullptr, &layouts[i]), "Failed to create descriptor set layout.");
-  }
+  /**@todo: Handle vertex formats.*/
+  /**@todo: Reflect descriptor sets instead of hardcoding them into the engine.*/
 }
 
-VkPipelineBindPoint Shader::getBindPoint() const {
-  return bindPoint;
+Shader::~Shader() {
+  vkDestroyShaderModule(device->device, module, nullptr);
+  module = VK_NULL_HANDLE;
 }
+
+void Shader::save(yyjson_mut_doc* doc, yyjson_mut_val* obj) const {
+  // Start fresh
+  yyjson_mut_obj_clear(obj);
+  
+  // Source path
+  yyjson_mut_obj_add_strcpy(doc, obj, "source", sourcePath.string().c_str());
+  
+  // Performance optimized code
+  yyjson_mut_obj_add(obj, yyjson_mut_strcpy(doc, "code"), yyjson_mut_arr_with_sint32(doc, reinterpret_cast<const int32_t*>(code.data()), code.size()));
+  
+  // Shader stage
+  yyjson_mut_obj_add_int(doc, obj, "stage", stage);
+  
+  // Entry points
+  yyjson_mut_val* entryPoints = yyjson_mut_obj_add_arr(doc, obj, "entry points");
+  yyjson_mut_val* epObj = yyjson_mut_arr_add_obj(doc, entryPoints);
+  // Entry point name
+  yyjson_mut_obj_add_strcpy(doc, epObj, "name", entryPoint.c_str());
+}
+
+VkShaderStageFlagBits Shader::getStage() const { return stage; }
+VkPipelineBindPoint Shader::getBindPoint() const { return bindPoint; }
+VkShaderModule Shader::getModule() const { return module; }
+std::string_view Shader::getEntryPoint() const { return entryPoint; }

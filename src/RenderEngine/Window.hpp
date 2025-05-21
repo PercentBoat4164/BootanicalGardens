@@ -13,20 +13,19 @@ class Window {
   VkSurfaceKHR surface{VK_NULL_HANDLE};
   vkb::Swapchain swapchain;
   uint32_t swapchainIndex{};
-  std::vector<Image> swapchainImages{};
+  std::vector<std::shared_ptr<Image>> swapchainImages;
 
-  const GraphicsDevice& device;
-
-  uint32_t getImage(VkSemaphore swapchainSemaphore);
+  const std::shared_ptr<GraphicsDevice> device;
 
 public:
-  RenderGraph renderer;
-
   static SDL_Window* initialize();
   static void cleanupInitialization(SDL_Window* window);
 
-  explicit Window(const GraphicsDevice& device);
+  explicit Window(const std::shared_ptr<GraphicsDevice>& device);
   ~Window();
 
-  void draw();
+  [[nodiscard]] VkExtent3D getResolution() const;
+
+  std::shared_ptr<Image> getNextImage(VkSemaphore swapchainSemaphore);
+  void present(VkSemaphore semaphore) const;
 };

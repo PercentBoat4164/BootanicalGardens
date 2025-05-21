@@ -1,17 +1,20 @@
 #pragma once
 
-class GraphicsDevice;
+#include <memory>
 
-class Resource {
+class GraphicsDevice;
+class Buffer;
+
+class Resource : public std::enable_shared_from_this<Resource> {
 public:
   enum Type {
     Image,
     Buffer
   } type;
 
-  const GraphicsDevice& device;
+  const std::shared_ptr<GraphicsDevice> device;
 
-  explicit Resource(const Type type, const GraphicsDevice& device) : type(type), device(device) {}
+  explicit Resource(Type type, const std::shared_ptr<GraphicsDevice>& device);
   virtual ~Resource();
 
   [[nodiscard]] virtual void* getObject() const = 0;

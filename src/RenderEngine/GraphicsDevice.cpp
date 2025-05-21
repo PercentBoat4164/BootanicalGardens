@@ -1,8 +1,11 @@
 #include "GraphicsDevice.hpp"
 
 #include "GraphicsInstance.hpp"
+#include "Pipeline.hpp"
+#include "Renderable/Material.hpp"
+#include "Shader.hpp"
 
-#include <volk.h>
+#include <volk/volk.h>
 
 void getQueues(VkPhysicalDevice physicalDevice, std::vector<VkQueueFlags> required, std::vector<VkQueueFlags> requested) {
   uint32_t count{};
@@ -15,23 +18,27 @@ void getQueues(VkPhysicalDevice physicalDevice, std::vector<VkQueueFlags> requir
   }
 }
 
-GraphicsDevice::GraphicsDevice() {
+GraphicsDevice::GraphicsDevice() :
+    perFrameDescriptorAllocator(*this),
+    perPassDescriptorAllocator (*this),
+    perMaterialDescriptorAllocator(*this),
+    perObjectDescriptorAllocator(*this) {
   vkb::PhysicalDeviceSelector deviceSelector{GraphicsInstance::instance};
   deviceSelector.defer_surface_initialization();
   deviceSelector.prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
   vkb::DeviceBuilder deviceBuilder{deviceSelector.select().value()};
-  /**@todo Do not hardcode the queues. Build an actually good algorithm to find the most suitable queues.
+  /**@todo: Do not hardcode the queues. Build an actually good algorithm to find the most suitable queues.
    *    Assign badness to each queue family choice based on how many other capabilities that queue family has and how rare those capabilities are on the device.*/
   deviceBuilder.custom_queue_setup({vkb::CustomQueueDescription(0, {1}), vkb::CustomQueueDescription(1, {0})});
   const auto builderResult = deviceBuilder.build();
-  GraphicsInstance::showError(builderResult, "Failed to create the Vulkan device.");
+  if (!builderResult.has_value()) GraphicsInstance::showError(builderResult.vk_result(), "Failed to create the Vulkan device");
   device = builderResult.value();
   volkLoadDevice(device.device);
   const vkb::Result<VkQueue> queueResult = device.get_queue(vkb::QueueType::graphics);
-  GraphicsInstance::showError(queueResult, "Failed to get Vulkan device queue.");
+  if (!queueResult.has_value()) GraphicsInstance::showError(queueResult.vk_result(), "Failed to get Vulkan device queue");
   globalQueue = queueResult.value();
   const vkb::Result<uint32_t> queueIndexResult = device.get_queue_index(vkb::QueueType::graphics);
-  GraphicsInstance::showError(queueIndexResult, "Failed to get Vulkan device queue index");
+  if (!queueIndexResult.has_value()) GraphicsInstance::showError(queueIndexResult.vk_result(), "Failed to get Vulkan device queue index");
   globalQueueFamilyIndex = queueIndexResult.value();
 
   VmaVulkanFunctions vulkanFunctions {
@@ -70,7 +77,7 @@ GraphicsDevice::GraphicsDevice() {
     .instance = GraphicsInstance::instance,
     .vulkanApiVersion = std::min(device.instance_version, volkGetInstanceVersion()),
   };
-  GraphicsInstance::showError(vmaCreateAllocator(&allocatorCreateInfo, &allocator), "Failed to create VMA allocator.");
+  if (const VkResult result = vmaCreateAllocator(&allocatorCreateInfo, &allocator); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create VMA allocator.");
 
   const VkCommandPoolCreateInfo commandPoolCreateInfo {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -79,60 +86,92 @@ GraphicsDevice::GraphicsDevice() {
     .queueFamilyIndex = globalQueueFamilyIndex,
   };
   vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool);
+
+  perFrameDescriptorAllocator.prepareAllocation({
+      /// Frame number
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+      /// Game time
+      VkDescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+  });
+  perPassDescriptorAllocator.prepareAllocation({
+      /// view * projection matrix
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+  });
+  perMaterialDescriptorAllocator.prepareAllocation({
+      /// Color Texture
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+      /// Normal Texture
+      VkDescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr}
+  }),
+  perObjectDescriptorAllocator.prepareAllocation({
+      /// model matrix
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+  });
 }
 
 GraphicsDevice::~GraphicsDevice() {
   destroy();
 }
 
-VkCommandBuffer GraphicsDevice::getOneShotCommandBuffer() const {
-  const VkCommandBufferAllocateInfo allocateInfo {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-    .pNext = nullptr,
-    .commandPool = commandPool,
-    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    .commandBufferCount = 1,
+GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferImmediateAsync(const CommandBuffer& commandBuffer) const {
+  const VkCommandBufferAllocateInfo allocateInfo{
+      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext              = nullptr,
+      .commandPool        = commandPool,
+      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
   };
-  VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(device, &allocateInfo, &commandBuffer);
-  constexpr VkCommandBufferBeginInfo beginInfo {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    .pNext = nullptr,
-    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    .pInheritanceInfo = nullptr,
+  VkCommandBuffer vkCmdBuf;
+  if (const VkResult result = vkAllocateCommandBuffers(device, &allocateInfo, &vkCmdBuf); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to allocate VkCommandBuffer");
+  constexpr VkCommandBufferBeginInfo beginInfo{
+      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .pNext            = nullptr,
+      .flags            = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+      .pInheritanceInfo = nullptr,
   };
-  vkBeginCommandBuffer(commandBuffer, &beginInfo);
-  return commandBuffer;
-}
-
-VkFence GraphicsDevice::submitOneShotCommandBuffer(VkCommandBuffer commandBuffer) const {
-  vkEndCommandBuffer(commandBuffer);
+  if (const VkResult result = vkBeginCommandBuffer(vkCmdBuf, &beginInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to begin VkCommandBuffer");
+  commandBuffer.bake(vkCmdBuf);
+  if (const VkResult result = vkEndCommandBuffer(vkCmdBuf); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to end VkCommandBuffer");
   std::array<VkPipelineStageFlags, 1> arr{VK_PIPELINE_STAGE_NONE};
-  const VkSubmitInfo submitInfo {
-    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    .pNext = nullptr,
-    .waitSemaphoreCount = 0,
-    .pWaitSemaphores = nullptr,
-    .pWaitDstStageMask = arr.data(),
-    .commandBufferCount = 1,
-    .pCommandBuffers = &commandBuffer,
-    .signalSemaphoreCount = 0,
-    .pSignalSemaphores = nullptr
+  const VkSubmitInfo submitInfo{
+      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext                = nullptr,
+      .waitSemaphoreCount   = 0,
+      .pWaitSemaphores      = nullptr,
+      .pWaitDstStageMask    = arr.data(),
+      .commandBufferCount   = 1,
+      .pCommandBuffers      = &vkCmdBuf,
+      .signalSemaphoreCount = 0,
+      .pSignalSemaphores    = nullptr
   };
-  constexpr VkFenceCreateInfo fenceCreateInfo {
-    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-    .pNext = nullptr,
-    .flags = 0,
+  constexpr VkFenceCreateInfo fenceCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
   };
   VkFence fence;
-  vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
-  vkQueueSubmit(globalQueue, 1, &submitInfo, fence);
-  return fence;
+  if (const VkResult result = vkCreateFence(device, &fenceCreateInfo, nullptr, &fence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create VkFence");
+  if (const VkResult result = vkQueueSubmit(globalQueue, 1, &submitInfo, fence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed VkQueue submission");
+  return {vkCmdBuf, fence};
+}
+
+void GraphicsDevice::waitForAsyncCommandBuffer(const ImmediateExecutionContext context) const {
+  if (const VkResult result = vkWaitForFences(device, 1, &context.fence, VK_TRUE, -1ULL); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to wait for VkFence");
+  vkFreeCommandBuffers(device, commandPool, 1, &context.commandBuffer);
+  vkDestroyFence(device, context.fence, nullptr);
+}
+
+void GraphicsDevice::executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const {
+  waitForAsyncCommandBuffer(executeCommandBufferImmediateAsync(commandBuffer));
 }
 
 void GraphicsDevice::destroy() {
   vkDestroyCommandPool(device, commandPool, nullptr);
   commandPool = VK_NULL_HANDLE;
+  perFrameDescriptorAllocator.destroy();
+  perPassDescriptorAllocator.destroy();
+  perMaterialDescriptorAllocator.destroy();
+  perObjectDescriptorAllocator.destroy();
   if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
   allocator = VK_NULL_HANDLE;
   if (device) {

@@ -10,14 +10,13 @@ class Material;
 class Light;
 
 class Renderable {
-  const GraphicsDevice& device;
-  std::vector<Mesh*> meshes;
+  const std::shared_ptr<GraphicsDevice> device;
+  std::vector<std::shared_ptr<Mesh>> meshes;
 
 public:
-  explicit Renderable(const GraphicsDevice& device, const std::filesystem::path& path);
-  explicit Renderable(const GraphicsDevice& device, yyjson_val* val);
+  explicit Renderable(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& path);
+  explicit Renderable(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* val);
 
   void loadData(fastgltf::GltfDataGetter& dataGetter);
-
-  ~Renderable();
+  [[nodiscard]] const std::vector<std::shared_ptr<Mesh>>& getMeshes() const;
 };

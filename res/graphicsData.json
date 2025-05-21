@@ -6,14 +6,7 @@
       "stage": 536234,
       "entry points": [
         {
-          "name": "main",
-          "descriptor layout": [
-            {
-              "binding": 0,
-              "type": 2438027,
-              "count": 378902
-            }
-          ]
+          "name": "main"
         }
       ]
     }

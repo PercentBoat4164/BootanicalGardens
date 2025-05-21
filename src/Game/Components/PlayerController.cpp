@@ -9,7 +9,7 @@
 PlayerController::PlayerController(std::uint64_t id, const Entity& entity, yyjson_val* initializerObject) : Component(id, entity) {}
 
 void PlayerController::onTick() {
-  if (Input::keyDown(Input::P) > 0) {
+  if (Input::keyDown(SDLK_P) > 0) {
     Entity& myPlant = Game::addEntity(entity);
     myPlant.addComponent<Plant>();
   }

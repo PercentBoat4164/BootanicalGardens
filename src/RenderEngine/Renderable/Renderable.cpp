@@ -1,43 +1,40 @@
 #include "Renderable.hpp"
 
+#include "src/RenderEngine/GraphicsInstance.hpp"
+
 #include <src/RenderEngine/CommandBuffer.hpp>
 #include <src/RenderEngine/GraphicsDevice.hpp>
-#include <volk.h>
+#include <volk/volk.h>
 
-Renderable::Renderable(const GraphicsDevice& device, const std::filesystem::path& path) : device(device) {
+Renderable::Renderable(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& path) : device(device) {
   fastgltf::GltfFileStream fileStream(path);
   loadData(fileStream);
 }
 
-Renderable::Renderable(const GraphicsDevice& device, yyjson_val* val) : device(device){
+Renderable::Renderable(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* val) : device(device){
   const char* bytes = yyjson_get_str(val);
-  size_t len = yyjson_get_len(val);
+  const size_t len = yyjson_get_len(val);
   auto dataBuffer = fastgltf::GltfDataBuffer::FromBytes(reinterpret_cast<const std::byte*>(bytes), len);
-  if (dataBuffer.error() != fastgltf::Error::None) return; /**@todo Log this control path.*/
+  if (dataBuffer.error() != fastgltf::Error::None) GraphicsInstance::showError("failed to parse bytes in GLTF file");
   loadData(dataBuffer.get());
 }
 
 void Renderable::loadData(fastgltf::GltfDataGetter& dataGetter) {
   fastgltf::Asset asset;
   {
-    fastgltf::Parser parser(static_cast<fastgltf::Extensions>(0xffffff1));  // Enables all extensions because we do not know which extensions this file will require.
+    fastgltf::Parser parser(fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_texture_basisu | fastgltf::Extensions::MSFT_texture_dds | fastgltf::Extensions::KHR_mesh_quantization | fastgltf::Extensions::EXT_meshopt_compression | fastgltf::Extensions::KHR_lights_punctual | fastgltf::Extensions::EXT_texture_webp | fastgltf::Extensions::KHR_materials_specular | fastgltf::Extensions::KHR_materials_ior | fastgltf::Extensions::KHR_materials_iridescence | fastgltf::Extensions::KHR_materials_volume | fastgltf::Extensions::KHR_materials_transmission | fastgltf::Extensions::KHR_materials_clearcoat | fastgltf::Extensions::KHR_materials_emissive_strength | fastgltf::Extensions::KHR_materials_sheen | fastgltf::Extensions::KHR_materials_unlit | fastgltf::Extensions::KHR_materials_anisotropy | fastgltf::Extensions::EXT_mesh_gpu_instancing | fastgltf::Extensions::MSFT_packing_normalRoughnessMetallic | fastgltf::Extensions::MSFT_packing_occlusionRoughnessMetallic | fastgltf::Extensions::KHR_materials_dispersion | fastgltf::Extensions::KHR_materials_variants | fastgltf::Extensions::KHR_accessor_float64);
     fastgltf::Expected<fastgltf::Asset> gltfAsset = parser.loadGltf(dataGetter, std::filesystem::canonical("../res"), fastgltf::Options::GenerateMeshIndices);
-    if (gltfAsset.error() != fastgltf::Error::None) return; /**@todo Log this control path.*/
+    if (gltfAsset.error() != fastgltf::Error::None) GraphicsInstance::showError("failed to parse GLTF file");
     asset = std::move(gltfAsset.get());
   }
   CommandBuffer commandBuffer;
-  for (const fastgltf::Mesh& mesh : asset.meshes)
-    for (const fastgltf::Primitive& primitive : mesh.primitives)
-      meshes.push_back(new Mesh(device, commandBuffer, asset, primitive));  /**@todo Make a way to store Mesh data globally.*/
-  commandBuffer.optimize();
-  VkCommandBuffer vkCommandBuffer = device.getOneShotCommandBuffer();
-  commandBuffer.bake(vkCommandBuffer);
-  VkFence fence = device.submitOneShotCommandBuffer(vkCommandBuffer);
-  vkWaitForFences(device.device, 1, &fence, VK_TRUE, UINT64_MAX);
-  vkFreeCommandBuffers(device.device, device.commandPool, 1, &vkCommandBuffer);
-  vkDestroyFence(device.device, fence, nullptr);
+  for (const fastgltf::Mesh& mesh: asset.meshes)
+    for (const fastgltf::Primitive& primitive: mesh.primitives)
+      meshes.push_back(std::make_shared<Mesh>(device, commandBuffer, asset, primitive));
+  commandBuffer.preprocess();
+  device->executeCommandBufferImmediate(commandBuffer);
 }
 
-Renderable::~Renderable() {
-  for (const Mesh* mesh : meshes) delete mesh;
+const std::vector<std::shared_ptr<Mesh>>& Renderable::getMeshes() const {
+  return meshes;
 }

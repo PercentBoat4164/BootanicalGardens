@@ -1,0 +1,52 @@
+#include "Framebuffer.hpp"
+
+#include "GraphicsDevice.hpp"
+#include "Image.hpp"
+
+#include <memory>
+#include <vector>
+#include <volk/volk.h>
+
+Framebuffer::Framebuffer(const std::shared_ptr<GraphicsDevice>& device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass) : device(device),
+                                                                                                                                                      images(images),
+                                                                                                                                                      extent{images.front()->extent().width, images.front()->extent().height},
+                                                                                                                                                      rect{0, 0, extent.width, extent.height} {
+  std::vector<VkImageView> views{images.size()};
+  for (uint32_t i{}; i < images.size(); ++i)
+    views[i] = images[i]->view();
+  const VkFramebufferCreateInfo framebufferCreateInfo{
+      .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .pNext           = nullptr,
+      .flags           = 0,
+      .renderPass      = renderPass,
+      .attachmentCount = static_cast<uint32_t>(views.size()),
+      .pAttachments    = views.data(),
+      .width           = extent.width,
+      .height          = extent.height,
+      .layers          = images.front()->layerCount()
+  };
+  vkCreateFramebuffer(device->device, &framebufferCreateInfo, nullptr, &framebuffer);
+}
+
+Framebuffer::~Framebuffer() {
+  if (framebuffer != VK_NULL_HANDLE) {
+    vkDestroyFramebuffer(device->device, framebuffer, nullptr);
+    framebuffer = VK_NULL_HANDLE;
+  }
+}
+
+VkFramebuffer Framebuffer::getFramebuffer() const {
+  return framebuffer;
+}
+
+VkExtent2D Framebuffer::getExtent() const {
+  return extent;
+}
+
+VkRect2D Framebuffer::getRect() const {
+  return rect;
+}
+
+const std::vector<std::shared_ptr<Image>>& Framebuffer::getImages() const {
+  return images;
+}

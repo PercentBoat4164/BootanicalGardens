@@ -1,44 +1,54 @@
 #include "Buffer.hpp"
 
-#include "Image.hpp"
+#include "src/RenderEngine/GraphicsDevice.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/Image.hpp"
 
-Buffer::Buffer(const GraphicsDevice& device, const std::string& name, const std::size_t size, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage) : Resource(Resource::Buffer, device) {
+Buffer::Buffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags required, const VkMemoryPropertyFlags preferred, const VmaMemoryUsage memoryUsage, const VmaAllocationCreateFlags flags) :
+    Resource(Resource::Buffer, device) {
   const VkBufferCreateInfo bufferCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext                 = nullptr,
       .flags                 = 0,
-      .size                  = size,
+      .size                  = bufferSize,
       .usage                 = usage,
       .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices   = nullptr
   };
   const VmaAllocationCreateInfo allocationCreateInfo {
+      .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT | flags,
       .usage = memoryUsage,
+      .requiredFlags = required,
+      .preferredFlags = preferred,
+      .memoryTypeBits = 0,
+      .pool = VK_NULL_HANDLE,
       .pUserData = this,
+      .priority = 1.0f
   };
-  GraphicsInstance::showError(vmaCreateBuffer(device.allocator, &bufferCreateInfo, &allocationCreateInfo, &_buffer, &allocation, &allocationInfo), "Failed to create buffer [" + name + "].");
-  vmaSetAllocationName(device.allocator, allocation, name.c_str());
+
+  if (const VkResult result = vmaCreateBuffer(device->allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, name);
+  vmaSetAllocationName(device->allocator, allocation, name);
 }
 
 Buffer::~Buffer() {
-  vmaDestroyBuffer(device.allocator, _buffer, allocation);
-  _buffer     = VK_NULL_HANDLE;
+  vmaDestroyBuffer(device->allocator, buffer, allocation);
+  buffer     = VK_NULL_HANDLE;
   allocation = VK_NULL_HANDLE;
 }
 
-VkBuffer Buffer::buffer() const {
-  return _buffer;
+VkBuffer Buffer::getBuffer() const {
+  return buffer;
 }
 
-uint64_t Buffer::size() const {
+VkDeviceSize Buffer::getSize() const {
   return allocationInfo.size;
 }
 
 void* Buffer::getObject() const {
-  return _buffer;
+  return buffer;
 }
 
 void* Buffer::getView() const {
-  return _view;
+  return view;
 }

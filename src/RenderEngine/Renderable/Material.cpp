@@ -1,12 +1,12 @@
 #include "Material.hpp"
 
-#include <SDL_image.h>
-#include <iostream>
-
-#include "Texture.hpp"
 #include "src/RenderEngine/Buffer.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
+#include "src/RenderEngine/Renderable/Texture.hpp"
+#include "src/RenderEngine/StagingBuffer.hpp"
 
-#include <src/RenderEngine/CommandBuffer.hpp>
+#include <SDL3_image/SDL_image.h>
+#include <iostream>
 
 const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::DataSource& source, size_t* size) {
   return std::visit(fastgltf::visitor {
@@ -27,19 +27,19 @@ const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::
       }, source);
 }
 
-template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void loadTexture(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
+template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
   if (!textureInfo->has_value()) return;
   const fastgltf::Optional<unsigned long>& imageIndex = asset.textures[textureInfo->value().textureIndex].imageIndex;
   if (!imageIndex.has_value()) return;
   const fastgltf::Image& image = asset.images[imageIndex.value()];
   std::size_t size;
-  auto* bytes = const_cast<std::byte*>(handleDataSource(asset, image.data, &size));
-  SDL_RWops* io = SDL_RWFromMem(bytes, static_cast<int>(size));
-  SDL_Surface* surface = IMG_Load_RW(io, true);
-  const std::vector textureBytes(static_cast<std::byte*>(surface->pixels), static_cast<std::byte*>(surface->pixels) + surface->w * surface->h * surface->format->BytesPerPixel);
-  auto buffer = std::make_shared<Buffer>(device, std::string{image.name + " upload buffer"}, textureBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  const auto* bytes = handleDataSource(asset, image.data, &size);
+  SDL_IOStream* io  = SDL_IOFromConstMem(bytes, static_cast<int>(size));
+  SDL_Surface* surface = IMG_Load_IO(io, true);
+  const std::vector textureBytes(static_cast<std::byte*>(surface->pixels), static_cast<std::byte*>(surface->pixels) + surface->w * surface->h * SDL_BYTESPERPIXEL(surface->format));
+  auto buffer = std::make_shared<StagingBuffer>(device, std::string{image.name + " upload buffer"}.c_str(), textureBytes);
   VkFormat format;
-  switch (static_cast<SDL_PixelFormatEnum>(surface->format->format)) {
+  switch (surface->format) {
     case SDL_PIXELFORMAT_ARGB4444: format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT; break;
     case SDL_PIXELFORMAT_RGBA4444: format = VK_FORMAT_R4G4B4A4_UNORM_PACK16; break;
     case SDL_PIXELFORMAT_ABGR4444: format = VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT; break;
@@ -76,29 +76,25 @@ template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void l
     .imageExtent = (*texture)->extent()
   }};
   commandBuffer.record<CommandBuffer::CopyBufferToImage>(buffer, *texture, regions);
-  SDL_FreeSurface(surface);
+  SDL_DestroySurface(surface);
 }
 
-Material::Material(const GraphicsDevice& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) :
-    doubleSided(material.doubleSided),
-    alphaMode(material.alphaMode),
-    alphaCutoff(material.alphaCutoff),
-    unlit(material.unlit),
-    ior(material.ior),
-    dispersion(material.dispersion),
-    albedoFactor(material.pbrData.baseColorFactor.x(), material.pbrData.baseColorFactor.y(), material.pbrData.baseColorFactor.z(), material.pbrData.baseColorFactor.w()),
-    normalFactor(material.normalTexture.has_value() ? material.normalTexture->scale : 1.f),
-    occlusionFactor(material.occlusionTexture.has_value() ? material.occlusionTexture->strength : 1.f),
-    emissiveFactor(material.emissiveFactor.x(), material.emissiveFactor.y(), material.emissiveFactor.z()),
-    anisotropyFactor(material.anisotropy ? material.anisotropy->anisotropyStrength : 0.f),
-    anisotropyRotation(material.anisotropy ? material.anisotropy->anisotropyRotation : 0.f),
-    metallicFactor(material.pbrData.metallicFactor),
-    roughnessFactor(material.pbrData.roughnessFactor) {
-  /**@todo This could be immensely sped up using multi-threading (most lucrative option because most time is spent on the CPU in loadTexture calls) and by using a dedicated transfer queue for these operations.
-   *    I refrained from doing these things for two reasons:
-   *    - I do not know what the multi-threading of this game is going to look like yet, and I am not ready to make that decision (especially without Ethan).
-   *    - I am aiming for speed of development. I just want to make this work for now, hence this comment reminding myself to improve this later.
-   *      - Fixing the way that command buffers are handled should be almost trivial. The only tricky part is retaining all the temporary buffers until the commands have finished then properly destroying them.
+Material::Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) : doubleSided(material.doubleSided),
+                                                                                                                                                                    alphaMode(material.alphaMode),
+                                                                                                                                                                    alphaCutoff(material.alphaCutoff),
+                                                                                                                                                                    unlit(material.unlit),
+                                                                                                                                                                    ior(material.ior),
+                                                                                                                                                                    dispersion(material.dispersion),
+                                                                                                                                                                    albedoFactor(material.pbrData.baseColorFactor.x(), material.pbrData.baseColorFactor.y(), material.pbrData.baseColorFactor.z(), material.pbrData.baseColorFactor.w()),
+                                                                                                                                                                    normalFactor(material.normalTexture.has_value() ? material.normalTexture->scale : 1.f),
+                                                                                                                                                                    occlusionFactor(material.occlusionTexture.has_value() ? material.occlusionTexture->strength : 1.f),
+                                                                                                                                                                    emissiveFactor(material.emissiveFactor.x(), material.emissiveFactor.y(), material.emissiveFactor.z()),
+                                                                                                                                                                    anisotropyFactor(material.anisotropy ? material.anisotropy->anisotropyStrength : 0.f),
+                                                                                                                                                                    anisotropyRotation(material.anisotropy ? material.anisotropy->anisotropyRotation : 0.f),
+                                                                                                                                                                    metallicFactor(material.pbrData.metallicFactor),
+                                                                                                                                                                    roughnessFactor(material.pbrData.roughnessFactor) {
+  /**@todo: This could be immensely sped up using multi-threading (most lucrative option because most time is spent on the CPU in loadTexture calls) and by using a dedicated transfer queue for these operations.
+   *    I refrained from doing these things because I do not know what the multi-threading of this game is going to look like yet, and I am not ready to make that decision (especially without Ethan).
    */
   loadTexture<decltype(material.pbrData.baseColorTexture)::value_type>(device, commandBuffer, asset, &albedoTexture, &material.pbrData.baseColorTexture);
   loadTexture<decltype(material.normalTexture)::value_type>(device, commandBuffer, asset, &normalTexture, &material.normalTexture);
@@ -107,3 +103,27 @@ Material::Material(const GraphicsDevice& device, CommandBuffer& commandBuffer, c
   if (material.anisotropy) loadTexture<decltype(material.anisotropy->anisotropyTexture)::value_type>(device, commandBuffer, asset, &anisotropyTexture, &material.anisotropy->anisotropyTexture);
   loadTexture<decltype(material.pbrData.metallicRoughnessTexture)::value_type>(device, commandBuffer, asset, &metallicRoughnessTexture, &material.pbrData.metallicRoughnessTexture);
 }
+
+bool Material::isDoubleSided() const { return doubleSided; }
+fastgltf::AlphaMode Material::getAlphaMode() const { return alphaMode; }
+float Material::getAlphaCutoff() const { return alphaCutoff; }
+bool Material::isUnlit() const { return unlit; }
+float Material::getIor() const { return ior; }
+float Material::getDispersion() const { return dispersion; }
+std::shared_ptr<Texture> Material::getAlbedoTexture() const { return albedoTexture; }
+glm::vec4 Material::getAlbedoFactor() const { return albedoFactor; }
+std::shared_ptr<Texture> Material::getNormalTexture() const { return normalTexture; }
+float Material::getNormalFactor() const { return normalFactor; }
+std::shared_ptr<Texture> Material::getOcclusionTexture() const { return occlusionTexture; }
+float Material::getOcclusionFactor() const { return occlusionFactor; }
+std::shared_ptr<Texture> Material::getEmissiveTexture() const { return emissiveTexture; }
+glm::vec3 Material::getEmissiveFactor() const { return emissiveFactor; }
+std::shared_ptr<Texture> Material::getAnisotropyTexture() const { return anisotropyTexture; }
+float Material::getAnisotropyFactor() const { return anisotropyFactor; }
+float Material::getAnisotropyRotation() const { return anisotropyRotation; }
+std::shared_ptr<Texture> Material::getMetallicRoughnessTexture() const { return metallicRoughnessTexture; }
+float Material::getMetallicFactor() const { return metallicFactor; }
+float Material::getRoughnessRotation() const { return roughnessFactor; }
+std::vector<std::shared_ptr<Shader>> Material::getShaders() const { return shaders; }
+
+void Material::setShaders(const std::vector<std::shared_ptr<Shader>>& shaders) { this->shaders = shaders; }

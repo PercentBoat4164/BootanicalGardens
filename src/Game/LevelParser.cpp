@@ -18,7 +18,7 @@ Entity& LevelParser::loadEntity(yyjson_val* entityData) {
   }
   std::array<double, 4> rotation {};
   jsonData = yyjson_obj_get(entityData, "rotation");
-  if (yyjson_arr_size(jsonData) == 3) {
+  if (yyjson_arr_size(jsonData) == 4) {
     rotation[0] = yyjson_get_num(yyjson_arr_get(jsonData, 0));
     rotation[1] = yyjson_get_num(yyjson_arr_get(jsonData, 1));
     rotation[2] = yyjson_get_num(yyjson_arr_get(jsonData, 2));
@@ -48,5 +48,5 @@ Entity& LevelParser::loadEntity(yyjson_val* entityData) {
 void LevelParser::loadLevel(const std::filesystem::path& filename) {
   yyjson_read_err error;
   doc = yyjson_read_file(filename.c_str(), YYJSON_READ_ALLOW_INF_AND_NAN, nullptr, &error);
-  if (doc == nullptr) { /**@todo Read `error`.*/ }
+  if (doc == nullptr) { /**@todo: Read `error`.*/ }
 }
