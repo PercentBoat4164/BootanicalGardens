@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Entity.hpp"
+#include "src/Entity.hpp"
 
 #include <chrono>
 #include <memory>
@@ -10,6 +10,7 @@
 class Game {
   static std::unordered_map<std::uint64_t, Entity> entities;
   static double time;
+  static double tickTime;
   static std::uint64_t entityId;
 
 public:
@@ -22,13 +23,19 @@ public:
    */
   template<typename... Args> requires std::constructible_from<Entity, std::uint64_t, Args...> static Entity& addEntity(Args&&... args) {
     ++entityId;
-    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(entityId), std::forward_as_tuple(entityId, std::forward<Args>(args)...)).first->second;
+    return entities.emplace(std::piecewise_construct, std::forward_as_tuple(entityId), std::forward_as_tuple(entityId, std::forward<Args&&>(args)...)).first->second;
   }
 
   /**
    * Move the game state forward one tick.
    */
   static bool tick();
+
+  /**
+   * Get the time the last tick took.
+   * @return the time in seconds
+   */
+  static double getTickTime();
 
   /**
    * Get the total time the game has been running.

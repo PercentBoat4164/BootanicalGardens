@@ -26,6 +26,7 @@ CPMAddPackage(
 )
 CPMAddPackage("gh:ibireme/yyjson#0.10.0")
 CPMAddPackage("gh:jeremy-rifkin/cpptrace#v0.7.5")
+CPMAddPackage("gh:SpartanJ/efsw#1.4.0")
 
 add_executable(BootanicalGardens
         src/Component.cpp
@@ -57,11 +58,14 @@ add_executable(BootanicalGardens
 
         src/Tools/ClassName.h
         src/Tools/StringHash.h
+
+        src/Filesystem/UpdateListener.cpp
+        src/Filesystem/UpdateListener.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
 target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
-target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace)
+target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace efsw)
 target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
 
 # Move all .dlls to the exe

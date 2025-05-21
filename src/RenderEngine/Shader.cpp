@@ -112,7 +112,7 @@ Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesys
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<Includer>());
   shaderc_shader_kind shaderKind;
-  switch (Tools::hash(sourcePath.extension())) {
+  switch (Tools::hash(sourcePath.extension().string())) {
     case Tools::hash(".hlsl"):
     case Tools::hash(".glsl"): shaderKind = shaderc_glsl_infer_from_source; break;
     case Tools::hash(".vert"): shaderKind = shaderc_glsl_default_vertex_shader; break;

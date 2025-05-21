@@ -2,7 +2,7 @@
 
 #include "Entity.hpp"
 
-Component::Component(std::uint64_t id, const Entity& entity) : id(id), entity(entity) {}
+Component::Component(std::uint64_t id, Entity& entity) : id(id), entity(entity) {}
 
 Component::~Component() = default;
 

@@ -1,4 +1,5 @@
 #include "src/Game/Game.hpp"
+#include "src/Game/LevelParser.hpp"
 #include "src/InputEngine/Input.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
@@ -51,30 +52,3 @@ int main() {
   GraphicsInstance::destroy();
   return 0;
 }
-
-/*
- * ━━━━━━ == Owns
- * ╌╌╌╌╌╌ == References
- * ────── == Is Created With                          [Renderable]
- *  Item  == Single item                                   ╎
- * [Item] == Many items                                    ╎
- *                                                         ↓
- * RenderGraph ━━━━━━━━━━━━━━━━━━━→ [RenderPass] ╌╌╌╌╌→ [Mesh]
- *   ┃   ┃                               ┃                 ╎
- *   ┃   ┗━━━━━━━━━━━━┓                  ┃                 ╎
- *   ↓                ↓                  ↓                 ↓
- * [VkPipeline] [VkFramebuffer]    [VkRenderPass]       Material ╌╌╌╌╌╌╌╌╌╌╌╌┐
- *    │               │                  ↑                 ╎                 ╎
- *    ├───────────────┴──────────────────┘                 ╎                 ╎
- *    │                                                    ↓                 ↓
- *    └───────────────────────────────────────────→ VkPipelineLayout ───→ [Shader]
- *
- * // Add render passes
- * // RenderPasses internally specify what types of Meshes they operate on. When Renderables are added to the RenderGraph references to the new Meshes are given to the applicable RenderPasses.
- * graph.insert<OpaqueRenderPass>(attachmentsProperties);
- * graph.insert<TransparentRenderPass>(attachmentsProperties);
- * graph.insert<PostProcessingRenderPass>(attachmentsProperties);
- * // Add renderables
- * Renderable renderable(graphicsDevice, path);
- * graph.addRenderable(renderable);
- */

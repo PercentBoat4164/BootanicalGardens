@@ -6,14 +6,27 @@
 #include "src/Entity.hpp"
 #include "src/Game/Game.hpp"
 
-PlayerController::PlayerController(std::uint64_t id, const Entity& entity, yyjson_val* initializerObject) : Component(id, entity) {}
+#include <iostream>
+
+PlayerController::PlayerController(const std::uint64_t id, Entity& entity) : Component(id, entity) {}
 
 void PlayerController::onTick() {
-  if (Input::keyDown(SDLK_P) > 0) {
-    Entity& myPlant = Game::addEntity(entity);
-    myPlant.addComponent<Plant>();
+  //move the player using keyboard
+  if (Input::keyDown(SDLK_UP) > 0 || Input::keyDown(SDLK_W) > 0) {
+    entity.position.y += movementSpeed;
   }
+  if (Input::keyDown(SDLK_DOWN) > 0 || Input::keyDown(SDLK_S) > 0) {
+    entity.position.y -= movementSpeed;
+  }
+  if (Input::keyDown(SDLK_LEFT) > 0 || Input::keyDown(SDLK_A) > 0) {
+    entity.position.x -= movementSpeed;
+  }
+  if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
+    entity.position.x += movementSpeed;
+  }
+  std::cout<<"Player position: "<<entity.position.x<<", "<<entity.position.y<<std::endl;
 }
-std::unique_ptr<Component> PlayerController::create(std::uint64_t id, const Entity& entity, yyjson_val* i) {
-  return std::make_unique<PlayerController>(id, entity, i);
+
+std::shared_ptr<Component> PlayerController::create(std::uint64_t id, Entity& entity, yyjson_val* obj) {
+  return std::make_shared<PlayerController>(id, entity);
 }

@@ -23,7 +23,11 @@ void Input::onEvent(SDL_Event event) {
  * Update input values that change every tick
  */
 void Input::onTick() {
-  for (float& key : std::ranges::views::values(keys)) key += Game::getTime() * std::abs(key) == key ? 1 : -1;
+  for (float& key : std::views::values(keys))
+    if (std::signbit(key))
+      key -= static_cast<float>(Game::getTickTime());
+    else
+      key += static_cast<float>(Game::getTickTime());
 }
 
 /**
@@ -42,7 +46,7 @@ bool Input::initialize() {
  * @return whether the key has been pressed
  */
 bool Input::keyPressed(const SDL_Keycode key) {
-  return keys[key] == Game::getTime();
+  return keys[key] == Game::getTickTime();
 }
 
 /**
@@ -54,7 +58,7 @@ bool Input::keyPressed(const SDL_Keycode key) {
  */
 float Input::keyDown(const SDL_Keycode key) {
   const float value = keys[key];
-  return value >= 0 ? value : 0;
+  return value <= -0.0f ? -value : 0;
 }
 
 /**
@@ -64,7 +68,7 @@ float Input::keyDown(const SDL_Keycode key) {
  * @return whether the key has been released
  */
 bool Input::keyReleased(const SDL_Keycode key) {
-  return keys[key] == -Game::getTime();
+  return keys[key] == Game::getTickTime();
 }
 
 /**
@@ -75,5 +79,5 @@ bool Input::keyReleased(const SDL_Keycode key) {
  */
 float Input::keyUp(const SDL_Keycode key) {
   const float value = keys[key];
-  return value <= -0 ? value : 0;
+  return value > 0.0f ? value : 0;
 }

@@ -15,9 +15,9 @@
 struct yyjson_val;
 
 class Entity {
-  static std::unordered_map<std::string, void*> componentConstructors;
+  static std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Entity&, yyjson_val*)> componentConstructors;
 
-  std::unordered_map<uint64_t, std::unique_ptr<Component>> components;
+  std::unordered_map<uint64_t, std::shared_ptr<Component>> components;
   uint64_t nextComponentId{UINT64_MAX};
   std::uint64_t id;
 
@@ -27,7 +27,17 @@ public:
   glm::vec3 scale;
 
   /**
-   * Constructor an empty Entity with the given position, rotation, and scale.
+   * Registers a new Component Constructor to enable the use of <c>addComponent</c> for a new Component type.
+   * If another Component Constructor of the same <c>name</c> has already been registered this function will return <c>false</c>
+   * and the old Constructor will not be overridden.
+   * @param name the name of the function. to be used as a parameter of <c>addComponent</c>
+   * @param function the functon to be called
+   * @return <c>false</c> if a pre-existing Component Constructor would have been overridden, <c>true</c> otherwise.
+   */
+  static bool registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*));
+
+  /**
+   * Construct an empty Entity with the given position, rotation, and scale.
    * @param position the initial position of the entity
    * @param rotation the initial orientation
    * @param scale the initial scale
@@ -58,7 +68,7 @@ public:
    * @param args The arguments for the Component's constructor
    */
   template<typename T, typename... Args> requires std::constructible_from<T, uint64_t, const Entity&, Args...> && std::derived_from<T, Component> void addComponent(Args&& ... args) {
-    std::unique_ptr<Component> component = reinterpret_cast<std::unique_ptr<Component>(*)(std::uint64_t, const Entity&, Args...)>(componentConstructors.at(static_cast<std::string>(Tools::className<T>())))(++nextComponentId, *this, std::forward<Args>(args)...);
+    std::shared_ptr<Component> component = reinterpret_cast<std::shared_ptr<Component>(*)(std::uint64_t, const Entity&, Args...)>(componentConstructors.at(static_cast<std::string>(Tools::className<T>())))(++nextComponentId, *this, std::forward<Args>(args)...);
     components.emplace(component->getId(), std::move(component));
   }
 
@@ -89,7 +99,7 @@ public:
   }
 
   template<typename T> requires std::derived_from<T, Component> T* getComponentOfType() {
-    for (std::unique_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) return component;
     return nullptr;
   }
@@ -101,8 +111,20 @@ public:
    */
   template<typename T> requires std::derived_from<T, Component> std::vector<T*> getComponentsOfType() {
     std::vector<T*> requestedComponents;
-    for (std::unique_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) requestedComponents.push_back(component);
     return requestedComponents;
+  }
+
+  /**
+   * Get a vector of shared pointers of all Components in this Entity.
+   * @tparam T Derives from Component
+   * @return a Vector containing shared pointers of all Components of a specific type in this Entity
+   */
+  std::vector<std::shared_ptr<Component>> getComponents() {
+    std::vector<std::shared_ptr<Component>> out;
+    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+      out.push_back(component);
+    return out;
   }
 };
