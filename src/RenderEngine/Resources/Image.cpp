@@ -1,17 +1,17 @@
 #include "Image.hpp"
 
-#include "Buffer.hpp"
-#include "GraphicsDevice.hpp"
-#include "GraphicsInstance.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
+#include "src/RenderEngine/GraphicsDevice.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
 
 #include <vma/vk_mem_alloc.h>
 #include <volk/volk.h>
 
 #include <utility>
 
-Image::Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, uint32_t mipLevels, VkSampleCountFlagBits sampleCount, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {}
+Image::Image(std::shared_ptr<GraphicsDevice> device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, uint32_t mipLevels, VkSampleCountFlagBits sampleCount, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {}
 
-Image::Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits sampleCount) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
+Image::Image(std::shared_ptr<GraphicsDevice> device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits sampleCount) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
   const VkImageCreateInfo imageCreateInfo {
     .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext         = nullptr,
@@ -76,19 +76,19 @@ void Image::rebuild(VkExtent3D newExtent) {
   std::construct_at(this, device, name, format, newExtent, usage, mipLevels, sampleCount);
 }
 
-VkImage Image::image() const {
+VkImage Image::getImage() const {
   return _image;
 }
 
-VkExtent3D Image::extent() const {
+VkExtent3D Image::getExtent() const {
   return _extent;
 }
 
-VkImageView Image::view() const {
+VkImageView Image::getImageView() const {
   return _view;
 }
 
-VkImageView Image::view(const VkComponentMapping mapping, const VkImageSubresourceRange& subresourceRange) const {
+VkImageView Image::getImageView(const VkComponentMapping mapping, const VkImageSubresourceRange& subresourceRange) const {
     const VkImageViewCreateInfo imageViewCreateInfo {
         .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext            = nullptr,
@@ -104,27 +104,27 @@ VkImageView Image::view(const VkComponentMapping mapping, const VkImageSubresour
     return view;
 }
 
-VkFormat Image::format() const {
+VkFormat Image::getFormat() const {
   return _format;
 }
 
-VkImageAspectFlags Image::aspect() const {
+VkImageAspectFlags Image::getAspect() const {
     return _aspect;
 }
 
-uint32_t Image::mipLevels() const {
+uint32_t Image::getMipLevels() const {
   return _mipLevels;
 }
 
-uint32_t Image::layerCount() const {
+uint32_t Image::getLayerCount() const {
   return _layerCount;
 }
 
-VkSampleCountFlagBits Image::sampleCount() const {
+VkSampleCountFlagBits Image::getSampleCount() const {
   return _sampleCount;
 }
 
-VkImageSubresourceRange Image::wholeRange() const {
+VkImageSubresourceRange Image::getWholeRange() const {
   return {
     .aspectMask = _aspect,
     .baseMipLevel = 0,

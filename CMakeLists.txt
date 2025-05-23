@@ -36,14 +36,13 @@ add_executable(BootanicalGardens
         src/Game/Game.cpp
         src/Game/LevelParser.cpp
         src/InputEngine/Input.cpp
-        src/RenderEngine/Buffer.cpp
         src/RenderEngine/CommandBuffer.cpp
         src/RenderEngine/DescriptorAllocator.cpp
+        src/RenderEngine/Framebuffer.cpp
         src/RenderEngine/GraphicsDevice.cpp
         src/RenderEngine/GraphicsInstance.cpp
-        src/RenderEngine/Framebuffer.cpp
-        src/RenderEngine/Image.cpp
         src/RenderEngine/Pipeline.cpp
+        src/RenderEngine/RenderGraph.cpp
         src/RenderEngine/RenderPass/OpaqueRenderPass.cpp
         src/RenderEngine/RenderPass/RenderPass.cpp
         src/RenderEngine/Renderable/Material.cpp
@@ -51,8 +50,11 @@ add_executable(BootanicalGardens
         src/RenderEngine/Renderable/Renderable.cpp
         src/RenderEngine/Renderable/Texture.cpp
         src/RenderEngine/Renderable/Vertex.cpp
-        src/RenderEngine/RenderGraph.cpp
-        src/RenderEngine/Resource.cpp
+        src/RenderEngine/Resources/Buffer.cpp
+        src/RenderEngine/Resources/Image.cpp
+        src/RenderEngine/Resources/Resource.cpp
+        src/RenderEngine/Resources/StagingBuffer.cpp
+        src/RenderEngine/Resources/UniformBuffer.cpp
         src/RenderEngine/Shader.cpp
         src/RenderEngine/Window.cpp
 

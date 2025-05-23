@@ -2,7 +2,7 @@
 
 #include "GraphicsDevice.hpp"
 
-#include "Image.hpp"
+#include "Resources/Image.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
@@ -12,12 +12,16 @@
 
 #include <chrono>
 
-Window::Window(const std::shared_ptr<GraphicsDevice>& device) : device{device} {
-  window = SDL_CreateWindow("Example Engine", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
+Window::Window(std::shared_ptr<GraphicsDevice> device) : device{device} {
+  window = SDL_CreateWindow("Bootanical Gardens", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
   if (window == nullptr) GraphicsInstance::showSDLError();
   if (!SDL_Vulkan_CreateSurface(window, GraphicsInstance::instance, nullptr, &surface)) GraphicsInstance::showSDLError();
   vkb::SwapchainBuilder builder{device->device, surface};
   builder.add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+  int width, height;
+  SDL_GetWindowSizeInPixels(window, &width, &height);
+  builder.set_desired_extent(width, height);
+  builder.set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR);
   const vkb::Result<vkb::Swapchain> swapchainResult = builder.build();
   if (!swapchainResult.has_value()) GraphicsInstance::showError(swapchainResult.vk_result(), "Failed to create the Vulkan swapchain.");
   swapchain = swapchainResult.value();

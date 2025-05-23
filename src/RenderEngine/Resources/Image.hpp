@@ -31,22 +31,22 @@ public:
     Compute = VK_IMAGE_USAGE_STORAGE_BIT,
   };
 
-  Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
-  Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT);
+  Image(std::shared_ptr<GraphicsDevice> device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
+  Image(std::shared_ptr<GraphicsDevice> device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT);
   ~Image() override;
 
   void rebuild(VkExtent3D newExtent);
 
-  [[nodiscard]] VkImage image() const;
-  [[nodiscard]] VkExtent3D extent() const;
-  [[nodiscard]] VkImageView view() const;
-  [[nodiscard]] VkImageView view(VkComponentMapping mapping, const VkImageSubresourceRange&subresourceRange) const;
-  [[nodiscard]] VkFormat format() const;
-  [[nodiscard]] VkImageAspectFlags aspect() const;
-  [[nodiscard]] uint32_t mipLevels() const;
-  [[nodiscard]] uint32_t layerCount() const;
-  [[nodiscard]] VkSampleCountFlagBits sampleCount() const;
-  [[nodiscard]] VkImageSubresourceRange wholeRange() const;
+  [[nodiscard]] VkImage getImage() const;
+  [[nodiscard]] VkExtent3D getExtent() const;
+  [[nodiscard]] VkImageView getImageView() const;
+  [[nodiscard]] VkImageView getImageView(VkComponentMapping mapping, const VkImageSubresourceRange&subresourceRange) const;
+  [[nodiscard]] VkFormat getFormat() const;
+  [[nodiscard]] VkImageAspectFlags getAspect() const;
+  [[nodiscard]] uint32_t getMipLevels() const;
+  [[nodiscard]] uint32_t getLayerCount() const;
+  [[nodiscard]] VkSampleCountFlagBits getSampleCount() const;
+  [[nodiscard]] VkImageSubresourceRange getWholeRange() const;
 
 private:
   [[nodiscard]] void* getObject() const override;

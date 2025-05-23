@@ -37,7 +37,7 @@ public:
   /// Used to allocate the per-object descriptor sets.
   ///
   /// FRAMES_IN_FLIGHT * objectCount descriptor sets
-  DescriptorAllocator perObjectDescriptorAllocator;
+  DescriptorAllocator perMeshDescriptorAllocator;
 
   explicit GraphicsDevice();
   ~GraphicsDevice();

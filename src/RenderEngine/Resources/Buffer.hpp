@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Resource.hpp"
+#include "src/RenderEngine/Resources/Resource.hpp"
 
 #include <vma/vk_mem_alloc.h>
 
@@ -8,6 +8,12 @@ class Image;
 class GraphicsDevice;
 
 class Buffer : public Resource {
+public:
+  struct BufferMapping;
+
+private:
+  std::weak_ptr<BufferMapping> mapping;
+
 protected:
   VkBuffer buffer{VK_NULL_HANDLE};
   VkBufferView view{VK_NULL_HANDLE};
@@ -15,6 +21,15 @@ protected:
   VmaAllocationInfo allocationInfo{};
 
 public:
+  struct BufferMapping {
+    BufferMapping(std::shared_ptr<const GraphicsDevice> device, std::shared_ptr<const Buffer> buffer);
+    ~BufferMapping();
+
+    std::shared_ptr<const GraphicsDevice> device;
+    std::shared_ptr<const Buffer> buffer;
+    void* data;
+  };
+
   /**
    * @param device
    * @param name
@@ -25,11 +40,12 @@ public:
    * @param memoryUsage
    * @param flags
    */
-  explicit Buffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
+  explicit Buffer(std::shared_ptr<GraphicsDevice> device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
   ~Buffer() override;
 
   [[nodiscard]] VkBuffer getBuffer() const;
   [[nodiscard]] VkDeviceSize getSize() const;
+  [[nodiscard]] std::shared_ptr<BufferMapping> map();
 
 private:
   [[nodiscard]] void* getObject() const override;

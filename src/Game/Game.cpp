@@ -29,7 +29,7 @@ bool Game::tick() {
   //call onTick for every component in the game
   //todo: move to systems?
   for (auto& entityPair : entities) {
-    for(const std::shared_ptr<Component>& component : entityPair.second.getComponents()) {
+    for(std::shared_ptr component : entityPair.second.getComponents()) {
       component->onTick();
     }
   }

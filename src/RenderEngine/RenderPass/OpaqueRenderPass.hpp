@@ -1,13 +1,17 @@
 #pragma once
 
-#include "RenderPass.hpp"
+#include "src/RenderEngine/RenderPass/RenderPass.hpp"
+
+#include "glm/mat4x4.hpp"
 
 class Buffer;
+template<typename T> class UniformBuffer;
 
 class OpaqueRenderPass final : public RenderPass {
+  struct PassData { glm::mat4 viewProjectionMatrix; };
   RenderGraph& graph;
   std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
-  std::vector<std::shared_ptr<Buffer>> uniformBuffers;
+  std::shared_ptr<UniformBuffer<PassData>> uniformBuffer;
 
 public:
   explicit OpaqueRenderPass(RenderGraph& graph);

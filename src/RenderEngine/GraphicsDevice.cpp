@@ -22,7 +22,7 @@ GraphicsDevice::GraphicsDevice() :
     perFrameDescriptorAllocator(*this),
     perPassDescriptorAllocator (*this),
     perMaterialDescriptorAllocator(*this),
-    perObjectDescriptorAllocator(*this) {
+    perMeshDescriptorAllocator(*this) {
   vkb::PhysicalDeviceSelector deviceSelector{GraphicsInstance::instance};
   deviceSelector.defer_surface_initialization();
   deviceSelector.prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
@@ -103,7 +103,7 @@ GraphicsDevice::GraphicsDevice() :
       /// Normal Texture
       VkDescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr}
   }),
-  perObjectDescriptorAllocator.prepareAllocation({
+  perMeshDescriptorAllocator.prepareAllocation({
       /// model matrix
       VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
   });
@@ -171,7 +171,7 @@ void GraphicsDevice::destroy() {
   perFrameDescriptorAllocator.destroy();
   perPassDescriptorAllocator.destroy();
   perMaterialDescriptorAllocator.destroy();
-  perObjectDescriptorAllocator.destroy();
+  perMeshDescriptorAllocator.destroy();
   if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
   allocator = VK_NULL_HANDLE;
   if (device) {

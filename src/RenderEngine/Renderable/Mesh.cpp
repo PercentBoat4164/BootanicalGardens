@@ -1,13 +1,15 @@
 #include "src/RenderEngine/Renderable/Mesh.hpp"
 
-#include "src/RenderEngine/Buffer.hpp"
+#include "../Resources/Buffer.hpp"
+#include "../Resources/StagingBuffer.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
 #include "src/RenderEngine/Renderable/Texture.hpp"
 #include "src/RenderEngine/Renderable/Vertex.hpp"
-#include "src/RenderEngine/StagingBuffer.hpp"
+#include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/Tools/StringHash.h"
 
 #include <fastgltf/glm_element_traits.hpp>
@@ -60,33 +62,35 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
 
-  descriptorSets = device->perObjectDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
+  descriptorSets = device->perMeshDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
+  uniformBuffer  = std::make_shared<UniformBuffer<glm::mat4>>(device, "UniformBuffer");
+  VkDescriptorBufferInfo bufferInfo {
+    .buffer = uniformBuffer->getBuffer(),
+    .offset = 0,
+    .range = VK_WHOLE_SIZE
+  };
+  std::vector<VkWriteDescriptorSet> writeDescriptorSet(descriptorSets.size(), {
+    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .pNext            = nullptr,
+    .dstSet           = VK_NULL_HANDLE,
+    .dstBinding       = 0,
+    .dstArrayElement  = 0,
+    .descriptorCount  = 1,
+    .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    .pImageInfo       = nullptr,
+    .pBufferInfo      = &bufferInfo,
+    .pTexelBufferView = nullptr
+  });
+  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = *descriptorSets[i];
+  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 void Mesh::update(const RenderGraph& graph) const {
-  const Texture& texture = *material->getAlbedoTexture();
-  VkDescriptorImageInfo imageInfo {
-      .sampler     = texture.getSampler(),
-      .imageView   = texture.view(),
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-  };
-  const VkWriteDescriptorSet writeDescriptorSet {
-      .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .pNext            = nullptr,
-      .dstSet           = *descriptorSets[graph.getFrameIndex()],
-      .dstBinding       = 0,
-      .dstArrayElement  = 0,
-      .descriptorCount  = 1,
-      .descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo       = &imageInfo,
-      .pBufferInfo      = nullptr,
-      .pTexelBufferView = nullptr
-  };
-  vkUpdateDescriptorSets(graph.device->device, 1, &writeDescriptorSet, 0, nullptr);
+  uniformBuffer->update(glm::identity<glm::mat4>());
 }
 
-bool Mesh::isOpaque() const { return material->getAlphaMode() == fastgltf::AlphaMode::Opaque; }
-bool Mesh::isTransparent() const { return material->getAlphaMode() != fastgltf::AlphaMode::Opaque; }
+bool Mesh::isOpaque() const { return material->getAlphaMode() != fastgltf::AlphaMode::Blend; }
+bool Mesh::isTransparent() const { return material->getAlphaMode() == fastgltf::AlphaMode::Blend; }
 std::shared_ptr<Material> Mesh::getMaterial() const { return material; }
 std::shared_ptr<Buffer> Mesh::getVertexBuffer() const { return vertexBuffer; }
 std::shared_ptr<Buffer> Mesh::getIndexBuffer() const { return indexBuffer; }

@@ -1,13 +1,13 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 
-#include "src/RenderEngine/Buffer.hpp"
+#include "Resources/Buffer.hpp"
+#include "Resources/Image.hpp"
+#include "Resources/Resource.hpp"
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Image.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
 #include "src/RenderEngine/Renderable/Vertex.hpp"
-#include "src/RenderEngine/Resource.hpp"
 
 #include <volk/volk.h>
 #include <vulkan/utility/vk_format_utils.h>
@@ -28,7 +28,7 @@ CommandBuffer::BeginRenderPass::BeginRenderPass(std::shared_ptr<RenderPass> rend
       std::vector<ResourceAccess> accesses;
       auto attachments = renderPass->declareAttachments();
       uint32_t index{};
-      for (const std::shared_ptr<Image>& image : renderPass->getFramebuffer()->getImages()) {
+      for (std::shared_ptr<Image> image : renderPass->getFramebuffer()->getImages()) {
         auto& attachment = attachments[index++].second;
         accesses.emplace_back(ResourceAccess::Write, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
         accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
@@ -184,13 +184,13 @@ CommandBuffer::BlitImageToImage::BlitImageToImage(std::shared_ptr<Image> src, st
     filter(filter) {}
 void CommandBuffer::BlitImageToImage::preprocess(State& state, PreprocessingFlags flags) {
   if (regions.empty()) regions.push_back({
-    .srcSubresource = VkImageSubresourceLayers{src->aspect(), 0, 0, src->layerCount()},
-    .srcOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(src->extent().width), static_cast<int32_t>(src->extent().height), static_cast<int32_t>(src->extent().depth)}},
-    .dstSubresource = VkImageSubresourceLayers{dst->aspect(), 0, 0, dst->layerCount()},
-    .dstOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(dst->extent().width), static_cast<int32_t>(dst->extent().height), static_cast<int32_t>(dst->extent().depth)}},
+    .srcSubresource = VkImageSubresourceLayers{src->getAspect(), 0, 0, src->getLayerCount()},
+    .srcOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(src->getExtent().width), static_cast<int32_t>(src->getExtent().height), static_cast<int32_t>(src->getExtent().depth)}},
+    .dstSubresource = VkImageSubresourceLayers{dst->getAspect(), 0, 0, dst->getLayerCount()},
+    .dstOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(dst->getExtent().width), static_cast<int32_t>(dst->getExtent().height), static_cast<int32_t>(dst->getExtent().depth)}},
   });
-  srcImage = src->image();
-  dstImage = dst->image();
+  srcImage = src->getImage();
+  dstImage = dst->getImage();
   srcImageLayout = state.resourceStates.at(srcImage).layout;
   dstImageLayout = state.resourceStates.at(dstImage).layout;
 }
@@ -213,8 +213,8 @@ CommandBuffer::ClearColorImage::ClearColorImage(std::shared_ptr<Image> img, cons
     value(value),
     subresourceRanges(std::move(subresourceRanges)) {}
 void CommandBuffer::ClearColorImage::preprocess(State& state, PreprocessingFlags flags) {
-  if (subresourceRanges.empty()) subresourceRanges.push_back({img->aspect(), 0, img->mipLevels(), 0, img->layerCount()});
-  image = img->image();
+  if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
+  image = img->getImage();
   layout = state.resourceStates.at(image).layout;
 }
 void CommandBuffer::ClearColorImage::bake(VkCommandBuffer commandBuffer) {
@@ -236,8 +236,8 @@ CommandBuffer::ClearDepthStencilImage::ClearDepthStencilImage(std::shared_ptr<Im
     value(value),
     subresourceRanges(std::move(subresourceRanges)) {}
 void CommandBuffer::ClearDepthStencilImage::preprocess(State& state, PreprocessingFlags flags) {
-  if (subresourceRanges.empty()) subresourceRanges.push_back({img->aspect(), 0, img->mipLevels(), 0, img->layerCount()});
-  image = img->image();
+  if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
+  image = img->getImage();
   layout = state.resourceStates.at(image).layout;
 }
 void CommandBuffer::ClearDepthStencilImage::bake(VkCommandBuffer commandBuffer) {
@@ -290,14 +290,14 @@ CommandBuffer::CopyBufferToImage::CopyBufferToImage(std::shared_ptr<Buffer> src,
 void CommandBuffer::CopyBufferToImage::preprocess(State& state, PreprocessingFlags flags) {
   if (regions.empty()) regions.push_back({
     .bufferOffset = 0,
-    .bufferRowLength = vkuFormatTexelBlockExtent(dst->format()).width * dst->extent().width,
-    .bufferImageHeight = vkuFormatTexelBlockExtent(dst->format()).height * dst->extent().height,
-    .imageSubresource = VkImageSubresourceLayers{dst->aspect(), 0, 0, dst->layerCount()},
+    .bufferRowLength = vkuFormatTexelBlockExtent(dst->getFormat()).width * dst->getExtent().width,
+    .bufferImageHeight = vkuFormatTexelBlockExtent(dst->getFormat()).height * dst->getExtent().height,
+    .imageSubresource = VkImageSubresourceLayers{dst->getAspect(), 0, 0, dst->getLayerCount()},
     .imageOffset = VkOffset3D{0, 0, 0},
-    .imageExtent = dst->extent()
+    .imageExtent = dst->getExtent()
   });
   buffer = src->getBuffer();
-  image = dst->image();
+  image = dst->getImage();
   layout = state.resourceStates.at(image).layout;
 }
 void CommandBuffer::CopyBufferToImage::bake(VkCommandBuffer commandBuffer) {
@@ -322,13 +322,13 @@ CommandBuffer::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<Image> src, 
 void CommandBuffer::CopyImageToBuffer::preprocess(State& state, PreprocessingFlags flags) {
   if (regions.empty()) regions.push_back({
     .bufferOffset = 0,
-    .bufferRowLength = vkuFormatTexelBlockExtent(src->format()).width * src->extent().width,
-    .bufferImageHeight = vkuFormatTexelBlockExtent(src->format()).height * src->extent().height,
-    .imageSubresource = VkImageSubresourceLayers{src->aspect(), 0, 0, src->layerCount()},
+    .bufferRowLength = vkuFormatTexelBlockExtent(src->getFormat()).width * src->getExtent().width,
+    .bufferImageHeight = vkuFormatTexelBlockExtent(src->getFormat()).height * src->getExtent().height,
+    .imageSubresource = VkImageSubresourceLayers{src->getAspect(), 0, 0, src->getLayerCount()},
     .imageOffset = VkOffset3D{0, 0, 0},
-    .imageExtent = src->extent()
+    .imageExtent = src->getExtent()
   });
-  image = src->image();
+  image = src->getImage();
   buffer = dst->getBuffer();
   layout = state.resourceStates.at(image).layout;
 }
@@ -355,14 +355,14 @@ CommandBuffer::CopyImageToImage::CopyImageToImage(std::shared_ptr<Image> src, st
     regions(std::move(regions)) {}
 void CommandBuffer::CopyImageToImage::preprocess(State& state, PreprocessingFlags flags) {
   if (regions.empty()) regions.push_back({
-    .srcSubresource = VkImageSubresourceLayers{src->aspect(), 0, 0, src->layerCount()},
+    .srcSubresource = VkImageSubresourceLayers{src->getAspect(), 0, 0, src->getLayerCount()},
     .srcOffset      = VkOffset3D{0, 0, 0},
-    .dstSubresource = VkImageSubresourceLayers{dst->aspect(), 0, 0, dst->layerCount()},
+    .dstSubresource = VkImageSubresourceLayers{dst->getAspect(), 0, 0, dst->getLayerCount()},
     .dstOffset      = VkOffset3D{0, 0, 0},
-    .extent         = VkExtent3D{std::min(src->extent().width, dst->extent().width), std::min(src->extent().height, dst->extent().height), std::min(src->extent().depth, dst->extent().depth)}
+    .extent         = VkExtent3D{std::min(src->getExtent().width, dst->getExtent().width), std::min(src->getExtent().height, dst->getExtent().height), std::min(src->getExtent().depth, dst->getExtent().depth)}
   });
-  srcImage = src->image();
-  dstImage = dst->image();
+  srcImage = src->getImage();
+  dstImage = dst->getImage();
   srcLayout = state.resourceStates.at(srcImage).layout;
   dstLayout = state.resourceStates.at(dstImage).layout;
 }
@@ -503,8 +503,8 @@ CommandBuffer::State CommandBuffer::preprocess(State state, const PreprocessingF
             .newLayout           = access.allowedLayouts[0],  // We always prefer the layout listed first.
             .srcQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex,
             .dstQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex,
-            .image               = image.image(),
-            .subresourceRange    = image.wholeRange()
+            .image               = image.getImage(),
+            .subresourceRange    = image.getWholeRange()
           });
           resourceState.layout = access.allowedLayouts[0];
         }
@@ -532,7 +532,7 @@ std::string CommandBuffer::toString() const {
 }
 
 void CommandBuffer::bake(VkCommandBuffer commandBuffer) const {
-  for (const std::shared_ptr<Command>& command: commands) command->bake(commandBuffer);
+  for (std::shared_ptr<Command> command: commands) command->bake(commandBuffer);
 }
 
 void CommandBuffer::clear() {

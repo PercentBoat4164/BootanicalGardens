@@ -1,17 +1,18 @@
 #include "OpaqueRenderPass.hpp"
 
-#include "src/RenderEngine/Buffer.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
-#include "src/RenderEngine/Image.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
 #include "src/RenderEngine/Renderable/Mesh.hpp"
-#include "src/RenderEngine/StagingBuffer.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
+#include "src/RenderEngine/Resources/Image.hpp"
+#include "src/RenderEngine/Resources/UniformBuffer.hpp"
 
-#include <glm/matrix.hpp>  // required for matrix_clip_space.hpp's templated functions to work
+
 #include <glm/ext/matrix_clip_space.hpp>
+#include <glm/matrix.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -80,33 +81,21 @@ void OpaqueRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
   vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass);
 
   framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr<Mesh>& mesh: meshes)
+  for (const std::shared_ptr mesh: meshes)
     graph.bakePipeline(mesh->getMaterial(), shared_from_this());
 
   descriptorSets = graph.device->perPassDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
-  uniformBuffers.resize(RenderGraph::FRAMES_IN_FLIGHT);
-  for (uint32_t i{}; i < uniformBuffers.size(); ++i) uniformBuffers[i] = std::make_shared<Buffer>(graph.device, "uniform buffer", sizeof(glm::mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
-}
+  uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "uniform buffer");
 
-void OpaqueRenderPass::update(const RenderGraph& graph) {
-  const uint32_t frameIndex                    = graph.getFrameIndex();
-  const glm::mat4x4 projectionMatrix           = glm::perspectiveZO(glm::radians(60.0f), 8.0f / 6.0f, 0.001f, 1000.0f);
-  const glm::mat4x4 viewMatrix                 = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0));
-  const auto uniformStagingBuffer              = std::make_shared<StagingBuffer>(graph.device, "uniform staging buffer", std::vector{projectionMatrix * viewMatrix});
-  const std::shared_ptr<Buffer>& uniformBuffer = uniformBuffers[frameIndex];
-  CommandBuffer commandBuffer;
-  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(uniformStagingBuffer, uniformBuffer);
-  commandBuffer.preprocess();
-  graph.device->executeCommandBufferImmediate(commandBuffer);
   VkDescriptorBufferInfo bufferInfo {
     .buffer = uniformBuffer->getBuffer(),
     .offset = 0,
     .range = uniformBuffer->getSize()
   };
-  const VkWriteDescriptorSet writeDescriptorSet {
+  std::vector<VkWriteDescriptorSet> writeDescriptorSet(RenderGraph::FRAMES_IN_FLIGHT, {
     .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .pNext            = nullptr,
-    .dstSet           = *descriptorSets[frameIndex],
+    .dstSet           = VK_NULL_HANDLE,
     .dstBinding       = 0,
     .dstArrayElement  = 0,
     .descriptorCount  = 1,
@@ -114,8 +103,17 @@ void OpaqueRenderPass::update(const RenderGraph& graph) {
     .pImageInfo       = nullptr,
     .pBufferInfo      = &bufferInfo,
     .pTexelBufferView = nullptr
-  };
-  vkUpdateDescriptorSets(graph.device->device, 1, &writeDescriptorSet, 0, nullptr);
+  });
+  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = *descriptorSets[i];
+  vkUpdateDescriptorSets(graph.device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
+}
+
+void OpaqueRenderPass::update(const RenderGraph& graph) {
+  const glm::mat4x4 projectionMatrix = glm::perspectiveZO(glm::radians(60.0f), 8.0f / 6.0f, 0.001f, 1000.0f);
+  const glm::mat4x4 viewMatrix       = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0));
+
+  const PassData passData {projectionMatrix * viewMatrix};
+  uniformBuffer->update(passData);
 }
 
 void OpaqueRenderPass::execute(CommandBuffer& commandBuffer) {
@@ -123,7 +121,7 @@ void OpaqueRenderPass::execute(CommandBuffer& commandBuffer) {
   // Perform all state transitions and render all meshes belonging to this render pass.
   for (const std::shared_ptr<Mesh>& mesh : meshes) {
     commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});
-    bool meshIsIndexed = mesh->getIndexBuffer() != nullptr;
+    const bool meshIsIndexed = mesh->getIndexBuffer() != nullptr;
     if (meshIsIndexed) commandBuffer.record<CommandBuffer::BindIndexBuffers>(mesh->getIndexBuffer());
     std::shared_ptr<Pipeline> pipeline = graph.getPipeline(mesh->getMaterial(), compatibility);
     commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);

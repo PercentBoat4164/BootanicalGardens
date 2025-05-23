@@ -52,7 +52,7 @@ public:
   }
 };
 
-Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) : device(device) {
+Shader::Shader(std::shared_ptr<GraphicsDevice> device, yyjson_val* obj) : device(device) {
   // Source file path
   sourcePath = yyjson_get_str(yyjson_obj_get(obj, "source"));
 
@@ -107,7 +107,7 @@ Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) :
   if (!has_main) return;
 }
 
-Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
+Shader::Shader(std::shared_ptr<GraphicsDevice> device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
   const shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<Includer>());

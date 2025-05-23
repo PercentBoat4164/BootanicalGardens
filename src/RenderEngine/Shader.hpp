@@ -23,8 +23,8 @@ class Shader {
   std::string entryPoint;
 
 public:
-  explicit Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj);
-  explicit Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& sourcePath);
+  explicit Shader(std::shared_ptr<GraphicsDevice> device, yyjson_val* obj);
+  explicit Shader(std::shared_ptr<GraphicsDevice> device, const std::filesystem::path& sourcePath);
   ~Shader();
 
   void save(yyjson_mut_doc* doc, yyjson_mut_val* obj) const;

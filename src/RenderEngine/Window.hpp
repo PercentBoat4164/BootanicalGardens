@@ -21,7 +21,7 @@ public:
   static SDL_Window* initialize();
   static void cleanupInitialization(SDL_Window* window);
 
-  explicit Window(const std::shared_ptr<GraphicsDevice>& device);
+  explicit Window(std::shared_ptr<GraphicsDevice> device);
   ~Window();
 
   [[nodiscard]] VkExtent3D getResolution() const;

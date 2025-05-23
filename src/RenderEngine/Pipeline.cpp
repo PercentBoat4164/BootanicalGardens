@@ -3,6 +3,7 @@
 #include "GraphicsInstance.hpp"
 #include "RenderPass/RenderPass.hpp"
 #include "Renderable/Material.hpp"
+#include "Renderable/Texture.hpp"
 #include "Renderable/Vertex.hpp"
 #include "Shader.hpp"
 
@@ -11,7 +12,7 @@
 
 #include <ranges>
 
-Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, std::shared_ptr<const Material> material, std::shared_ptr<const RenderPass> renderPass, VkPipelineLayout layout) : device(device), layout(layout) {
+Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass, VkPipelineLayout layout) : device(device), layout(layout), material(material) {
   shaders = material->getShaders();
   if (shaders.empty()) GraphicsInstance::showError("A pipeline must be created with at least one shader.");
   bindPoint = shaders.back()->getBindPoint();
@@ -183,7 +184,7 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, std::shared_pt
         .dynamicStateCount = std::extent_v<decltype(dynamicStates)>,
         .pDynamicStates    = dynamicStates
     };
-    const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+    const VkGraphicsPipelineCreateInfo pipelineCreateInfo {
         .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext               = nullptr,
         .flags               = 0,
@@ -207,6 +208,25 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, std::shared_pt
     if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create graphics pipeline.");
   }
   descriptorSets = device->perMaterialDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
+  VkDescriptorImageInfo imageInfo {
+    .sampler = material->getAlbedoTexture()->getSampler(),
+    .imageView = material->getAlbedoTexture()->getImageView(),
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  };
+  std::vector<VkWriteDescriptorSet> writeDescriptorSet (descriptorSets.size(), {
+    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .pNext            = nullptr,
+    .dstSet           = VK_NULL_HANDLE,
+    .dstBinding       = 0,
+    .dstArrayElement  = 0,
+    .descriptorCount  = 1,
+    .descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo       = &imageInfo,
+    .pBufferInfo      = nullptr,
+    .pTexelBufferView = nullptr
+  });
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writeDescriptorSet[i].dstSet = *descriptorSets[i];
+  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 Pipeline::~Pipeline() {
@@ -217,3 +237,4 @@ Pipeline::~Pipeline() {
 VkPipeline Pipeline::getPipeline() const { return pipeline; }
 VkPipelineLayout Pipeline::getLayout() const { return layout; }
 std::shared_ptr<VkDescriptorSet> Pipeline::getDescriptorSet(const uint64_t frameIndex) const { return descriptorSets[frameIndex]; }
+void Pipeline::update() {}

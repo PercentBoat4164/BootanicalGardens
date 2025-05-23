@@ -1,15 +1,14 @@
 #version 460
+#include "BooLib.glsl"
 
 layout (location = 0) in vec3 inPosition;
 layout (location = 3) in vec2 inTextureCoordinates0;
 
-layout (set = 1, binding = 0) uniform PVMData {
-    mat4 viewProjectionMatrix;
-};
+PER_RENDERPASS_DATA passData;
 
 layout (location = 0) out vec2 outTextureCoordinates;
 
 void main() {
-    gl_Position = viewProjectionMatrix * vec4(inPosition, 1);
+    gl_Position = passData.viewProjectionMatrix * vec4(inPosition, 1);
     outTextureCoordinates = inTextureCoordinates0;
 }

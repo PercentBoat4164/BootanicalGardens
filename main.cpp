@@ -15,7 +15,7 @@ int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
   GraphicsInstance::create({});
   {
-    const auto graphicsDevice{std::make_shared<GraphicsDevice>()};
+    const auto graphicsDevice = std::make_shared<GraphicsDevice>();
 
     Window window{graphicsDevice};
 
@@ -36,6 +36,7 @@ int main() {
 
     CommandBuffer commandBuffer;
     renderGraph.bake(commandBuffer);
+    graphicsDevice->executeCommandBufferImmediate(commandBuffer);
 
     do {
       // Make sure that the CPU is not getting too far ahead of the GPU

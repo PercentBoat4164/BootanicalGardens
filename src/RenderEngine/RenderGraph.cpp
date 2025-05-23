@@ -1,15 +1,16 @@
 #include "RenderGraph.hpp"
 
-#include "Buffer.hpp"
-#include "CommandBuffer.hpp"
-#include "GraphicsDevice.hpp"
-#include "Image.hpp"
-#include "Pipeline.hpp"
-#include "RenderPass/RenderPass.hpp"
-#include "Renderable/Mesh.hpp"
-#include "Renderable/Renderable.hpp"
-#include "StagingBuffer.hpp"
-#include "Window.hpp"
+#include "src/Game/Game.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
+#include "src/RenderEngine/GraphicsDevice.hpp"
+#include "src/RenderEngine/Pipeline.hpp"
+#include "src/RenderEngine/RenderPass/RenderPass.hpp"
+#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/Renderable/Mesh.hpp"
+#include "src/RenderEngine/Renderable/Renderable.hpp"
+#include "src/RenderEngine/Resources/Image.hpp"
+#include "src/RenderEngine/Resources/UniformBuffer.hpp"
+#include "src/RenderEngine/Window.hpp"
 
 #include <volk/volk.h>
 
@@ -52,7 +53,6 @@ RenderGraph::PerFrameData::PerFrameData(const std::shared_ptr<GraphicsDevice>& d
       .flags = VK_FENCE_CREATE_SIGNALED_BIT
   };
   if (const VkResult result = vkCreateFence(device->device, &fenceCreateInfo, nullptr, &renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create fence");
-  uniformBuffer = std::make_shared<Buffer>(device, "uniform buffer", sizeof(uint64_t) + sizeof(double), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
 RenderGraph::PerFrameData::~PerFrameData() {
@@ -82,7 +82,7 @@ RenderGraph::RenderGraph(const std::shared_ptr<GraphicsDevice>& device) : device
     device->perFrameDescriptorAllocator.getLayout(),
     device->perPassDescriptorAllocator.getLayout(),
     device->perMaterialDescriptorAllocator.getLayout(),
-    device->perObjectDescriptorAllocator.getLayout()
+    device->perMeshDescriptorAllocator.getLayout()
   };
 
   const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
@@ -95,6 +95,28 @@ RenderGraph::RenderGraph(const std::shared_ptr<GraphicsDevice>& device) : device
     .pPushConstantRanges    = nullptr
   };
   if (const VkResult result = vkCreatePipelineLayout(device->device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create pipeline layout.");
+
+  uniformBuffer = std::make_shared<UniformBuffer<GraphData>>(device, "RenderGraph UniformBuffer");
+
+  const VkDescriptorBufferInfo bufferInfo {
+    .buffer = uniformBuffer->getBuffer(),
+    .offset = 0,
+    .range = VK_WHOLE_SIZE
+  };
+  std::vector<VkWriteDescriptorSet> writeDescriptorSet(frames.size(), {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .pNext = nullptr,
+    .dstSet = VK_NULL_HANDLE,
+    .dstBinding = 0,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    .pImageInfo = VK_NULL_HANDLE,
+    .pBufferInfo = &bufferInfo,
+    .pTexelBufferView = VK_NULL_HANDLE
+  });
+  for (uint32_t i{}; i < frames.size(); ++i) writeDescriptorSet[i].dstSet = *frames[i].descriptorSet;
+  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 RenderGraph::~RenderGraph() {
@@ -107,7 +129,7 @@ RenderGraph::~RenderGraph() {
 void RenderGraph::setResolutionGroup(const ResolutionGroupID id, const VkExtent3D resolution) {
   auto& group = resolutionGroups[id];
   std::get<0>(group) = resolution;
-  for (AttachmentID attachmentId : std::get<1>(group)) if (const std::shared_ptr<Image>& image = backingImages[attachmentId]; image != nullptr) image->rebuild(resolution);
+  for (AttachmentID attachmentId : std::get<1>(group)) if (std::shared_ptr<Image> image = backingImages[attachmentId]; image != nullptr) image->rebuild(resolution);
   outOfDate = true;
 }
 
@@ -121,16 +143,16 @@ void RenderGraph::addRenderable(const std::shared_ptr<Renderable>& renderable) {
   renderables.emplace(renderable);
   for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
     for (const std::shared_ptr<RenderPass>& renderPass: renderPasses)
-      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) ||
-          (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit)) renderPass->addMesh(mesh);
+      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) || (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit))
+        renderPass->addMesh(mesh);
 }
 
 void RenderGraph::removeRenderable(const std::shared_ptr<Renderable>& renderable) {
   renderables.erase(renderables.get_iterator(&renderable));
   for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
     for (const std::shared_ptr<RenderPass>& renderPass: renderPasses)
-      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) ||
-          (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit)) renderPass->removeMesh(mesh);
+      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) || (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit))
+        renderPass->removeMesh(mesh);
 }
 
 bool RenderGraph::bake(CommandBuffer& commandBuffer) {
@@ -158,7 +180,7 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
     images.reserve(renderPassAttachmentIDs.size());
     for (const AttachmentID& id: renderPassAttachmentIDs) {
       /**@todo: Add support for aliasing attachmentsProperties.*/
-      const std::shared_ptr<Image>& image = backingImages.at(id);
+      std::shared_ptr<Image> image = backingImages.at(id);
       auto& attachmentDeclarations = id2decl[id];
       // Find this renderpass in the declarations of this attachment.
       const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
@@ -171,8 +193,8 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
       const AttachmentDeclaration& nextDeclaration = nextIt->second;
       descriptions.push_back({
         .flags = 0U,
-        .format = image->format(),
-        .samples = image->sampleCount(),
+        .format = image->getFormat(),
+        .samples = image->getSampleCount(),
         .loadOp = nextDeclaration.loadOp,
         .storeOp = nextDeclaration.storeOp,
         .stencilLoadOp = nextDeclaration.stencilLoadOp,
@@ -199,34 +221,12 @@ VkSemaphore RenderGraph::waitForNextFrameData() const {
 }
 
 void RenderGraph::update() const {
-  struct GraphUniformBufferObject {
-    uint64_t frameCount;
-    double   time;
-  } ubo;
-  const PerFrameData& frameData = getPerFrameData();
-  CommandBuffer commandBuffer;
-  const auto uniformStagingBuffer = std::make_shared<StagingBuffer>(device, "uniform staging buffer", &ubo, 1);
-  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(uniformStagingBuffer, frameData.uniformBuffer);
-  commandBuffer.preprocess();
-  device->executeCommandBufferImmediate(commandBuffer);
-  const VkDescriptorBufferInfo bufferInfo {
-    .buffer = frameData.uniformBuffer->getBuffer(),
-    .offset = 0,
-    .range = VK_WHOLE_SIZE
-  };
-  const VkWriteDescriptorSet writeDescriptorSet {
-    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .pNext = nullptr,
-    .dstSet = *frameData.descriptorSet,
-    .dstBinding = 0,
-    .dstArrayElement = 0,
-    .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    .pImageInfo = VK_NULL_HANDLE,
-    .pBufferInfo = &bufferInfo,
-    .pTexelBufferView = VK_NULL_HANDLE
-  };
-  vkUpdateDescriptorSets(device->device, 1, &writeDescriptorSet, 0, nullptr);
+  for (const std::shared_ptr<Renderable>& renderable : renderables)
+    for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
+      mesh->update(*this);
+  for (const std::shared_ptr<Pipeline>& pipeline : std::ranges::views::values(pipelines))
+    pipeline->update();
+  uniformBuffer->update({frameNumber, Game::getTime()});
 }
 
 VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) const {
@@ -244,7 +244,7 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
     .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
     .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .image = defaultColorImage->image(),
+    .image = defaultColorImage->getImage(),
     .subresourceRange = {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
       .baseMipLevel = 0,
@@ -268,7 +268,7 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
     .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
     .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .image = swapchainImage->image(),
+    .image = swapchainImage->getImage(),
     .subresourceRange = {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
       .baseMipLevel = 0,
@@ -337,8 +337,8 @@ void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::unor
       .newLayout = declaration.layout,
       .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
       .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-      .image = image->image(),
-      .subresourceRange = image->wholeRange()
+      .image = image->getImage(),
+      .subresourceRange = image->getWholeRange()
     };
     commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, declaration.stage, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, std::vector{imageMemoryBarrier});
   }

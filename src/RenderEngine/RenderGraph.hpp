@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DescriptorAllocator.hpp"
+#include "src/RenderEngine/DescriptorAllocator.hpp"
 #include "src/Tools/StringHash.h"
 
 #include "plf_colony.h"
@@ -20,8 +20,16 @@ class Pipeline;
 class RenderPass;
 class Image;
 class Renderable;
+template <typename T> class UniformBuffer;
 
 class RenderGraph {
+  struct GraphData {
+    uint64_t frameNumber;
+    double time;
+  };
+
+  std::shared_ptr<UniformBuffer<GraphData>> uniformBuffer{};
+
   class PerFrameData {
     const std::shared_ptr<GraphicsDevice> device;
     const RenderGraph& graph;
@@ -34,7 +42,6 @@ class RenderGraph {
     VkFence renderFence{VK_NULL_HANDLE};
     /// Per-frame descriptor set
     std::shared_ptr<VkDescriptorSet> descriptorSet{VK_NULL_HANDLE};
-    std::shared_ptr<Buffer> uniformBuffer{};
 
     PerFrameData(const std::shared_ptr<GraphicsDevice>& device, const RenderGraph& graph);
 
