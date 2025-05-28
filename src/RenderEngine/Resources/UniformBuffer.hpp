@@ -13,7 +13,7 @@ public:
    * @param device The GraphicsDevice that this UniformBuffer belongs to.
    * @param name The name of this UniformBuffer -- used for debugging purposes.
    */
-  UniformBuffer(std::shared_ptr<GraphicsDevice> device, const char * const name) : Buffer(device, name, sizeof(UniformData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT) {
+  UniformBuffer(const std::shared_ptr<GraphicsDevice>& device, const char * const name) : Buffer(device, name, sizeof(UniformData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT) {
     VkMemoryPropertyFlags properties;
     vmaGetAllocationMemoryProperties(device->allocator, allocation, &properties);
 
@@ -27,7 +27,7 @@ public:
    * @param name The name of this UniformBuffer -- used for debugging purposes.
    * @param data The data to fill the buffer with after it has been created.
    */
-  UniformBuffer(std::shared_ptr<GraphicsDevice> device, const char * const name, const UniformData& data) : UniformBuffer(device, name) {
+  UniformBuffer(const std::shared_ptr<GraphicsDevice>& device, const char * const name, const UniformData& data) : UniformBuffer(device, name) {
     update(data);
   }
 

@@ -1,13 +1,14 @@
 #include "GraphicsDevice.hpp"
 
-#include "GraphicsInstance.hpp"
-#include "Pipeline.hpp"
-#include "Renderable/Material.hpp"
-#include "Shader.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/Pipeline.hpp"
+#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/Shader.hpp"
+#include "src/Tools/Hashing.hpp"
 
 #include <volk/volk.h>
 
-void getQueues(VkPhysicalDevice physicalDevice, std::vector<VkQueueFlags> required, std::vector<VkQueueFlags> requested) {
+void getQueues(VkPhysicalDevice physicalDevice, const std::vector<VkQueueFlags>& required, const std::vector<VkQueueFlags>& requested) {
   uint32_t count{};
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
   std::vector<VkQueueFamilyProperties> properties(count);
@@ -165,7 +166,42 @@ void GraphicsDevice::executeCommandBufferImmediate(const CommandBuffer& commandB
   waitForAsyncCommandBuffer(executeCommandBufferImmediateAsync(commandBuffer));
 }
 
+std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificationFilter, const VkFilter minificationFilter, const VkSamplerMipmapMode mipmapMode, const VkSamplerAddressMode addressMode, const float lodBias, const VkBorderColor borderColor) {
+  std::size_t samplerID = hash(magnificationFilter, minificationFilter, mipmapMode, addressMode, lodBias, borderColor);
+  if (const auto it = samplers.find(samplerID); it != samplers.end())
+    if (!it->second.expired()) return it->second.lock();
+    else samplers.erase(it);
+  const VkSamplerCreateInfo createInfo {
+      .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .pNext                   = nullptr,
+      .flags                   = 0,
+      .magFilter               = magnificationFilter,
+      .minFilter               = minificationFilter,
+      .mipmapMode              = mipmapMode,
+      .addressModeU            = addressMode,
+      .addressModeV            = addressMode,
+      .addressModeW            = addressMode,
+      .mipLodBias              = lodBias,
+      .anisotropyEnable        = VK_FALSE,
+      .maxAnisotropy           = 0,
+      .compareEnable           = VK_FALSE,
+      .compareOp               = VK_COMPARE_OP_NEVER,
+      .minLod                  = std::numeric_limits<float>::min(),
+      .maxLod                  = std::numeric_limits<float>::max(),
+      .borderColor             = borderColor,
+      .unnormalizedCoordinates = VK_FALSE
+  };
+  auto sampler = std::shared_ptr<VkSampler>(new VkSampler, [this, samplerID](VkSampler* sampler) {
+    vkDestroySampler(device, *sampler, nullptr);
+    samplers.erase(samplerID);
+  });
+  samplers.emplace(samplerID, sampler);
+  if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get())) GraphicsInstance::showError(result, "failed to create sampler.");
+  return sampler;
+}
+
 void GraphicsDevice::destroy() {
+  samplers.clear();
   vkDestroyCommandPool(device, commandPool, nullptr);
   commandPool = VK_NULL_HANDLE;
   perFrameDescriptorAllocator.destroy();
@@ -178,5 +214,5 @@ void GraphicsDevice::destroy() {
     vkDeviceWaitIdle(device);
     destroy_device(device);
   }
-  std::construct_at(&device);
+  globalQueue = VK_NULL_HANDLE;
 }

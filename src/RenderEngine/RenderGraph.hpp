@@ -24,8 +24,8 @@ template <typename T> class UniformBuffer;
 
 class RenderGraph {
   struct GraphData {
-    uint64_t frameNumber;
-    double time;
+    uint32_t frameNumber;
+    float time;
   };
 
   std::shared_ptr<UniformBuffer<GraphData>> uniformBuffer{};

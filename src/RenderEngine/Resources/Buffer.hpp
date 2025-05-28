@@ -22,12 +22,12 @@ protected:
 
 public:
   struct BufferMapping {
-    BufferMapping(std::shared_ptr<const GraphicsDevice> device, std::shared_ptr<const Buffer> buffer);
+    BufferMapping(const std::shared_ptr<const GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer);
     ~BufferMapping();
 
     std::shared_ptr<const GraphicsDevice> device;
     std::shared_ptr<const Buffer> buffer;
-    void* data;
+    void* data{};
   };
 
   /**
@@ -40,7 +40,7 @@ public:
    * @param memoryUsage
    * @param flags
    */
-  explicit Buffer(std::shared_ptr<GraphicsDevice> device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
+  explicit Buffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
   ~Buffer() override;
 
   [[nodiscard]] VkBuffer getBuffer() const;

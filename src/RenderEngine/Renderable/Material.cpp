@@ -1,9 +1,8 @@
 #include "Material.hpp"
 
-#include "../Resources/Buffer.hpp"
-#include "../Resources/StagingBuffer.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/Renderable/Texture.hpp"
+#include "src/RenderEngine/Resources/StagingBuffer.hpp"
 
 #include <SDL3_image/SDL_image.h>
 #include <iostream>

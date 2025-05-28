@@ -226,14 +226,12 @@ void RenderGraph::update() const {
       mesh->update(*this);
   for (const std::shared_ptr<Pipeline>& pipeline : std::ranges::views::values(pipelines))
     pipeline->update();
-  uniformBuffer->update({frameNumber, Game::getTime()});
+  uniformBuffer->update({static_cast<uint32_t>(frameNumber), static_cast<float>(Game::getTime())});
 }
 
 VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) const {
   CommandBuffer commandBuffer;
   std::shared_ptr<Image> defaultColorImage = backingImages.at(RenderColor);
-  // commandBuffer.record<CommandBuffer::ClearColorImage>(swapchainImage);
-  commandBuffer.record<CommandBuffer::ClearColorImage>(defaultColorImage);
   commandBuffer.record<CommandBuffer::ClearDepthStencilImage>(backingImages.at(RenderDepth));
   VkImageMemoryBarrier imageMemoryBarrier {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,

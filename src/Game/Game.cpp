@@ -23,7 +23,7 @@ bool Game::tick() {
   }
   double currentTime = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
   tickTime           = currentTime - time;
-  time = currentTime;
+  time               = currentTime;
   Input::onTick();
 
   //call onTick for every component in the game
