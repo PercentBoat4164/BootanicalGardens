@@ -15,6 +15,9 @@
 #include <glm/matrix.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
+#include "src/RenderEngine/GraphicsInstance.hpp"
+
+
 #include <glm/gtx/transform.hpp>
 
 #include <volk/volk.h>
@@ -78,10 +81,10 @@ void OpaqueRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
       .pDependencies   = nullptr
   };
   compatibility = computeRenderPassCompatibility(renderPassCreateInfo);
-  vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass);
+  if (const VkResult result = vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create render pass");
 
   framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr mesh: meshes)
+  for (const std::shared_ptr<Mesh>& mesh : meshes)
     graph.bakePipeline(mesh->getMaterial(), shared_from_this());
 
   descriptorSets = graph.device->perPassDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
@@ -123,7 +126,7 @@ void OpaqueRenderPass::execute(CommandBuffer& commandBuffer) {
     commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});
     const bool meshIsIndexed = mesh->getIndexBuffer() != nullptr;
     if (meshIsIndexed) commandBuffer.record<CommandBuffer::BindIndexBuffers>(mesh->getIndexBuffer());
-    std::shared_ptr<Pipeline> pipeline = graph.getPipeline(mesh->getMaterial(), compatibility);
+    std::shared_ptr<Pipeline> pipeline = graph.getPipeline(compatibility);
     commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
     const uint64_t frameIndex = graph.getFrameIndex();
     commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*graph.getPerFrameData().descriptorSet, *descriptorSets[frameIndex], *pipeline->getDescriptorSet(frameIndex), *mesh->getDescriptorSet(frameIndex)});

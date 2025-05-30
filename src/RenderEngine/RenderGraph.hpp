@@ -56,8 +56,6 @@ class RenderGraph {
   plf::colony<std::shared_ptr<Renderable>> renderables;
   bool outOfDate = false;
 
-  VkPipelineLayout pipelineLayout;
-
 public:
   const std::shared_ptr<GraphicsDevice> device;
 
@@ -122,16 +120,12 @@ public:
   bool bake(CommandBuffer& commandBuffer);
 
   [[nodiscard]] const PerFrameData& getPerFrameData() const;
-  [[nodiscard]] VkPipelineLayout getPipelineLayout() const;
   [[nodiscard]] VkSemaphore waitForNextFrameData() const;
   void update() const;
   [[nodiscard]] VkSemaphore execute(const std::shared_ptr<Image>& swapchainImage) const;
 
-  /**@todo: Create Pipelines based on the pointer to the material and the RenderPass.*/
-  /**@todo: Get Pipelines based on the pointer to the material and the RenderPass's compatibility.*/
-  /**@todo: Compute each RenderPass's compatibility as it is baked.*/
   void bakePipeline(const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass);
-  std::shared_ptr<Pipeline> getPipeline(const std::shared_ptr<const Material>& material, uint64_t renderPassCompatibility);
+  std::shared_ptr<Pipeline> getPipeline(uint64_t renderPassCompatibility);
 
   inline static const AttachmentID RenderColor = getAttachmentId("RenderColor");
   inline static const AttachmentID RenderDepth = getAttachmentId("RenderDepth");

@@ -17,6 +17,7 @@
     /**This RenderPass' view projection matrix.*/                         \
     mat4 viewProjectionMatrix;                                            \
 }
+
 // @todo: This is probably where lighting data should go.
 #define PER_RENDERPASS_CUSTOM_DATA_SET_AND_BINDING set=1, binding=1
 
@@ -33,7 +34,7 @@
  * Per Mesh descriptor set bindings *
  ******************************************/
 
-#define PER_MESH_MODEL_DATA layout (set=3, binding=0) uniform MeshData {  \
-    /**This mesh's model to world matrix.*/                               \
-    mat4 modelMatrix;                                                     \
+#define PER_MESH_DATA layout (set=3, binding=0) uniform MeshData {  \
+    /**This mesh's model to world matrix.*/                         \
+    mat4 modelMatrix;                                               \
 }

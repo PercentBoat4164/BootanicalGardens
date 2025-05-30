@@ -4,7 +4,7 @@
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 
-Buffer::BufferMapping::BufferMapping(const std::shared_ptr<const GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
+Buffer::BufferMapping::BufferMapping(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
   vmaMapMemory(device->allocator, buffer->allocation, &data);
 }
 

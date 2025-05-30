@@ -13,7 +13,6 @@ class Shader;
 
 class Pipeline {
   const std::shared_ptr<GraphicsDevice> device;
-  std::vector<std::shared_ptr<Shader>> shaders;
   VkPipeline pipeline{VK_NULL_HANDLE};
   VkPipelineLayout layout{VK_NULL_HANDLE};
   std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
@@ -22,7 +21,7 @@ class Pipeline {
 public:
   VkPipelineBindPoint bindPoint;
 
-  Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass, VkPipelineLayout layout);
+  Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass);
   ~Pipeline();
 
   [[nodiscard]] VkPipeline getPipeline() const;

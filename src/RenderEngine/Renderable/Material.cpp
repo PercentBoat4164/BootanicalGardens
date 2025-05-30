@@ -26,72 +26,109 @@ const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::
       }, source);
 }
 
-template<typename T> requires std::derived_from<T, fastgltf::TextureInfo> void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
+template<typename T>
+requires std::derived_from<T, fastgltf::TextureInfo>
+void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
   if (!textureInfo->has_value()) return;
   const fastgltf::Optional<std::size_t>& imageIndex = asset.textures[textureInfo->value().textureIndex].imageIndex;
   if (!imageIndex.has_value()) return;
   const fastgltf::Image& image = asset.images[imageIndex.value()];
   std::size_t size;
-  const auto* bytes = handleDataSource(asset, image.data, &size);
-  SDL_IOStream* io  = SDL_IOFromConstMem(bytes, static_cast<int>(size));
+  const auto* bytes    = handleDataSource(asset, image.data, &size);
+  SDL_IOStream* io     = SDL_IOFromConstMem(bytes, static_cast<int>(size));
   SDL_Surface* surface = IMG_Load_IO(io, true);
   const std::vector textureBytes(static_cast<std::byte*>(surface->pixels), static_cast<std::byte*>(surface->pixels) + surface->w * surface->h * SDL_BYTESPERPIXEL(surface->format));
   auto buffer = std::make_shared<StagingBuffer>(device, std::string{image.name + " upload buffer"}.c_str(), textureBytes);
   VkFormat format;
   switch (surface->format) {
-    case SDL_PIXELFORMAT_ARGB4444: format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT; break;
-    case SDL_PIXELFORMAT_RGBA4444: format = VK_FORMAT_R4G4B4A4_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_ABGR4444: format = VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT; break;
-    case SDL_PIXELFORMAT_BGRA4444: format = VK_FORMAT_B4G4R4A4_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_ARGB1555: format = VK_FORMAT_A1R5G5B5_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_RGBA5551: format = VK_FORMAT_R5G5B5A1_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_ABGR1555: format = VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR; break;
-    case SDL_PIXELFORMAT_BGRA5551: format = VK_FORMAT_B5G5R5A1_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_RGB565: format = VK_FORMAT_R5G6B5_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_BGR565: format = VK_FORMAT_B5G6R5_UNORM_PACK16; break;
-    case SDL_PIXELFORMAT_RGB24: format = VK_FORMAT_R8G8B8_SRGB; break;
-    case SDL_PIXELFORMAT_BGR24: format = VK_FORMAT_B8G8R8_SRGB; break;
-    case SDL_PIXELFORMAT_RGBA32: format = VK_FORMAT_R8G8B8A8_SRGB; break;
-    case SDL_PIXELFORMAT_ABGR32: format = VK_FORMAT_A8B8G8R8_SRGB_PACK32; break;
-    case SDL_PIXELFORMAT_BGRA32: format = VK_FORMAT_B8G8R8A8_SRGB; break;
-    case SDL_PIXELFORMAT_RGBX32: format = VK_FORMAT_R8G8B8A8_SRGB; break;
-    case SDL_PIXELFORMAT_XBGR32: format = VK_FORMAT_A8B8G8R8_SRGB_PACK32; break;
-    case SDL_PIXELFORMAT_BGRX32: format = VK_FORMAT_B8G8R8A8_SRGB; break;
-    case SDL_PIXELFORMAT_ARGB2101010: format = VK_FORMAT_A2R10G10B10_UNORM_PACK32; break;
-    default: format = VK_FORMAT_UNDEFINED;
+    case SDL_PIXELFORMAT_ARGB4444:
+      format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT;
+      break;
+    case SDL_PIXELFORMAT_RGBA4444:
+      format = VK_FORMAT_R4G4B4A4_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_ABGR4444:
+      format = VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT;
+      break;
+    case SDL_PIXELFORMAT_BGRA4444:
+      format = VK_FORMAT_B4G4R4A4_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_ARGB1555:
+      format = VK_FORMAT_A1R5G5B5_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_RGBA5551:
+      format = VK_FORMAT_R5G5B5A1_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_ABGR1555:
+      format = VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR;
+      break;
+    case SDL_PIXELFORMAT_BGRA5551:
+      format = VK_FORMAT_B5G5R5A1_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_RGB565:
+      format = VK_FORMAT_R5G6B5_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_BGR565:
+      format = VK_FORMAT_B5G6R5_UNORM_PACK16;
+      break;
+    case SDL_PIXELFORMAT_RGB24:
+      format = VK_FORMAT_R8G8B8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_BGR24:
+      format = VK_FORMAT_B8G8R8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_RGBA32:
+      format = VK_FORMAT_R8G8B8A8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_ABGR32:
+      format = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
+      break;
+    case SDL_PIXELFORMAT_BGRA32:
+      format = VK_FORMAT_B8G8R8A8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_RGBX32:
+      format = VK_FORMAT_R8G8B8A8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_XBGR32:
+      format = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
+      break;
+    case SDL_PIXELFORMAT_BGRX32:
+      format = VK_FORMAT_B8G8R8A8_SRGB;
+      break;
+    case SDL_PIXELFORMAT_ARGB2101010:
+      format = VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+      break;
+    default:
+      format = VK_FORMAT_UNDEFINED;
   }
   *texture = std::make_shared<Texture>(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  std::vector<VkBufferImageCopy> regions{{
-    .bufferOffset      = 0,
-    .bufferRowLength   = 0,
-    .bufferImageHeight = 0,
-    .imageSubresource  = VkImageSubresourceLayers {
-      .aspectMask     = (*texture)->getAspect(),
-      .mipLevel       = 0,
-      .baseArrayLayer = 0,
-      .layerCount     = (*texture)->getLayerCount(),
-    },
-    .imageOffset = {},
-    .imageExtent = (*texture)->getExtent()
-  }};
+  std::vector<VkBufferImageCopy> regions{{.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0, .imageSubresource = VkImageSubresourceLayers{
+                                                                                                               .aspectMask     = (*texture)->getAspect(),
+                                                                                                               .mipLevel       = 0,
+                                                                                                               .baseArrayLayer = 0,
+                                                                                                               .layerCount     = (*texture)->getLayerCount(),
+                                                                                                           },
+                                          .imageOffset = {},
+                                          .imageExtent = (*texture)->getExtent()}};
   commandBuffer.record<CommandBuffer::CopyBufferToImage>(buffer, *texture, regions);
   std::vector<VkImageMemoryBarrier> imageMemoryBarriers{
-    {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      .pNext = nullptr,
-      .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
-      .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-      .image = (*texture)->getImage(),
-      .subresourceRange = (*texture)->getWholeRange()
-    }};
+      {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+       .pNext               = nullptr,
+       .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+       .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+       .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+       .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+       .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
+       .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
+       .image               = (*texture)->getImage(),
+       .subresourceRange    = (*texture)->getWholeRange()
+      }
+  };
   commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageMemoryBarriers);
   SDL_DestroySurface(surface);
 }
 
+Material::Material(const std::shared_ptr<const Shader>& vertexShader, const std::shared_ptr<const Shader>& fragmentShader) : vertexShader(vertexShader), fragmentShader(fragmentShader) {}
 Material::Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) : doubleSided(material.doubleSided),
                                                                                                                                                                     alphaMode(material.alphaMode),
                                                                                                                                                                     alphaCutoff(material.alphaCutoff),
@@ -137,6 +174,7 @@ float Material::getAnisotropyRotation() const { return anisotropyRotation; }
 std::shared_ptr<Texture> Material::getMetallicRoughnessTexture() const { return metallicRoughnessTexture; }
 float Material::getMetallicFactor() const { return metallicFactor; }
 float Material::getRoughnessRotation() const { return roughnessFactor; }
-std::vector<std::shared_ptr<Shader>> Material::getShaders() const { return shaders; }
-
-void Material::setShaders(const std::vector<std::shared_ptr<Shader>>& shaders) { this->shaders = shaders; }
+void Material::setVertexShader(const std::shared_ptr<const Shader>& shader) { vertexShader = shader; }
+std::shared_ptr<const Shader> Material::getVertexShader() const { return vertexShader; }
+void Material::setFragmentShader(const std::shared_ptr<const Shader>& shader) { fragmentShader = shader; }
+std::shared_ptr<const Shader> Material::getFragmentShader() const { return fragmentShader; }

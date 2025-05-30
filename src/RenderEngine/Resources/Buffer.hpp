@@ -22,10 +22,10 @@ protected:
 
 public:
   struct BufferMapping {
-    BufferMapping(const std::shared_ptr<const GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer);
+    BufferMapping(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer);
     ~BufferMapping();
 
-    std::shared_ptr<const GraphicsDevice> device;
+    std::shared_ptr<GraphicsDevice> device;
     std::shared_ptr<const Buffer> buffer;
     void* data{};
   };

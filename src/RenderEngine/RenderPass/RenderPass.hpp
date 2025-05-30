@@ -48,3 +48,6 @@ public:
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] std::shared_ptr<Framebuffer> getFramebuffer() const;
 };
+
+
+template<> struct std::hash<RenderPass> { size_t operator()(const RenderPass& pass) const noexcept { return pass.compatibility; } };

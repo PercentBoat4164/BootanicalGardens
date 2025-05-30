@@ -13,7 +13,7 @@ public:
    * @param name The name of the buffer - to be used for debugging purposes.
    * @param size The size of the buffer in bytes.
    */
-  explicit StagingBuffer(std::shared_ptr<GraphicsDevice> device, const char* name, VkDeviceSize size);
+  explicit StagingBuffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, VkDeviceSize size);
 
   /**
    * Creates a host visible buffer and fills it with data. This buffer can then be copied into a device visible buffer.

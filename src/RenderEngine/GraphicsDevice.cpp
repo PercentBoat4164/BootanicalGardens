@@ -89,24 +89,20 @@ GraphicsDevice::GraphicsDevice() :
   vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool);
 
   perFrameDescriptorAllocator.prepareAllocation({
-      /// Frame number
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-      /// Game time
-      VkDescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+      /// Frame number, Game time
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
   });
   perPassDescriptorAllocator.prepareAllocation({
       /// view * projection matrix
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}
   });
   perMaterialDescriptorAllocator.prepareAllocation({
       /// Color Texture
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-      /// Normal Texture
-      VkDescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr}
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
   }),
   perMeshDescriptorAllocator.prepareAllocation({
       /// model matrix
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}
+      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}
   });
 }
 
@@ -196,7 +192,7 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
     samplers.erase(samplerID);
   });
   samplers.emplace(samplerID, sampler);
-  if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get())) GraphicsInstance::showError(result, "failed to create sampler.");
+  if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create sampler.");
   return sampler;
 }
 

@@ -30,7 +30,7 @@ void DescriptorAllocator::prepareAllocation(const std::vector<VkDescriptorSetLay
     .flags = 0,
     .bindingCount = static_cast<uint32_t>(bindings.size()),
     .pBindings = bindings.data()
-};
+  };
   vkCreateDescriptorSetLayout(device.device, &descriptorSetLayoutCreateInfo, nullptr, &layout);
 }
 

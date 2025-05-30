@@ -11,6 +11,7 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/Window.hpp"
+#include "src/Tools/Hashing.hpp"
 
 #include <volk/volk.h>
 
@@ -78,24 +79,6 @@ RenderGraph::RenderGraph(const std::shared_ptr<GraphicsDevice>& device) : device
     frames.back().descriptorSet = descriptorSets[i];
   }
 
-  std::array layouts {
-    device->perFrameDescriptorAllocator.getLayout(),
-    device->perPassDescriptorAllocator.getLayout(),
-    device->perMaterialDescriptorAllocator.getLayout(),
-    device->perMeshDescriptorAllocator.getLayout()
-  };
-
-  const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
-    .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-    .pNext                  = nullptr,
-    .flags                  = 0,
-    .setLayoutCount         = static_cast<uint32_t>(layouts.size()),
-    .pSetLayouts            = layouts.data(),
-    .pushConstantRangeCount = 0,
-    .pPushConstantRanges    = nullptr
-  };
-  if (const VkResult result = vkCreatePipelineLayout(device->device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create pipeline layout.");
-
   uniformBuffer = std::make_shared<UniformBuffer<GraphData>>(device, "RenderGraph UniformBuffer");
 
   const VkDescriptorBufferInfo bufferInfo {
@@ -122,8 +105,6 @@ RenderGraph::RenderGraph(const std::shared_ptr<GraphicsDevice>& device) : device
 RenderGraph::~RenderGraph() {
   const PerFrameData& frameData = getPerFrameData();
   if (const VkResult result = vkWaitForFences(device->device, 1, &frameData.renderFence, VK_TRUE, UINT64_MAX); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to wait for fence.");
-  vkDestroyPipelineLayout(device->device, pipelineLayout, nullptr);
-  pipelineLayout = VK_NULL_HANDLE;
 }
 
 void RenderGraph::setResolutionGroup(const ResolutionGroupID id, const VkExtent3D resolution) {
@@ -302,17 +283,17 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
       .signalSemaphoreCount = 1,
       .pSignalSemaphores    = &frameData.frameFinishedSemaphore
   };
-  if (const VkResult result = vkQueueSubmit(device->globalQueue, 1, &submitInfo, frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to submit recorded commandbuffer to queue.");
+  if (const VkResult result = vkQueueSubmit(device->globalQueue, 1, &submitInfo, frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to submit recorded command buffer to queue");
   return frameData.frameFinishedSemaphore;
 }
 
-/**@todo Do not tie Pipelines to specific Materials so that they can be reused more effectively.*/
+/**@todo: Do not tie Pipelines to specific Materials so that they can be reused more effectively.*/
 void RenderGraph::bakePipeline(const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass) {
-  pipelines[reinterpret_cast<uint64_t>(material.get()) ^ renderPass->compatibility] = std::make_shared<Pipeline>(device, material, renderPass, pipelineLayout);
+  pipelines[renderPass->compatibility] = std::make_shared<Pipeline>(device, material, renderPass);
 }
 
-std::shared_ptr<Pipeline> RenderGraph::getPipeline(const std::shared_ptr<const Material>& material, const uint64_t renderPassCompatibility) {
-  return pipelines[reinterpret_cast<uint64_t>(material.get()) ^ renderPassCompatibility];
+std::shared_ptr<Pipeline> RenderGraph::getPipeline(const uint64_t renderPassCompatibility) {
+  return pipelines.at(renderPassCompatibility);
 }
 
 void RenderGraph::buildImages() {
@@ -343,4 +324,3 @@ void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::unor
 }
 
 const RenderGraph::PerFrameData& RenderGraph::getPerFrameData() const { return frames[getFrameIndex()]; }
-VkPipelineLayout RenderGraph::getPipelineLayout() const { return pipelineLayout; }

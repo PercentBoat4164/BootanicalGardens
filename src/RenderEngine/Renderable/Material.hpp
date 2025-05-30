@@ -1,5 +1,8 @@
 #pragma once
 
+#include "src/RenderEngine/Shader.hpp"
+
+
 #include <fastgltf/core.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -12,7 +15,8 @@ class GraphicsDevice;
 class CommandBuffer;
 
 class Material {
-  std::vector<std::shared_ptr<Shader>> shaders;
+  std::shared_ptr<const Shader> vertexShader;
+  std::shared_ptr<const Shader> fragmentShader;
 
   bool doubleSided = true;
   fastgltf::AlphaMode alphaMode = fastgltf::AlphaMode::Opaque;
@@ -43,7 +47,7 @@ class Material {
   float roughnessFactor = 1;
 
 public:
-  Material() = default;
+  explicit Material(const std::shared_ptr<const Shader>& vertexShader=nullptr, const std::shared_ptr<const Shader>& fragmentShader=nullptr);
   Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
 
   [[nodiscard]] bool isDoubleSided() const;
@@ -66,8 +70,10 @@ public:
   [[nodiscard]] std::shared_ptr<Texture> getMetallicRoughnessTexture() const;
   [[nodiscard]] float getMetallicFactor() const;
   [[nodiscard]] float getRoughnessRotation() const;
-  [[nodiscard]] std::vector<std::shared_ptr<Shader>> getShaders() const;
-
-  void setShaders(const std::vector<std::shared_ptr<Shader>>& shaders);
+  void setVertexShader(const std::shared_ptr<const Shader>& shader);
+  [[nodiscard]] std::shared_ptr<const Shader> getVertexShader() const;
+  void setFragmentShader(const std::shared_ptr<const Shader>& shader);
+  [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
 };
 
+template<> struct std::hash<Material> { size_t operator()(const Material& mat) const noexcept { return 0; } };

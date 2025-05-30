@@ -52,7 +52,7 @@ public:
   }
 };
 
-Shader::Shader(std::shared_ptr<GraphicsDevice> device, yyjson_val* obj) : device(device) {
+Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) : device(device) {
   // Source file path
   sourcePath = yyjson_get_str(yyjson_obj_get(obj, "source"));
 
@@ -107,7 +107,7 @@ Shader::Shader(std::shared_ptr<GraphicsDevice> device, yyjson_val* obj) : device
   if (!has_main) return;
 }
 
-Shader::Shader(std::shared_ptr<GraphicsDevice> device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
+Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
   const shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<Includer>());
@@ -132,13 +132,23 @@ Shader::Shader(std::shared_ptr<GraphicsDevice> device, const std::filesystem::pa
   }
 
   std::string contents;
-  if (!readFile(sourcePath, contents)) GraphicsInstance::showError("Failed to read file: '" + sourcePath.string() + "'.");
+  if (!readFile(sourcePath, contents)) GraphicsInstance::showError("failed to read file: '" + sourcePath.string() + "'");
+
+  // Compile with debug info and no optimizations to get reflection data
+  options.SetOptimizationLevel(shaderc_optimization_level_zero);
+  options.SetGenerateDebugInfo();
+  shaderc::CompilationResult compilationResult = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
+  code = {compilationResult.cbegin(), compilationResult.cend()};
+
+  reflectionData = spv_reflect::ShaderModule{code.size() * sizeof(decltype(code)::value_type), code.data(), SPV_REFLECT_MODULE_FLAG_NO_COPY};
+  stage      = static_cast<VkShaderStageFlagBits>(reflectionData.GetShaderStage());
+  entryPoint = reflectionData.GetEntryPointName();
 
   // Compile with optimal performance to build the pipeline with
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
-  shaderc::CompilationResult result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
-  if (result.GetCompilationStatus() != shaderc_compilation_status_success) GraphicsInstance::showError("Failed to compile production shader. Error: " + result.GetErrorMessage());
-  code = {result.cbegin(), result.cend()};
+  compilationResult = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
+  if (compilationResult.GetCompilationStatus() != shaderc_compilation_status_success) GraphicsInstance::showError(compilationResult.GetErrorMessage());
+  code = {compilationResult.cbegin(), compilationResult.cend()};
 
   const VkShaderModuleCreateInfo shaderModuleCreateInfo {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -147,20 +157,7 @@ Shader::Shader(std::shared_ptr<GraphicsDevice> device, const std::filesystem::pa
       .codeSize = code.size() * sizeof(decltype(code)::value_type),
       .pCode = code.data()
   };
-  if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create shader module.");
-
-  // Compile with debug info and no optimizations to get reflection data
-  options.SetOptimizationLevel(shaderc_optimization_level_zero);
-  options.SetGenerateDebugInfo();
-  result = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), options);
-  std::vector<uint32_t> debugCode = {result.cbegin(), result.cend()};
-
-  const auto* reflectionData = new spv_reflect::ShaderModule{debugCode.size() * sizeof(decltype(debugCode)::value_type), debugCode.data(), SPV_REFLECT_MODULE_FLAG_NO_COPY};
-
-  stage      = static_cast<VkShaderStageFlagBits>(reflectionData->GetShaderStage());
-  entryPoint = reflectionData->GetEntryPointName();
-  /**@todo: Handle vertex formats.*/
-  /**@todo: Reflect descriptor sets instead of hardcoding them into the engine.*/
+  if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create shader module");
 }
 
 Shader::~Shader() {
@@ -192,3 +189,4 @@ VkShaderStageFlagBits Shader::getStage() const { return stage; }
 VkPipelineBindPoint Shader::getBindPoint() const { return bindPoint; }
 VkShaderModule Shader::getModule() const { return module; }
 std::string_view Shader::getEntryPoint() const { return entryPoint; }
+const spv_reflect::ShaderModule* Shader::getReflectedData() const { return &reflectionData; }

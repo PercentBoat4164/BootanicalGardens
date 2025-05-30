@@ -12,9 +12,9 @@ public:
     Buffer
   } type;
 
-  const std::shared_ptr<GraphicsDevice> device;
+  std::shared_ptr<GraphicsDevice> device;
 
-  explicit Resource(Type type, std::shared_ptr<GraphicsDevice> device);
+  explicit Resource(Type type, const std::shared_ptr<GraphicsDevice>& device);
   virtual ~Resource();
 
   [[nodiscard]] virtual void* getObject() const = 0;

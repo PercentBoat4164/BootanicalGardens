@@ -12,7 +12,6 @@ class Texture : public Image {
 public:
   [[nodiscard]] VkSampler getSampler() const;
 
-  template <typename... Args> requires(std::constructible_from<Image, std::shared_ptr<GraphicsDevice>, const std::string&, Args&&...>) Texture(std::shared_ptr<GraphicsDevice> device, const std::string& name, VkSampler* sampler, Args&&... args) : Image(device, name, args...), sampler(sampler) {}
-  /**@todo: This constructor leaks the memory of the VkSampler. Write a system to track and deduplicate VkSamplers.*/
-  template <typename... Args> requires(std::constructible_from<Image, std::shared_ptr<GraphicsDevice>, const std::string&, Args&&...>) Texture(std::shared_ptr<GraphicsDevice> device, const std::string& name, Args&&... args) : Image(device, name, args...), sampler(device->getSampler()) {}
+  template <typename... Args> requires(std::constructible_from<Image, const std::shared_ptr<GraphicsDevice>&, const std::string&, Args&&...>) Texture(const std::shared_ptr<GraphicsDevice>& device, const std::string& name, VkSampler* sampler, Args&&... args) : Image(device, name, args...), sampler(sampler) {}
+  template <typename... Args> requires(std::constructible_from<Image, const std::shared_ptr<GraphicsDevice>&, const std::string&, Args&&...>) Texture(const std::shared_ptr<GraphicsDevice>& device, const std::string& name, Args&&... args) : Image(device, name, args...), sampler(device->getSampler()) {}
 };
