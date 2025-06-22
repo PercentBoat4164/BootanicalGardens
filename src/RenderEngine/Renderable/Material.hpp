@@ -74,6 +74,8 @@ public:
   [[nodiscard]] std::shared_ptr<const Shader> getVertexShader() const;
   void setFragmentShader(const std::shared_ptr<const Shader>& shader);
   [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
+
+  [[nodiscard]] DescriptorSetRequirements computeDescriptorSetRequirements(const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline, const std::shared_ptr<Mesh>& mesh) const;
 };
 
 template<> struct std::hash<Material> { size_t operator()(const Material& mat) const noexcept { return 0; } };

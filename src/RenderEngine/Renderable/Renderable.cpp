@@ -4,7 +4,6 @@
 
 #include <src/RenderEngine/CommandBuffer.hpp>
 #include <src/RenderEngine/GraphicsDevice.hpp>
-#include <volk/volk.h>
 
 Renderable::Renderable(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& path) : device(device) {
   fastgltf::GltfFileStream fileStream(path);
@@ -35,6 +34,4 @@ void Renderable::loadData(fastgltf::GltfDataGetter& dataGetter) {
   device->executeCommandBufferImmediate(commandBuffer);
 }
 
-const std::vector<std::shared_ptr<Mesh>>& Renderable::getMeshes() const {
-  return meshes;
-}
+const std::vector<std::shared_ptr<Mesh>>& Renderable::getMeshes() const { return meshes; }

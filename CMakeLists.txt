@@ -37,7 +37,7 @@ add_executable(BootanicalGardens
         src/Game/LevelParser.cpp
         src/InputEngine/Input.cpp
         src/RenderEngine/CommandBuffer.cpp
-        src/RenderEngine/DescriptorAllocator.cpp
+        src/RenderEngine/DescriptorSetRequirements.cpp
         src/RenderEngine/Framebuffer.cpp
         src/RenderEngine/GraphicsDevice.cpp
         src/RenderEngine/GraphicsInstance.cpp

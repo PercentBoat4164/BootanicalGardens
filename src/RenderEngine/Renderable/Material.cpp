@@ -6,6 +6,8 @@
 
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
+#include <set>
+#include <volk/volk.h>
 
 const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::DataSource& source, size_t* size) {
   return std::visit(fastgltf::visitor {
@@ -41,65 +43,26 @@ void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& c
   auto buffer = std::make_shared<StagingBuffer>(device, std::string{image.name + " upload buffer"}.c_str(), textureBytes);
   VkFormat format;
   switch (surface->format) {
-    case SDL_PIXELFORMAT_ARGB4444:
-      format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT;
-      break;
-    case SDL_PIXELFORMAT_RGBA4444:
-      format = VK_FORMAT_R4G4B4A4_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_ABGR4444:
-      format = VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT;
-      break;
-    case SDL_PIXELFORMAT_BGRA4444:
-      format = VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_ARGB1555:
-      format = VK_FORMAT_A1R5G5B5_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_RGBA5551:
-      format = VK_FORMAT_R5G5B5A1_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_ABGR1555:
-      format = VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR;
-      break;
-    case SDL_PIXELFORMAT_BGRA5551:
-      format = VK_FORMAT_B5G5R5A1_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_RGB565:
-      format = VK_FORMAT_R5G6B5_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_BGR565:
-      format = VK_FORMAT_B5G6R5_UNORM_PACK16;
-      break;
-    case SDL_PIXELFORMAT_RGB24:
-      format = VK_FORMAT_R8G8B8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_BGR24:
-      format = VK_FORMAT_B8G8R8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_RGBA32:
-      format = VK_FORMAT_R8G8B8A8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_ABGR32:
-      format = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
-      break;
-    case SDL_PIXELFORMAT_BGRA32:
-      format = VK_FORMAT_B8G8R8A8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_RGBX32:
-      format = VK_FORMAT_R8G8B8A8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_XBGR32:
-      format = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
-      break;
-    case SDL_PIXELFORMAT_BGRX32:
-      format = VK_FORMAT_B8G8R8A8_SRGB;
-      break;
-    case SDL_PIXELFORMAT_ARGB2101010:
-      format = VK_FORMAT_A2R10G10B10_UNORM_PACK32;
-      break;
-    default:
-      format = VK_FORMAT_UNDEFINED;
+    case SDL_PIXELFORMAT_ARGB4444: format = VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT; break;
+    case SDL_PIXELFORMAT_RGBA4444: format = VK_FORMAT_R4G4B4A4_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_ABGR4444: format = VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT; break;
+    case SDL_PIXELFORMAT_BGRA4444: format = VK_FORMAT_B4G4R4A4_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_ARGB1555: format = VK_FORMAT_A1R5G5B5_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_RGBA5551: format = VK_FORMAT_R5G5B5A1_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_ABGR1555: format = VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR; break;
+    case SDL_PIXELFORMAT_BGRA5551: format = VK_FORMAT_B5G5R5A1_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_RGB565: format = VK_FORMAT_R5G6B5_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_BGR565: format = VK_FORMAT_B5G6R5_UNORM_PACK16; break;
+    case SDL_PIXELFORMAT_RGB24: format = VK_FORMAT_R8G8B8_SRGB; break;
+    case SDL_PIXELFORMAT_BGR24: format = VK_FORMAT_B8G8R8_SRGB; break;
+    case SDL_PIXELFORMAT_RGBA32: format = VK_FORMAT_R8G8B8A8_SRGB; break;
+    case SDL_PIXELFORMAT_ABGR32: format = VK_FORMAT_A8B8G8R8_SRGB_PACK32; break;
+    case SDL_PIXELFORMAT_BGRA32: format = VK_FORMAT_B8G8R8A8_SRGB; break;
+    case SDL_PIXELFORMAT_RGBX32: format = VK_FORMAT_R8G8B8A8_SRGB; break;
+    case SDL_PIXELFORMAT_XBGR32: format = VK_FORMAT_A8B8G8R8_SRGB_PACK32; break;
+    case SDL_PIXELFORMAT_BGRX32: format = VK_FORMAT_B8G8R8A8_SRGB; break;
+    case SDL_PIXELFORMAT_ARGB2101010: format = VK_FORMAT_A2R10G10B10_UNORM_PACK32; break;
+    default: format = VK_FORMAT_UNDEFINED;
   }
   *texture = std::make_shared<Texture>(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   std::vector<VkBufferImageCopy> regions{{.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0, .imageSubresource = VkImageSubresourceLayers{
@@ -178,3 +141,64 @@ void Material::setVertexShader(const std::shared_ptr<const Shader>& shader) { ve
 std::shared_ptr<const Shader> Material::getVertexShader() const { return vertexShader; }
 void Material::setFragmentShader(const std::shared_ptr<const Shader>& shader) { fragmentShader = shader; }
 std::shared_ptr<const Shader> Material::getFragmentShader() const { return fragmentShader; }
+DescriptorSetRequirements Material::computeDescriptorSetRequirements(const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline, const std::shared_ptr<Mesh>& mesh) const {
+  DescriptorSetRequirements requirements;
+  const std::vector shaders = {vertexShader, fragmentShader};
+
+  // Obtain reflected descriptor set data
+  std::vector<SpvReflectDescriptorSet*> sets;  // Per-shader sets
+  std::vector<VkShaderStageFlags> shaderStages;
+  for (uint32_t i{}; i < shaders.size(); ++i) {
+    const Shader& shader = *shaders[i];
+    const spv_reflect::ShaderModule* reflectedData = shader.getReflectedData();
+    uint32_t count;
+    reflectedData->EnumerateDescriptorSets(&count, nullptr);
+    const uint32_t offset = sets.size();
+    sets.resize(offset + count);
+    reflectedData->EnumerateDescriptorSets(&count, sets.data() + offset);
+    shaderStages.resize(offset + count, shader.getStage());
+  }
+
+  // Build requirements
+  requirements.bindingIDs.resize(sets.size());
+  requirements.setBindings.resize(sets.size());
+  std::vector<std::vector<bool>> bindingsDefined(sets.size());
+  for (uint32_t i{}; i < sets.size(); ++i) {
+    const SpvReflectDescriptorSet& set = *sets.at(i);
+    switch (set.set) {
+      case 0: requirements.objectDataIndex[nullptr] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
+      case 1: requirements.objectDataIndex[renderPass] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
+      case 2: requirements.objectDataIndex[std::reinterpret_pointer_cast<DescriptorSetRequirer>(pipeline)] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
+      case 3: requirements.objectDataIndex[std::reinterpret_pointer_cast<DescriptorSetRequirer>(mesh)] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
+      default: GraphicsInstance::showError("Descriptor set " + std::to_string(set.set) + " not supported.");
+    }
+    std::vector<uint64_t>& bindingIDs  = requirements.bindingIDs.at(set.set);
+    bindingIDs.resize(set.binding_count);
+    std::vector<VkDescriptorSetLayoutBinding>& setBindings = requirements.setBindings.at(set.set);
+    setBindings.resize(set.binding_count);
+    std::vector<bool>& bindingDefined = bindingsDefined.at(set.set);
+    bindingDefined.resize(set.binding_count);
+    for (uint32_t j{}; j < set.binding_count; ++j) {
+      const SpvReflectDescriptorBinding& binding = *set.bindings[j];
+      if (bindingDefined[binding.binding]) {
+        /**@todo: Warn if bindings do not match!*/
+        setBindings.at(binding.binding).stageFlags |= shaderStages.at(i);
+      }
+      bindingIDs[binding.binding]  = Tools::hash(binding.name);
+      setBindings[binding.binding] = {
+          .binding = binding.binding,
+          .descriptorType = static_cast<VkDescriptorType>(binding.descriptor_type),
+          .descriptorCount = binding.count,
+          .stageFlags = shaderStages.at(i),
+          .pImmutableSamplers = VK_NULL_HANDLE
+      };
+    }
+  }
+
+  for (const SpvReflectDescriptorSet* set : sets) {
+    SpvReflectDescriptorBinding& binding = *set->bindings[0];
+    requirements.sizes[static_cast<VkDescriptorType>(binding.descriptor_type)] += binding.count;
+  }
+
+  return requirements;
+}

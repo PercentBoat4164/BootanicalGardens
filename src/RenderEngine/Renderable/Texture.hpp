@@ -4,8 +4,6 @@
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 
-#include <volk/volk.h>
-
 class Texture : public Image {
   std::shared_ptr<VkSampler> sampler;
 

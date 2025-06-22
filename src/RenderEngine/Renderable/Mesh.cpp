@@ -62,7 +62,6 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
 
-  descriptorSets = device->perMeshDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
   uniformBuffer  = std::make_shared<UniformBuffer<glm::mat4>>(device, "UniformBuffer");
   VkDescriptorBufferInfo bufferInfo {
     .buffer = uniformBuffer->getBuffer(),
@@ -81,7 +80,7 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     .pBufferInfo      = &bufferInfo,
     .pTexelBufferView = nullptr
   });
-  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = *descriptorSets[i];
+  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = descriptorSets[i];
   vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
@@ -94,4 +93,3 @@ bool Mesh::isTransparent() const { return material->getAlphaMode() == fastgltf::
 std::shared_ptr<Material> Mesh::getMaterial() const { return material; }
 std::shared_ptr<Buffer> Mesh::getVertexBuffer() const { return vertexBuffer; }
 std::shared_ptr<Buffer> Mesh::getIndexBuffer() const { return indexBuffer; }
-std::shared_ptr<VkDescriptorSet> Mesh::getDescriptorSet(const uint64_t frameIndex) const { return descriptorSets[frameIndex]; }

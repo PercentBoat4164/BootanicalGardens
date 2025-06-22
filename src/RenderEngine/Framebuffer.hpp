@@ -16,7 +16,7 @@ class Framebuffer {
   VkRect2D rect;
 
 public:
-  Framebuffer(std::shared_ptr<GraphicsDevice> device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass);
+  Framebuffer(const std::shared_ptr<GraphicsDevice>& device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass);
   ~Framebuffer();
 
   [[nodiscard]] VkFramebuffer getFramebuffer() const;

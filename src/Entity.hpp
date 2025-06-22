@@ -99,7 +99,7 @@ public:
   }
 
   template<typename T> requires std::derived_from<T, Component> T* getComponentOfType() {
-    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) return component;
     return nullptr;
   }
@@ -111,7 +111,7 @@ public:
    */
   template<typename T> requires std::derived_from<T, Component> std::vector<T*> getComponentsOfType() {
     std::vector<T*> requestedComponents;
-    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::views::values(components))
       if (dynamic_cast<T*>(component.get()) != nullptr) requestedComponents.push_back(component);
     return requestedComponents;
   }
@@ -123,7 +123,7 @@ public:
    */
   std::vector<std::shared_ptr<Component>> getComponents() {
     std::vector<std::shared_ptr<Component>> out;
-    for (std::shared_ptr<Component>& component : std::ranges::views::values(components))
+    for (std::shared_ptr<Component>& component : std::views::values(components))
       out.push_back(component);
     return out;
   }

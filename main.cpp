@@ -28,8 +28,8 @@ int main() {
 
     const auto renderable = std::make_shared<Renderable>(graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
     for (const auto& mesh : renderable->getMeshes()) {
-      mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/default.frag")));
-      mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/default.vert")));
+      mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/shaders/default.frag")));
+      mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/shaders/default.vert")));
     }
     renderGraph.addRenderable(renderable);
 

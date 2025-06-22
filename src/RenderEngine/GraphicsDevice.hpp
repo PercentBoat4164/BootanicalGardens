@@ -1,12 +1,14 @@
 #pragma once
 
 #include "src/RenderEngine/CommandBuffer.hpp"
-#include "src/RenderEngine/DescriptorAllocator.hpp"
+#include "src/RenderEngine/DescriptorSetRequirements.hpp"
 
 #include <VkBootstrap.h>
+#include <functional>
 #include <vma/vk_mem_alloc.h>
 
 #include <map>
+#include <memory>
 
 class Texture;
 class Mesh;
@@ -22,26 +24,6 @@ public:
   VkCommandPool commandPool{VK_NULL_HANDLE};
   std::map<std::size_t, std::weak_ptr<VkSampler>> samplers;
 
-  /// Used to allocate the per-frame descriptor sets.
-  ///
-  /// FRAMES_IN_FLIGHT descriptor sets
-  DescriptorAllocator perFrameDescriptorAllocator;
-
-  /// Used to allocate the per-pass descriptor sets.
-  ///
-  /// FRAMES_IN_FLIGHT * passCount descriptor sets
-  DescriptorAllocator perPassDescriptorAllocator;
-
-  /// Used to allocate the per-material descriptor sets.
-  ///
-  /// FRAMES_IN_FLIGHT * materialCount descriptor sets
-  DescriptorAllocator perMaterialDescriptorAllocator;
-
-  /// Used to allocate the per-object descriptor sets.
-  ///
-  /// FRAMES_IN_FLIGHT * objectCount descriptor sets
-  DescriptorAllocator perMeshDescriptorAllocator;
-
   explicit GraphicsDevice();
   ~GraphicsDevice();
 
@@ -50,11 +32,12 @@ public:
     VkFence fence;
   };
 
-  [[nodiscard]] ImmediateExecutionContext executeCommandBufferImmediateAsync(const CommandBuffer& commandBuffer) const;
+  [[nodiscard]] ImmediateExecutionContext executeCommandBufferAsync(const CommandBuffer& commandBuffer) const;
   void waitForAsyncCommandBuffer(ImmediateExecutionContext context) const;
   void executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const;
   std::shared_ptr<VkSampler> getSampler(VkFilter magnificationFilter = VK_FILTER_NEAREST, VkFilter minificationFilter = VK_FILTER_NEAREST, VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, float lodBias = 0, VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
-  void destroySampler(VkSampler sampler);
+  [[nodiscard]] std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> createDescriptorPool(const DescriptorSetRequirements& requirements, uint32_t copies, VkDescriptorPoolCreateFlags flags) const;
+  [[nodiscard]] std::vector<std::vector<VkDescriptorSet>> allocateDescriptorSets(VkDescriptorPool pool, const std::vector<VkDescriptorSetLayout>& layouts, uint32_t copies) const;
 
   void destroy();
 };

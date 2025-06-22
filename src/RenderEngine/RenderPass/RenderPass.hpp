@@ -5,17 +5,18 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <unordered_set>
 #include <vector>
 
 class CommandBuffer;
 
-class RenderPass : public std::enable_shared_from_this<RenderPass> {
+class RenderPass : public std::enable_shared_from_this<RenderPass>, public DescriptorSetRequirer {
 protected:
   RenderGraph& graph;
   VkRenderPass renderPass{VK_NULL_HANDLE};
   std::shared_ptr<Framebuffer> framebuffer;
-  std::unordered_set<std::shared_ptr<Mesh>> meshes;
+  plf::colony<std::shared_ptr<Mesh>> meshes;
+
+  std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>> pipelines;
 
   template<typename L, typename R>
   static constexpr L rollingShiftLeft(L left, R right) {
@@ -40,14 +41,15 @@ public:
   void addMesh(const std::shared_ptr<Mesh>& mesh);
   void removeMesh(const std::shared_ptr<Mesh>& mesh);
 
-  virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                = 0;
-  virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
-  virtual void update(const RenderGraph& graph)                                                                                     = 0;
-  virtual void execute(CommandBuffer& commandBuffer)                                                                                = 0;
+  virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                                     = 0;
+  virtual DescriptorSetRequirements bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
+  virtual void update(const RenderGraph& graph)                                                                                                          = 0;
+  virtual void execute(CommandBuffer& commandBuffer)                                                                                                     = 0;
 
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] std::shared_ptr<Framebuffer> getFramebuffer() const;
+  [[nodiscard]] const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& getPipelines();
+  [[nodiscard]] const plf::colony<std::shared_ptr<Mesh>>& getMeshes();
 };
-
 
 template<> struct std::hash<RenderPass> { size_t operator()(const RenderPass& pass) const noexcept { return pass.compatibility; } };
