@@ -36,19 +36,19 @@ std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclarat
   };
 }
 
-DescriptorSetRequirements OpaqueRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
+void OpaqueRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
   const std::array attachmentReferences{
-      VkAttachmentReference {
+      VkAttachmentReference{
           .attachment = 0,
           .layout     = attachmentDescriptions[0].initialLayout
       },
-      VkAttachmentReference {
+      VkAttachmentReference{
           .attachment = 1,
           .layout     = attachmentDescriptions[1].initialLayout
       }
   };
   const std::array subpassDescriptions{
-      VkSubpassDescription {
+      VkSubpassDescription{
           .flags                   = 0,
           .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
           .inputAttachmentCount    = 0,
@@ -75,17 +75,34 @@ DescriptorSetRequirements OpaqueRenderPass::bake(const std::vector<VkAttachmentD
   compatibility = computeRenderPassCompatibility(renderPassCreateInfo);
   if (const VkResult result = vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create render pass");
 
-  DescriptorSetRequirements requirements;
   framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr<Mesh>& mesh : meshes) {
-    const std::shared_ptr<Material>& material = mesh->getMaterial();
-    const std::shared_ptr<Pipeline>& pipeline = pipelines[material] = std::make_shared<Pipeline>(graph.device, material);
-    requirements += material->computeDescriptorSetRequirements(shared_from_this(), pipeline, mesh);
+  for (const std::shared_ptr<Mesh>& mesh: meshes) {
+    const std::shared_ptr<Material> material = mesh->getMaterial();
+    pipelines[material]                      = std::make_shared<Pipeline>(graph.device, material);
   }
 
   uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "uniform buffer");
+}
 
-  return requirements;
+void OpaqueRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
+  const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
+       .buffer = uniformBuffer->getBuffer(),
+       .offset = 0,
+       .range = uniformBuffer->getSize()
+  }));
+  const uint32_t offset = writes.size();
+  writes.resize(offset + descriptorSets.size(), {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .pImageInfo = nullptr,
+      .pBufferInfo = bufferInfo,
+      .pTexelBufferView = nullptr
+  });
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
 }
 
 void OpaqueRenderPass::update(const RenderGraph& graph) {
@@ -104,7 +121,7 @@ void OpaqueRenderPass::execute(CommandBuffer& commandBuffer) {
     const std::shared_ptr<Pipeline>& pipeline = pipelines.at(mesh->getMaterial());
     commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
     const uint64_t frameIndex = graph.getFrameIndex();
-    commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{graph.getPerFrameData(frameIndex).descriptorSet, descriptorSets[frameIndex], pipeline->getDescriptorSet(frameIndex), mesh->getDescriptorSet(frameIndex)});
+    commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*graph.getPerFrameData(frameIndex).descriptorSet, *getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)});
     if (meshIsIndexed) commandBuffer.record<CommandBuffer::DrawIndexed>();
     else commandBuffer.record<CommandBuffer::Draw>();
   }

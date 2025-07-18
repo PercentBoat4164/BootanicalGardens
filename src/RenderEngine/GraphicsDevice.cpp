@@ -145,8 +145,7 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
   std::size_t samplerID = hash(magnificationFilter, minificationFilter, mipmapMode, addressMode, lodBias, borderColor);
   if (const auto it = samplers.find(samplerID); it != samplers.end())
     if (!it->second.expired()) return it->second.lock();
-    else
-      samplers.erase(it);
+    else samplers.erase(it);
   const VkSamplerCreateInfo createInfo{
       .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .pNext                   = nullptr,
@@ -177,47 +176,8 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
   return sampler;
 }
 
-std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> GraphicsDevice::createDescriptorPool(const DescriptorSetRequirements& requirements, const uint32_t copies, const VkDescriptorPoolCreateFlags flags) const {
-  std::vector<VkDescriptorPoolSize> sizes;
-  sizes.reserve(requirements.sizes.size());
-  for (const auto& [type, count]: requirements.sizes)
-    sizes.emplace_back(type, count * copies);
-  const VkDescriptorPoolCreateInfo createInfo{
-      .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .pNext         = nullptr,
-      .flags         = flags,
-      .maxSets       = static_cast<uint32_t>(requirements.setBindings.size()) + 1U,
-      .poolSizeCount = static_cast<uint32_t>(sizes.size()),
-      .pPoolSizes    = sizes.data(),
-  };
-  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> pool{new VkDescriptorPool, [this](const VkDescriptorPool* descriptorPool) {
-                                                                                   vkDestroyDescriptorPool(device, *descriptorPool, nullptr);
-                                                                                   delete descriptorPool;
-                                                                                 }};
-  if (const VkResult result = vkCreateDescriptorPool(device, &createInfo, nullptr, pool.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create descriptor pool");
-  return pool;
-}
-
-std::vector<std::vector<VkDescriptorSet>> GraphicsDevice::allocateDescriptorSets(VkDescriptorPool pool, const std::vector<VkDescriptorSetLayout>& layouts, const uint32_t copies) const {
-  const VkDescriptorSetAllocateInfo allocateInfo {
-      .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .pNext              = nullptr,
-      .descriptorPool     = pool,
-      .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
-      .pSetLayouts        = layouts.data()
-  };
-  std::vector<VkDescriptorSet> allSets(layouts.size() * copies);
-  if (const VkResult result = vkAllocateDescriptorSets(device, &allocateInfo, allSets.data()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to allocate descriptor sets");
-  std::vector<std::vector<VkDescriptorSet>> setGroups(layouts.size());
-  for (uint32_t i = 0; i < layouts.size(); ++i) {
-    std::vector<VkDescriptorSet>& sets = setGroups[i];
-    sets.resize(copies);
-    for (uint32_t j = 0; j < copies; ++j) sets[j] = allSets[j * layouts.size() + i];
-  }
-  return setGroups;
-}
-
 void GraphicsDevice::destroy() {
+  descriptorSetAllocator.destroy();
   samplers.clear();
   vkDestroyCommandPool(device, commandPool, nullptr);
   commandPool = VK_NULL_HANDLE;

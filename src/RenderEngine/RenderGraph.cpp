@@ -139,7 +139,6 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
   buildImages();
 
   // Bake RenderPasses
-  DescriptorSetRequirements descriptorSetRequirements{};
   for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
     const std::vector<AttachmentID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
     std::vector<VkAttachmentDescription> descriptions;
@@ -161,55 +160,95 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
       const AttachmentDeclaration& thisDeclaration = thisIt->second;
       const AttachmentDeclaration& nextDeclaration = nextIt->second;
       descriptions.push_back({
-        .flags = 0U,
-        .format = image->getFormat(),
-        .samples = image->getSampleCount(),
-        .loadOp = nextDeclaration.loadOp,
-        .storeOp = nextDeclaration.storeOp,
-        .stencilLoadOp = nextDeclaration.stencilLoadOp,
-        .stencilStoreOp = nextDeclaration.stencilStoreOp,
-        .initialLayout = thisDeclaration.layout,
-        .finalLayout = nextDeclaration.layout
+          .flags = 0U,
+          .format = image->getFormat(),
+          .samples = image->getSampleCount(),
+          .loadOp = nextDeclaration.loadOp,
+          .storeOp = nextDeclaration.storeOp,
+          .stencilLoadOp = nextDeclaration.stencilLoadOp,
+          .stencilStoreOp = nextDeclaration.stencilStoreOp,
+          .initialLayout = thisDeclaration.layout,
+          .finalLayout = nextDeclaration.layout
       });
       images.push_back(image);
     }
-    descriptorSetRequirements += renderPass->bake(descriptions, images);
+    renderPass->bake(descriptions, images);
     if (renderPass->compatibility == -1U) GraphicsInstance::showError("`RenderPass::bake(...)` failed to update the RenderPass compatibility.");
   }
   transitionImages(commandBuffer, declarations);
 
+  // Compute the descriptor set requirements
+  std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>> requirements;
+  for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) {
+    for (const std::shared_ptr<Pipeline>& pipeline: renderPass->getPipelines() | std::ranges::views::values) {
+      pipeline->getMaterial()->computeDescriptorSetRequirements(requirements, renderPass, pipeline);
+    }
+  }
+  std::size_t i = std::numeric_limits<std::size_t>::max();
+  std::map<std::shared_ptr<DescriptorSetRequirer>, std::size_t> requirementIndices;
+  for (const std::shared_ptr<DescriptorSetRequirer>& requirer: requirements | std::ranges::views::keys) requirementIndices[requirer] = ++i;
+  auto perSetDescriptorBindings = requirements | std::ranges::views::values;
+
   // Create VkDescriptorSetLayout objects
-  std::vector<VkDescriptorSetLayout> layouts(descriptorSetRequirements.objectDataIndex.size());
+  std::vector<VkDescriptorSetLayout> layouts(perSetDescriptorBindings.size());
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    .pNext = nullptr,
-    .flags = 0
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0
   };
-  for (uint32_t i = 0; i < descriptorSetRequirements.setBindings.size(); i++) {
-    const std::vector<VkDescriptorSetLayoutBinding>& setBindings = descriptorSetRequirements.setBindings[i];
-    descriptorSetLayoutCreateInfo.bindingCount = setBindings.size();
-    descriptorSetLayoutCreateInfo.pBindings = setBindings.data();
-    if (VkResult result = vkCreateDescriptorSetLayout(device->device, &descriptorSetLayoutCreateInfo, nullptr, &layouts[i]); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create descriptor set layout.");
+  i = std::numeric_limits<std::size_t>::max();
+  for (const std::vector<VkDescriptorSetLayoutBinding>& bindings: perSetDescriptorBindings) {
+    descriptorSetLayoutCreateInfo.bindingCount = bindings.size();
+    descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+    if (const VkResult result = vkCreateDescriptorSetLayout(device->device, &descriptorSetLayoutCreateInfo, nullptr, &layouts[++i]); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create descriptor set layout");
   }
 
   // Bake pipelines
+  std::vector<void*> miscMemoryPool;
+  std::vector<VkGraphicsPipelineCreateInfo> pipelineCreateInfos;
+  std::vector<VkPipeline*> pipelines;
+  VkDescriptorSetLayout frameDataLayout = layouts.at(requirementIndices.at(nullptr));
   for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
     for (const std::shared_ptr<Pipeline>& pipeline : renderPass->getPipelines() | std::views::values) {
-      auto& [_, startIndex, count] = descriptorSetRequirements.objectDataIndex.at(pipeline);
-      pipeline->bake(renderPass, std::span{layouts.data() + startIndex, count});
+      std::vector setLayouts {
+        frameDataLayout,
+        layouts.at(requirementIndices.at(renderPass)),
+        layouts.at(requirementIndices.at(pipeline))
+      };
+      pipeline->bake(renderPass, setLayouts, miscMemoryPool, pipelineCreateInfos, pipelines);
     }
+  std::vector<VkPipeline> tempPipelines(pipelines.size());
+  if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, pipelineCreateInfos.size(), pipelineCreateInfos.data(), nullptr, tempPipelines.data()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create graphics pipelines");
+  for (uint32_t j{}; j < tempPipelines.size(); ++j) *pipelines.at(j) = tempPipelines.at(j);
+  for (void* memory: miscMemoryPool) free(memory);
+  miscMemoryPool.clear();
+  pipelineCreateInfos.clear();
+  pipelines.clear();
 
-  // Allocate and assign descriptor sets
-  descriptorPool = device->createDescriptorPool(descriptorSetRequirements, FRAMES_IN_FLIGHT, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
-  std::vector<std::vector<VkDescriptorSet>> descriptorSets = device->allocateDescriptorSets(*descriptorPool, layouts, FRAMES_IN_FLIGHT);
-  uint32_t setIndex{};
-  for (const std::shared_ptr<DescriptorSetRequirer>& descriptorSetRequirer: descriptorSetRequirements.objectDataIndex | std::views::keys) if (descriptorSetRequirer) descriptorSetRequirer->setDescriptorSets(descriptorSets[setIndex++]);
-  setIndex = descriptorSetRequirements.objectDataIndex.at(nullptr).index;
-  const std::vector<VkDescriptorSet>& perFrameSets = descriptorSets.at(setIndex);
-  for (uint32_t i{}; i < frames.size(); ++i) frames.at(i).descriptorSet = perFrameSets.at(i);
+  // Allocate descriptor sets
+  std::vector<VkDescriptorSetLayout> framesInFlightLayouts;
+  framesInFlightLayouts.reserve(layouts.size() * FRAMES_IN_FLIGHT);  // One layout for each descriptor set for each frame in flight
+  for (const VkDescriptorSetLayout& layout : layouts) for (int j = 0; j < FRAMES_IN_FLIGHT; ++j) framesInFlightLayouts.push_back(layout);
+  std::vector<std::vector<VkDescriptorSetLayoutBinding>> framesInFlightBindings;
+  framesInFlightBindings.reserve(layouts.size() * FRAMES_IN_FLIGHT);
+  for (const std::vector<VkDescriptorSetLayoutBinding>& bindings : perSetDescriptorBindings) for (int j = 0; j < FRAMES_IN_FLIGHT; ++j) framesInFlightBindings.push_back(bindings);
+  std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets = device->descriptorSetAllocator.allocate(framesInFlightBindings, framesInFlightLayouts);
 
   // Destroy descriptor set layouts.
-  for (VkDescriptorSetLayout& layout: layouts) vkDestroyDescriptorSetLayout(device->device, layout, nullptr);
+  framesInFlightLayouts.clear();
+
+  // Assign descriptor sets
+  std::vector<VkWriteDescriptorSet> writes;
+  for (auto& [descriptorSetRequirer, index]: requirementIndices) {
+    auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
+    if (descriptorSetRequirer) {
+      descriptorSetRequirer->setDescriptorSets({start, start + FRAMES_IN_FLIGHT}, layouts[index]);
+      descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes);
+    }
+    else for (uint32_t j{}; j < frames.size(); ++j) frames.at(j).descriptorSet = *(start + j);
+  }
+  vkUpdateDescriptorSets(device->device, writes.size(), writes.data(), 0, nullptr);
+  for (void* memory: miscMemoryPool) free(memory);
 
   outOfDate = false;
   return true;
@@ -226,6 +265,8 @@ void RenderGraph::update() const {
   for (const std::shared_ptr<Renderable>& renderable : renderables)
     for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
       mesh->update(*this);
+  for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
+    renderPass->update(*this);
   uniformBuffer->update({static_cast<uint32_t>(frameNumber), static_cast<float>(Game::getTime())});
 }
 
@@ -233,6 +274,7 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
   CommandBuffer commandBuffer;
   std::shared_ptr<Image> defaultColorImage = backingImages.at(RenderColor);
   commandBuffer.record<CommandBuffer::ClearDepthStencilImage>(backingImages.at(RenderDepth));
+  commandBuffer.record<CommandBuffer::ClearColorImage>(defaultColorImage);
   VkImageMemoryBarrier imageMemoryBarrier {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext = nullptr,

@@ -36,7 +36,7 @@ uint64_t RenderPass::computeRenderPassCompatibility(const VkRenderPassCreateInfo
   return compatibility;
 }
 
-RenderPass::RenderPass(RenderGraph& graph, const MeshFilter meshFilter) : graph(graph), meshFilter(meshFilter) {}
+RenderPass::RenderPass(RenderGraph& graph, const MeshFilter meshFilter) : DescriptorSetRequirer(graph.device), graph(graph), meshFilter(meshFilter) {}
 
 RenderPass::~RenderPass() {
   if (renderPass != VK_NULL_HANDLE) {

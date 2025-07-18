@@ -1,5 +1,6 @@
 #pragma once
 
+#include "src/RenderEngine/DescriptorSetRequirer.hpp"
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
 
@@ -9,7 +10,7 @@
 
 class CommandBuffer;
 
-class RenderPass : public std::enable_shared_from_this<RenderPass>, public DescriptorSetRequirer {
+class RenderPass : public DescriptorSetRequirer, public std::enable_shared_from_this<RenderPass> {
 protected:
   RenderGraph& graph;
   VkRenderPass renderPass{VK_NULL_HANDLE};
@@ -36,15 +37,15 @@ public:
   uint64_t compatibility{-1U};
 
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
-  virtual ~RenderPass();
+  ~RenderPass() override;
 
   void addMesh(const std::shared_ptr<Mesh>& mesh);
   void removeMesh(const std::shared_ptr<Mesh>& mesh);
 
-  virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                                     = 0;
-  virtual DescriptorSetRequirements bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
-  virtual void update(const RenderGraph& graph)                                                                                                          = 0;
-  virtual void execute(CommandBuffer& commandBuffer)                                                                                                     = 0;
+  virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                = 0;
+  virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
+  virtual void update(const RenderGraph& graph)                                                                                     = 0;
+  virtual void execute(CommandBuffer& commandBuffer)                                                                                = 0;
 
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] std::shared_ptr<Framebuffer> getFramebuffer() const;

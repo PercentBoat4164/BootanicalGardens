@@ -1,11 +1,13 @@
 #pragma once
 
-#include "src/RenderEngine/DescriptorSetRequirements.hpp"
 #include "src/Tools/StringHash.h"
 
 #include <plf_colony.h>
 
+#include <vulkan/vulkan.h>
+
 #include <functional>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -40,7 +42,7 @@ class RenderGraph {
     VkSemaphore frameFinishedSemaphore{VK_NULL_HANDLE};
     VkSemaphore frameDataSemaphore{VK_NULL_HANDLE};
     VkFence renderFence{VK_NULL_HANDLE};
-    VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
+    std::shared_ptr<VkDescriptorSet> descriptorSet{VK_NULL_HANDLE};
 
     PerFrameData(const std::shared_ptr<GraphicsDevice>& device, const RenderGraph& graph);
 

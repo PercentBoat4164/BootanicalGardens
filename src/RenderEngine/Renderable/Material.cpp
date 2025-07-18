@@ -6,6 +6,7 @@
 
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
+#include <ranges>
 #include <set>
 #include <volk/volk.h>
 
@@ -141,12 +142,11 @@ void Material::setVertexShader(const std::shared_ptr<const Shader>& shader) { ve
 std::shared_ptr<const Shader> Material::getVertexShader() const { return vertexShader; }
 void Material::setFragmentShader(const std::shared_ptr<const Shader>& shader) { fragmentShader = shader; }
 std::shared_ptr<const Shader> Material::getFragmentShader() const { return fragmentShader; }
-DescriptorSetRequirements Material::computeDescriptorSetRequirements(const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline, const std::shared_ptr<Mesh>& mesh) const {
-  DescriptorSetRequirements requirements;
+void Material::computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline) const {
   const std::vector shaders = {vertexShader, fragmentShader};
 
   // Obtain reflected descriptor set data
-  std::vector<SpvReflectDescriptorSet*> sets;  // Per-shader sets
+  std::vector<SpvReflectDescriptorSet*> sets;  // sets for all shaders
   std::vector<VkShaderStageFlags> shaderStages;
   for (uint32_t i{}; i < shaders.size(); ++i) {
     const Shader& shader = *shaders[i];
@@ -160,45 +160,42 @@ DescriptorSetRequirements Material::computeDescriptorSetRequirements(const std::
   }
 
   // Build requirements
-  requirements.bindingIDs.resize(sets.size());
-  requirements.setBindings.resize(sets.size());
   std::vector<std::vector<bool>> bindingsDefined(sets.size());
   for (uint32_t i{}; i < sets.size(); ++i) {
     const SpvReflectDescriptorSet& set = *sets.at(i);
+    // Find out which object this set belongs to
+    std::vector<VkDescriptorSetLayoutBinding>* psetRequirements = nullptr;
     switch (set.set) {
-      case 0: requirements.objectDataIndex[nullptr] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
-      case 1: requirements.objectDataIndex[renderPass] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
-      case 2: requirements.objectDataIndex[std::reinterpret_pointer_cast<DescriptorSetRequirer>(pipeline)] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
-      case 3: requirements.objectDataIndex[std::reinterpret_pointer_cast<DescriptorSetRequirer>(mesh)] = { set.set, 0, static_cast<uint32_t>(sets.size()) }; break;
-      default: GraphicsInstance::showError("Descriptor set " + std::to_string(set.set) + " not supported.");
+      case 0: psetRequirements = &requirements[nullptr]; break;
+      case 1: psetRequirements = &requirements[renderPass]; break;
+      case 2: psetRequirements = &requirements[std::reinterpret_pointer_cast<DescriptorSetRequirer>(pipeline)]; break;
+      default: return GraphicsInstance::showError("bad set: " + set.set);
     }
-    std::vector<uint64_t>& bindingIDs  = requirements.bindingIDs.at(set.set);
-    bindingIDs.resize(set.binding_count);
-    std::vector<VkDescriptorSetLayoutBinding>& setBindings = requirements.setBindings.at(set.set);
-    setBindings.resize(set.binding_count);
-    std::vector<bool>& bindingDefined = bindingsDefined.at(set.set);
-    bindingDefined.resize(set.binding_count);
+    std::vector<VkDescriptorSetLayoutBinding>& setRequirements = *psetRequirements;
+    // Build a map that will be used to merge all bindings at the same location
+    std::map<uint32_t, VkDescriptorSetLayoutBinding> bindings;
+    for (const VkDescriptorSetLayoutBinding& setRequirement: setRequirements) bindings[setRequirement.binding] = setRequirement;
+
     for (uint32_t j{}; j < set.binding_count; ++j) {
-      const SpvReflectDescriptorBinding& binding = *set.bindings[j];
-      if (bindingDefined[binding.binding]) {
+      const SpvReflectDescriptorBinding& binding  = *set.bindings[j];
+      // Check if this binding should be initialized or updated
+      if (bindings.contains(binding.binding)) {
+        // Update binding
         /**@todo: Warn if bindings do not match!*/
-        setBindings.at(binding.binding).stageFlags |= shaderStages.at(i);
-      }
-      bindingIDs[binding.binding]  = Tools::hash(binding.name);
-      setBindings[binding.binding] = {
+        bindings.at(binding.binding).stageFlags |= shaderStages.at(i);
+      } else {
+        // Initialize binding
+        bindings[binding.binding] = {
           .binding = binding.binding,
           .descriptorType = static_cast<VkDescriptorType>(binding.descriptor_type),
           .descriptorCount = binding.count,
           .stageFlags = shaderStages.at(i),
           .pImmutableSamplers = VK_NULL_HANDLE
-      };
+        };
+      }
     }
-  }
 
-  for (const SpvReflectDescriptorSet* set : sets) {
-    SpvReflectDescriptorBinding& binding = *set->bindings[0];
-    requirements.sizes[static_cast<VkDescriptorType>(binding.descriptor_type)] += binding.count;
+    auto setBindings = bindings | std::ranges::views::values;
+    setRequirements = {setBindings.begin(), setBindings.end()};
   }
-
-  return requirements;
 }

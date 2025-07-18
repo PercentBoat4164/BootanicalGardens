@@ -61,31 +61,10 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     regions[0].size = indexBuffer->getSize();
     commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
-
-  uniformBuffer  = std::make_shared<UniformBuffer<glm::mat4>>(device, "UniformBuffer");
-  VkDescriptorBufferInfo bufferInfo {
-    .buffer = uniformBuffer->getBuffer(),
-    .offset = 0,
-    .range = VK_WHOLE_SIZE
-  };
-  std::vector<VkWriteDescriptorSet> writeDescriptorSet(descriptorSets.size(), {
-    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .pNext            = nullptr,
-    .dstSet           = VK_NULL_HANDLE,
-    .dstBinding       = 0,
-    .dstArrayElement  = 0,
-    .descriptorCount  = 1,
-    .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    .pImageInfo       = nullptr,
-    .pBufferInfo      = &bufferInfo,
-    .pTexelBufferView = nullptr
-  });
-  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = descriptorSets[i];
-  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 void Mesh::update(const RenderGraph& graph) const {
-  uniformBuffer->update(glm::identity<glm::mat4>());
+  // uniformBuffer->update(glm::identity<glm::mat4>());
 }
 
 bool Mesh::isOpaque() const { return material->getAlphaMode() != fastgltf::AlphaMode::Blend; }

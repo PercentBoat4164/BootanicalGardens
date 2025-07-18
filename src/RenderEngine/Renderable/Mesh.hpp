@@ -15,14 +15,13 @@ class GraphicsDevice;
 class Material;
 template<typename T> class UniformBuffer;
 
-class Mesh : public DescriptorSetRequirer {
+class Mesh {
   VkPrimitiveTopology topology{VK_PRIMITIVE_TOPOLOGY_MAX_ENUM};
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   std::shared_ptr<Material> material{nullptr};
   std::shared_ptr<Buffer> vertexBuffer{nullptr};
   std::shared_ptr<Buffer> indexBuffer{nullptr};
-  std::shared_ptr<UniformBuffer<glm::mat4>> uniformBuffer;
 
 public:
   Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
