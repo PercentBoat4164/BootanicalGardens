@@ -42,7 +42,7 @@ public:
     readFile(path, contents, contentSize);
     const std::string::size_type sourceLength = path.string().length();
     const auto source = new char[sourceLength];
-    memcpy(source, path.c_str(), sourceLength);
+    std::memcpy(source, path.c_str(), sourceLength);
     return new shaderc_include_result{source, sourceLength, contents, static_cast<std::size_t>(contentSize), nullptr};
   }
 
@@ -53,7 +53,7 @@ public:
   }
 };
 
-Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) : device(device) {
+Shader::Shader(GraphicsDevice* const device, yyjson_val* obj) : device(device) {
   // Source file path
   sourcePath = yyjson_get_str(yyjson_obj_get(obj, "source"));
 
@@ -88,7 +88,7 @@ Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* obj) :
   if (!has_main) return;
 }
 
-Shader::Shader(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
+Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
   /**@todo: Use one global compiler and one global optimizer.*/
   const shaderc::Compiler compiler;
   shaderc::CompileOptions compilerOptions;

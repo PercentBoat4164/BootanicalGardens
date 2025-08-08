@@ -1,3 +1,4 @@
+#include "CommandBuffer.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 
 #include "Resources/Buffer.hpp"
@@ -415,6 +416,23 @@ void CommandBuffer::DrawIndexed::bake(VkCommandBuffer commandBuffer) {
 }
 std::string CommandBuffer::DrawIndexed::toString(bool includeArguments) {
   return "vkCmdDrawIndexed";
+}
+
+CommandBuffer::DrawIndexedIndirect::DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, const uint32_t count, const VkDeviceSize offset, const uint32_t stride) : Command({}), buffer(buffer), offset(offset), count(count), stride(stride) {}
+void CommandBuffer::DrawIndexedIndirect::preprocess(State& state, PreprocessingFlags flags) {
+  buf = buffer->getBuffer();
+}
+void CommandBuffer::DrawIndexedIndirect::bake(VkCommandBuffer commandBuffer) {
+#ifndef NDEBUG
+  GraphicsInstance::setDebugDataCommand(this);
+#endif
+  vkCmdDrawIndexedIndirect(commandBuffer, buf, offset, count, stride);
+#ifndef NDEBUG
+  GraphicsInstance::setDebugDataCommand(nullptr);
+#endif
+}
+std::string CommandBuffer::DrawIndexedIndirect::toString(bool includeArguments) {
+  return "vkCmdDrawIndexedIndirect";
 }
 
 CommandBuffer::EndRenderPass::EndRenderPass() : Command({}) {}

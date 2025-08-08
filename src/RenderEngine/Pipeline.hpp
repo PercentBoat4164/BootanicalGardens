@@ -11,7 +11,7 @@ class GraphicsDevice;
 class Shader;
 
 class Pipeline : public DescriptorSetRequirer {
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
   VkPipeline pipeline{VK_NULL_HANDLE};
   VkPipelineLayout layout{VK_NULL_HANDLE};
   std::shared_ptr<Material> material;
@@ -19,7 +19,7 @@ class Pipeline : public DescriptorSetRequirer {
 public:
   VkPipelineBindPoint bindPoint;
 
-  Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<Material>& material);
+  Pipeline(GraphicsDevice* device, const std::shared_ptr<Material>& material);
   void bake(const std::shared_ptr<const RenderPass>& renderPass, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines);
   void writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) override;
   void update();

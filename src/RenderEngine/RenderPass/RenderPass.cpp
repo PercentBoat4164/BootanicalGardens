@@ -45,15 +45,6 @@ RenderPass::~RenderPass() {
   }
 }
 
-void RenderPass::addMesh(const std::shared_ptr<Mesh>& mesh) {
-  meshes.insert(mesh);
-}
-
-void RenderPass::removeMesh(const std::shared_ptr<Mesh>& mesh) {
-  if (const auto it = std::ranges::find_if(meshes, [&](const std::shared_ptr<Mesh>& m) { return m == mesh; }); it != meshes.end()) meshes.erase(it);
-}
-
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }
 std::shared_ptr<Framebuffer> RenderPass::getFramebuffer() const { return framebuffer; }
 const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& RenderPass::getPipelines() { return pipelines; }
-const plf::colony<std::shared_ptr<Mesh>>& RenderPass::getMeshes() { return meshes; }

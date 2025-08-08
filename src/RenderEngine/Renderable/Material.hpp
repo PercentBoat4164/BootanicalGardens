@@ -48,7 +48,7 @@ class Material {
 
 public:
   explicit Material(const std::shared_ptr<const Shader>& vertexShader=nullptr, const std::shared_ptr<const Shader>& fragmentShader=nullptr);
-  Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
+  Material(GraphicsDevice* device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
 
   [[nodiscard]] bool isDoubleSided() const;
   [[nodiscard]] fastgltf::AlphaMode getAlphaMode() const;

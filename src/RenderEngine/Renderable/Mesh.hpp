@@ -2,10 +2,9 @@
 
 #include "Vertex.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
 
 #include <fastgltf/core.hpp>
-
-#include <vulkan/vulkan.h>
 
 #include <vector>
 
@@ -24,7 +23,7 @@ class Mesh {
   std::shared_ptr<Buffer> indexBuffer{nullptr};
 
 public:
-  Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
+  Mesh(GraphicsDevice* device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
 
   void update(const RenderGraph& graph) const;
 

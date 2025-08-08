@@ -11,31 +11,36 @@
 #include "src/RenderEngine/Shader.hpp"
 #include "src/RenderEngine/Window.hpp"
 
+#include <volk/volk.h>
+
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
   GraphicsInstance::create({});
   {
-    const auto graphicsDevice = std::make_shared<GraphicsDevice>();
+    GraphicsDevice graphicsDevice;
 
-    Window window{graphicsDevice};
+    Window window{&graphicsDevice};
 
     // Build the RenderGraph
-    RenderGraph renderGraph{graphicsDevice};
+    RenderGraph renderGraph{&graphicsDevice};
     renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution());
     renderGraph.setAttachment(RenderGraph::RenderColor, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, VK_SAMPLE_COUNT_1_BIT);
     renderGraph.setAttachment(RenderGraph::RenderDepth, RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
-    std::shared_ptr<RenderPass> renderPass = *renderGraph.insert<OpaqueRenderPass>();
+    renderGraph.insert<OpaqueRenderPass>();
 
-    const auto renderable = std::make_shared<Renderable>(graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
-    for (const auto& mesh : renderable->getMeshes()) {
-      mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/shaders/default.frag")));
-      mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(graphicsDevice, std::filesystem::canonical("../res/shaders/default.vert")));
+    // graphicsDevice->loadMeshes(std::filesystem::canonical("../res/FlightHelmet.glb"));
+
+    const auto renderable = std::make_shared<Renderable>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
+    const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
+    for (const std::shared_ptr<Mesh>& mesh: meshes) {
+      mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.frag")));
+      mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.vert")));
     }
-    renderGraph.addRenderable(renderable);
+    graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
 
     CommandBuffer commandBuffer;
     renderGraph.bake(commandBuffer);
-    graphicsDevice->executeCommandBufferImmediate(commandBuffer);
+    graphicsDevice.executeCommandBufferImmediate(commandBuffer);
 
     do {
       // Make sure that the CPU is not getting too far ahead of the GPU
@@ -44,9 +49,9 @@ int main() {
       const std::shared_ptr<Image> swapchainImage = window.getNextImage(frameDataSemaphore);
       // Render (CPU issues work to GPU)
       renderGraph.update();
-      VkSemaphore frameFinishedSemaphore = renderGraph.execute(swapchainImage);
-      // Tell the GPU to show the final image when it has finished processing this frame
-      window.present(frameFinishedSemaphore);
+      renderGraph.execute(swapchainImage, window.getSemaphore());
+      // Tell the GPU to show the final image when it has finished rendering this frame
+      window.present();
     } while (Game::tick());
   }
   GraphicsInstance::destroy();

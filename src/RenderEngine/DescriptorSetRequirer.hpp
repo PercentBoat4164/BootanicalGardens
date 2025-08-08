@@ -8,14 +8,14 @@
 class GraphicsDevice;
 
 class DescriptorSetRequirer {
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
 
 protected:
   std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
   VkDescriptorSetLayout layout{VK_NULL_HANDLE};
 
 public:
-  explicit DescriptorSetRequirer(const std::shared_ptr<GraphicsDevice>& device);
+  explicit DescriptorSetRequirer(GraphicsDevice* device);
   virtual ~DescriptorSetRequirer();
 
   void setDescriptorSets(std::span<std::shared_ptr<VkDescriptorSet>> sets, VkDescriptorSetLayout setLayout);

@@ -1,4 +1,4 @@
 #include "StagingBuffer.hpp"
 
-StagingBuffer::StagingBuffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, const VkDeviceSize size) :
+StagingBuffer::StagingBuffer(GraphicsDevice* const device, const char* name, const VkDeviceSize size) :
     Buffer(device, name, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST, VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_STRATEGY_MIN_TIME_BIT) {}

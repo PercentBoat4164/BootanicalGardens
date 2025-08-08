@@ -15,7 +15,6 @@ protected:
   RenderGraph& graph;
   VkRenderPass renderPass{VK_NULL_HANDLE};
   std::shared_ptr<Framebuffer> framebuffer;
-  plf::colony<std::shared_ptr<Mesh>> meshes;
 
   std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>> pipelines;
 
@@ -39,9 +38,6 @@ public:
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
   ~RenderPass() override;
 
-  void addMesh(const std::shared_ptr<Mesh>& mesh);
-  void removeMesh(const std::shared_ptr<Mesh>& mesh);
-
   virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
   virtual void update(const RenderGraph& graph)                                                                                     = 0;
@@ -49,8 +45,6 @@ public:
 
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] std::shared_ptr<Framebuffer> getFramebuffer() const;
-  [[nodiscard]] const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& getPipelines();
-  [[nodiscard]] const plf::colony<std::shared_ptr<Mesh>>& getMeshes();
-};
+  [[nodiscard]] const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& getPipelines();};
 
 template<> struct std::hash<RenderPass> { size_t operator()(const RenderPass& pass) const noexcept { return pass.compatibility; } };

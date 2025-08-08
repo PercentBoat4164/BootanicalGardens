@@ -56,10 +56,7 @@ namespace detail {
 class Vertex {
 public:
   glm::vec3 position;
-  glm::vec3 normal;
-  glm::vec4 tangent;
   glm::vec2 textureCoordinates0;
-  glm::vec4 color0;
 
   bool operator==(const Vertex& other) const;
 
@@ -81,25 +78,10 @@ public:
           .format   = formatOf<decltype(position)>(),
           .offset   = offsetof(Vertex, position)
         }, {
-          .location = 1,
-          .binding  = 0,
-          .format   = formatOf<decltype(normal)>(),
-          .offset   = offsetof(Vertex, normal)
-        }, {
-          .location = 2,
-          .binding  = 0,
-          .format   = formatOf<decltype(tangent)>(),
-          .offset   = offsetof(Vertex, tangent)
-        }, {
           .location = 3,
           .binding  = 0,
           .format   = formatOf<decltype(textureCoordinates0)>(),
           .offset   = offsetof(Vertex, textureCoordinates0)
-        }, {
-          .location = 4,
-          .binding  = 0,
-          .format   = formatOf<decltype(color0)>(),
-          .offset   = offsetof(Vertex, color0)
         }
     };
   }

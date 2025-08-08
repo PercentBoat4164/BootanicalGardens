@@ -7,7 +7,7 @@
 #include <vector>
 #include <volk/volk.h>
 
-Framebuffer::Framebuffer(const std::shared_ptr<GraphicsDevice>& device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass) : device(device),
+Framebuffer::Framebuffer(GraphicsDevice* const device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass) : device(device),
                                                                                                                                                       images(images),
                                                                                                                                                       extent{images.front()->getExtent().width, images.front()->getExtent().height},
                                                                                                                                                       rect{0, 0, extent.width, extent.height} {

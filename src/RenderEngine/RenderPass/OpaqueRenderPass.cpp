@@ -9,25 +9,14 @@
 #include "src/RenderEngine/Resources/Buffer.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
-
-
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/matrix.hpp>
-
-#define GLM_ENABLE_EXPERIMENTAL
 #include "src/RenderEngine/GraphicsInstance.hpp"
 
-
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 
 #include <volk/volk.h>
 
-OpaqueRenderPass::OpaqueRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit), graph(graph) {
-  material = std::make_shared<Material>(
-    std::make_shared<Shader>(graph.device, "../res/shaders/deferred.frag"),
-    std::make_shared<Shader>(graph.device, "../res/shaders/deferred.vert")
-  );
-}
+OpaqueRenderPass::OpaqueRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit), graph(graph) {}
 
 std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> OpaqueRenderPass::declareAttachments() {
   return {
@@ -76,9 +65,9 @@ void OpaqueRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
   if (const VkResult result = vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create render pass");
 
   framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr<Mesh>& mesh: meshes) {
-    const std::shared_ptr<Material> material = mesh->getMaterial();
-    pipelines[material]                      = std::make_shared<Pipeline>(graph.device, material);
+  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) {
+    const std::shared_ptr<Material>& material = mesh->getMaterial();
+    pipelines[material]                       = std::make_shared<Pipeline>(graph.device, material);
   }
 
   uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "uniform buffer");
@@ -114,7 +103,9 @@ void OpaqueRenderPass::update(const RenderGraph& graph) {
 
 void OpaqueRenderPass::execute(CommandBuffer& commandBuffer) {
   commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this());
-  for (const std::shared_ptr<Mesh>& mesh : meshes) {
+  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
+    if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
+      continue;
     commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});
     const bool meshIsIndexed = mesh->getIndexBuffer() != nullptr;
     if (meshIsIndexed) commandBuffer.record<CommandBuffer::BindIndexBuffers>(mesh->getIndexBuffer());

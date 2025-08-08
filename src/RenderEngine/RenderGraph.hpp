@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DescriptorSetRequirer.hpp"
+#include "src/RenderEngine/Renderable/Instance.hpp"
 #include "src/Tools/StringHash.h"
 
 #include <plf_colony.h>
@@ -33,7 +35,7 @@ class RenderGraph {
   std::shared_ptr<UniformBuffer<GraphData>> uniformBuffer{};
 
   class PerFrameData {
-    const std::shared_ptr<GraphicsDevice> device;
+    GraphicsDevice* const device;
     const RenderGraph& graph;
 
   public:
@@ -43,23 +45,23 @@ class RenderGraph {
     VkSemaphore frameDataSemaphore{VK_NULL_HANDLE};
     VkFence renderFence{VK_NULL_HANDLE};
     std::shared_ptr<VkDescriptorSet> descriptorSet{VK_NULL_HANDLE};
+    std::shared_ptr<VkDescriptorSetLayout> descriptorSetLayout{VK_NULL_HANDLE};
 
-    PerFrameData(const std::shared_ptr<GraphicsDevice>& device, const RenderGraph& graph);
-
+    PerFrameData(GraphicsDevice* device, const RenderGraph& graph);
     ~PerFrameData();
   };
   
   std::vector<PerFrameData> frames;
+  plf::colony<Instance> instances;
 
   uint64_t frameNumber{};
   std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE};
 
   std::vector<std::shared_ptr<RenderPass>> renderPasses;
-  plf::colony<std::shared_ptr<Renderable>> renderables;
   bool outOfDate = false;
 
 public:
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
 
   using AttachmentID = uint32_t;
   using ResolutionGroupID = uint32_t;
@@ -104,7 +106,7 @@ public:
   [[nodiscard]] const_reverse_iterator crbegin() const { return renderPasses.crbegin(); }
   [[nodiscard]] const_reverse_iterator crend() const { return renderPasses.crend(); }
 
-  explicit RenderGraph(const std::shared_ptr<GraphicsDevice>& device);
+  explicit RenderGraph(GraphicsDevice* device);
   ~RenderGraph();
 
   [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
@@ -112,8 +114,6 @@ public:
   void setResolutionGroup(ResolutionGroupID id, VkExtent3D resolution);
   static constexpr AttachmentID getAttachmentId(const std::string_view name) { return Tools::hash(name); }
   void setAttachment(AttachmentID id, ResolutionGroupID groupId, VkFormat format, VkSampleCountFlags sampleCount);
-  void addRenderable(const std::shared_ptr<Renderable>& renderable);
-  void removeRenderable(const std::shared_ptr<Renderable>& renderable);
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(const const_iterator iterator, Args&&... args) { outOfDate = true; return renderPasses.insert(iterator, std::make_unique<T>(*this, std::forward<Args&&>(args)...)); }
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(Args&&... args) { outOfDate = true; return insert<T>(cend(), std::forward<Args&&>(args)...); }
   bool bake(CommandBuffer& commandBuffer);
@@ -121,7 +121,7 @@ public:
   [[nodiscard]] const PerFrameData& getPerFrameData(uint64_t frameIndex=-1) const;
   [[nodiscard]] VkSemaphore waitForNextFrameData() const;
   void update() const;
-  [[nodiscard]] VkSemaphore execute(const std::shared_ptr<Image>& swapchainImage) const;
+  void execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore);
 
   inline static const AttachmentID RenderColor = getAttachmentId("RenderColor");
   inline static const AttachmentID RenderDepth = getAttachmentId("RenderDepth");

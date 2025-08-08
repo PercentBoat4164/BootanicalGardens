@@ -31,7 +31,7 @@ const std::byte* handleDataSource(const fastgltf::Asset& asset, const fastgltf::
 
 template<typename T>
 requires std::derived_from<T, fastgltf::TextureInfo>
-void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
+void loadTexture(GraphicsDevice* const device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, std::shared_ptr<Texture>* texture, const fastgltf::Optional<T>* textureInfo) {
   if (!textureInfo->has_value()) return;
   const fastgltf::Optional<std::size_t>& imageIndex = asset.textures[textureInfo->value().textureIndex].imageIndex;
   if (!imageIndex.has_value()) return;
@@ -93,7 +93,7 @@ void loadTexture(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& c
 }
 
 Material::Material(const std::shared_ptr<const Shader>& vertexShader, const std::shared_ptr<const Shader>& fragmentShader) : vertexShader(vertexShader), fragmentShader(fragmentShader) {}
-Material::Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) : doubleSided(material.doubleSided),
+Material::Material(GraphicsDevice* const device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material) : doubleSided(material.doubleSided),
                                                                                                                                                                     alphaMode(material.alphaMode),
                                                                                                                                                                     alphaCutoff(material.alphaCutoff),
                                                                                                                                                                     unlit(material.unlit),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderPass/RenderPass.hpp"
+#include "Resources/Buffer.hpp"
 
 #include <vulkan/vulkan_core.h>
 
@@ -274,6 +275,20 @@ public:
 
     uint32_t vertexCount{0};
     uint32_t indexCount{0};
+  };
+
+  struct DrawIndexedIndirect final : Command {
+    explicit DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, uint32_t count, VkDeviceSize offset=0, uint32_t stride=sizeof(VkDrawIndexedIndirectCommand));
+  private:
+    void preprocess(State& state, PreprocessingFlags flags) override;
+    void bake(VkCommandBuffer commandBuffer) override;
+    std::string toString(bool includeArguments) override;
+
+    std::shared_ptr<Buffer> buffer;
+    VkBuffer buf{VK_NULL_HANDLE};
+    VkDeviceSize offset{0};
+    uint32_t count{0};
+    uint32_t stride{0};
   };
 
   struct EndRenderPass final : Command {

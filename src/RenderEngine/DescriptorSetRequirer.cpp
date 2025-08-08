@@ -4,7 +4,7 @@
 
 #include <volk/volk.h>
 
-DescriptorSetRequirer::DescriptorSetRequirer(const std::shared_ptr<GraphicsDevice>& device) : device(device) {}
+DescriptorSetRequirer::DescriptorSetRequirer(GraphicsDevice* const device) : device(device) {}
 
 DescriptorSetRequirer::~DescriptorSetRequirer() {
   vkDestroyDescriptorSetLayout(device->device, layout, nullptr);

@@ -14,18 +14,20 @@ class Window {
   vkb::Swapchain swapchain;
   uint32_t swapchainIndex{};
   std::vector<std::shared_ptr<Image>> swapchainImages;
+  std::vector<VkSemaphore> semaphores;
 
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
 
 public:
   static SDL_Window* initialize();
   static void cleanupInitialization(SDL_Window* window);
 
-  explicit Window(std::shared_ptr<GraphicsDevice> device);
+  explicit Window(GraphicsDevice* device);
   ~Window();
 
   [[nodiscard]] VkExtent3D getResolution() const;
 
   std::shared_ptr<Image> getNextImage(VkSemaphore swapchainSemaphore);
-  void present(VkSemaphore semaphore) const;
+  VkSemaphore getSemaphore() const;
+  void present() const;
 };

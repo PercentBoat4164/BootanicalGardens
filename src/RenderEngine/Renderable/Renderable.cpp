@@ -5,12 +5,12 @@
 #include <src/RenderEngine/CommandBuffer.hpp>
 #include <src/RenderEngine/GraphicsDevice.hpp>
 
-Renderable::Renderable(const std::shared_ptr<GraphicsDevice>& device, const std::filesystem::path& path) : device(device) {
+Renderable::Renderable(GraphicsDevice* const device, const std::filesystem::path& path) : device(device) {
   fastgltf::GltfFileStream fileStream(path);
   loadData(fileStream);
 }
 
-Renderable::Renderable(const std::shared_ptr<GraphicsDevice>& device, yyjson_val* val) : device(device){
+Renderable::Renderable(GraphicsDevice* const device, yyjson_val* val) : device(device){
   const char* bytes = yyjson_get_str(val);
   const size_t len = yyjson_get_len(val);
   auto dataBuffer = fastgltf::GltfDataBuffer::FromBytes(reinterpret_cast<const std::byte*>(bytes), len);

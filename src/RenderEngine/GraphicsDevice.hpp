@@ -4,11 +4,11 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 
 #include <VkBootstrap.h>
-#include <functional>
 #include <vma/vk_mem_alloc.h>
 
 #include <map>
 #include <memory>
+#include <unordered_set>
 
 class Texture;
 class Mesh;
@@ -24,6 +24,7 @@ public:
   VkCommandPool commandPool{VK_NULL_HANDLE};
   std::map<std::size_t, std::weak_ptr<VkSampler>> samplers;
   DescriptorSetAllocator descriptorSetAllocator{*this};
+  std::unordered_set<std::shared_ptr<Mesh>> meshes;
 
   explicit GraphicsDevice();
   ~GraphicsDevice();
@@ -37,6 +38,4 @@ public:
   void waitForAsyncCommandBuffer(ImmediateExecutionContext context) const;
   void executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const;
   std::shared_ptr<VkSampler> getSampler(VkFilter magnificationFilter = VK_FILTER_NEAREST, VkFilter minificationFilter = VK_FILTER_NEAREST, VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, float lodBias = 0, VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
-
-  void destroy();
 };

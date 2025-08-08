@@ -10,7 +10,7 @@
 #include <magic_enum/magic_enum.hpp>
 #include <volk/volk.h>
 
-Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<Material>& material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
+Pipeline::Pipeline(GraphicsDevice* const device, const std::shared_ptr<Material>& material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
 
 /**@todo: Only rebake if out-of-date.*/
 void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {

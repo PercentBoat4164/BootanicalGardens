@@ -15,7 +15,7 @@
 #include <fastgltf/glm_element_traits.hpp>
 #include <volk/volk.h>
 
-Mesh::Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
+Mesh::Mesh(GraphicsDevice* const device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
 material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : std::make_shared<Material>()) {
   // Determine this mesh's topology
   switch (primitive.type) {
@@ -36,11 +36,11 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     /**@todo: Add support for other attributes (application specific, animations, more texture coordinates, more colors).*/
     switch (Tools::hash(attribute.name)) { /**@see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes */
       case Tools::hash("POSITION"): fastgltf::copyFromAccessor<decltype(Vertex::position), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, position)); break;
-      case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
-      case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
+      // case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
+      // case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
       case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, textureCoordinates0)); break;
-      case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
-      default: GraphicsInstance::showError(std::string("unknown vertex attribute name: " + attribute.name)); break;
+      // case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
+      default: break;
     }
   }
 

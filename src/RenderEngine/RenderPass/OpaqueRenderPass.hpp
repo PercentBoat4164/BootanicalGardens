@@ -11,7 +11,6 @@ class OpaqueRenderPass final : public RenderPass {
   struct PassData { glm::mat4 viewProjectionMatrix; };
   RenderGraph& graph;
   std::shared_ptr<UniformBuffer<PassData>> uniformBuffer;
-  std::shared_ptr<Material> material;
 
 public:
   explicit OpaqueRenderPass(RenderGraph& graph);
