@@ -1,7 +1,6 @@
 #pragma once
 
-#include "external/efsw/f29698bb9021ac0c3cf9f8aee9179c06dedad2b7/include/efsw/efsw.hpp"
-#include <cassert>
+#include "efsw/efsw.hpp"
 #include <filesystem>
 #include <functional>
 

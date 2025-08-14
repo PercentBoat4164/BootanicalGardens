@@ -4,8 +4,7 @@
 #include "GraphicsInstance.hpp"
 #include "Pipeline.hpp"
 
-#include <SPIRV-Reflect/spirv_reflect.c>  // Should only be included in one file.
-#include <SPIRV-Reflect/spirv_reflect.h>
+#include <spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
 #include <volk/volk.h>
 #include <yyjson.h>

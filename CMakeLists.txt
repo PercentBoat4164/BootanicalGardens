@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.27.8)
 project("Bootanical Gardens")
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 
 find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 
+set(ASM_NASM "nasm")
+
 set(CPM_SOURCE_CACHE external)
-include(cmake/CPM.cmake)
+include(cmake/get_cpm.cmake)
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap#v1.4.312")
+set(SPIRV_REFLECT_STATIC_LIB ON)
+CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-1.4.321.0")
 CPMAddPackage("gh:libsdl-org/SDL#release-3.2.10")
-CPMAddPackage("gh:libsdl-org/SDL_ttf#release-3.2.2")
+set(SDLIMAGE_AVIF OFF)
 CPMAddPackage("gh:libsdl-org/SDL_image#release-3.2.4")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.6")
 set(FASTGLTF_DOWNLOAD_SIMDJSON ON)
@@ -67,7 +71,7 @@ add_executable(BootanicalGardens
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
 target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
-target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace efsw)
+target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace efsw)
 target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
 
 # Move all .dlls to the exe

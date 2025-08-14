@@ -2,7 +2,7 @@
 
 #include "GraphicsDevice.hpp"
 
-#include <SPIRV-Reflect/spirv_reflect.h>
+#include <spirv_reflect.h>
 #include <filesystem>
 
 class yyjson_val;

@@ -1,5 +1,7 @@
 #include "UpdateListener.hpp"
 
+#include <cassert>
+
 std::unordered_map<std::filesystem::path, UpdateListener::Funcs> UpdateListener::directoryFuncMap;
 std::unordered_map<std::filesystem::path, UpdateListener::Funcs> UpdateListener::fileFuncMap;
 efsw::FileWatcher UpdateListener::watcher;
