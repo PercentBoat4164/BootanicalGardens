@@ -3,6 +3,7 @@
 
 
 #include <memory>
+#include <span>
 #include <vector>
 
 class GraphicsDevice;
