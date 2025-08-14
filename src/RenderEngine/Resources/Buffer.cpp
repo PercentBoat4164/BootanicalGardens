@@ -62,9 +62,9 @@ std::shared_ptr<Buffer::BufferMapping> Buffer::map() {
 }
 
 void* Buffer::getObject() const {
-  return buffer;
+  return reinterpret_cast<void *>(buffer);
 }
 
 void* Buffer::getView() const {
-  return view;
+  return reinterpret_cast<void *>(view);
 }

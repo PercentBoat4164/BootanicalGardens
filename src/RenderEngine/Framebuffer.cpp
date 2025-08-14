@@ -11,7 +11,7 @@ Framebuffer::Framebuffer(GraphicsDevice* const device, const std::vector<std::sh
                                                                                                                                                       images(images),
                                                                                                                                                       extent{images.front()->getExtent().width, images.front()->getExtent().height},
                                                                                                                                                       rect{0, 0, extent.width, extent.height} {
-  std::vector<VkImageView> views{images.size()};
+  std::vector<VkImageView> views(images.size());
   for (uint32_t i{}; i < images.size(); ++i)
     views[i] = images[i]->getImageView();
   const VkFramebufferCreateInfo framebufferCreateInfo{

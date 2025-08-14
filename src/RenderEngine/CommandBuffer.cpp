@@ -24,18 +24,20 @@ CommandBuffer::Command::Command(std::vector<ResourceAccess> accesses) : accesses
 #endif
 {}
 
+std::vector<CommandBuffer::Command::ResourceAccess> f(std::shared_ptr<RenderPass> renderPass) {
+  std::vector<CommandBuffer::Command::ResourceAccess> accesses;
+  auto attachments = renderPass->declareAttachments();
+  uint32_t index{};
+  for (const std::shared_ptr<Image>& image : renderPass->getFramebuffer()->getImages()) {
+    auto& attachment = attachments[index++].second;
+    accesses.emplace_back(CommandBuffer::Command::ResourceAccess::Write, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
+    accesses.emplace_back(CommandBuffer::Command::ResourceAccess::Write | CommandBuffer::Command::ResourceAccess::Read, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
+  }
+  return accesses;
+}
+
 CommandBuffer::BeginRenderPass::BeginRenderPass(std::shared_ptr<RenderPass> renderPass, const VkRect2D renderArea, std::vector<VkClearValue> clearValues) :
-    Command([&]->std::vector<ResourceAccess>{
-      std::vector<ResourceAccess> accesses;
-      auto attachments = renderPass->declareAttachments();
-      uint32_t index{};
-      for (const std::shared_ptr<Image>& image : renderPass->getFramebuffer()->getImages()) {
-        auto& attachment = attachments[index++].second;
-        accesses.emplace_back(ResourceAccess::Write, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
-        accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
-      }
-      return accesses;
-    }()),
+    Command(f(renderPass)),
     renderPass(std::move(renderPass)),
     renderArea(renderArea.offset.x == 0 && renderArea.offset.y == 0 && renderArea.extent.width == 0 && renderArea.extent.height == 0 ? this->renderPass->getFramebuffer()->getRect() : renderArea),
     clearValues(std::move(clearValues)),
@@ -192,8 +194,8 @@ void CommandBuffer::BlitImageToImage::preprocess(State& state, PreprocessingFlag
   });
   srcImage = src->getImage();
   dstImage = dst->getImage();
-  srcImageLayout = state.resourceStates.at(srcImage).layout;
-  dstImageLayout = state.resourceStates.at(dstImage).layout;
+  srcImageLayout = state.resourceStates.at(reinterpret_cast<void*>(srcImage)).layout;
+  dstImageLayout = state.resourceStates.at(reinterpret_cast<void*>(dstImage)).layout;
 }
 void CommandBuffer::BlitImageToImage::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -216,7 +218,7 @@ CommandBuffer::ClearColorImage::ClearColorImage(std::shared_ptr<Image> img, cons
 void CommandBuffer::ClearColorImage::preprocess(State& state, PreprocessingFlags flags) {
   if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
   image = img->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::ClearColorImage::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -239,7 +241,7 @@ CommandBuffer::ClearDepthStencilImage::ClearDepthStencilImage(std::shared_ptr<Im
 void CommandBuffer::ClearDepthStencilImage::preprocess(State& state, PreprocessingFlags flags) {
   if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
   image = img->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::ClearDepthStencilImage::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -299,7 +301,7 @@ void CommandBuffer::CopyBufferToImage::preprocess(State& state, PreprocessingFla
   });
   buffer = src->getBuffer();
   image = dst->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::CopyBufferToImage::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -331,7 +333,7 @@ void CommandBuffer::CopyImageToBuffer::preprocess(State& state, PreprocessingFla
   });
   image = src->getImage();
   buffer = dst->getBuffer();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::CopyImageToBuffer::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -364,8 +366,8 @@ void CommandBuffer::CopyImageToImage::preprocess(State& state, PreprocessingFlag
   });
   srcImage = src->getImage();
   dstImage = dst->getImage();
-  srcLayout = state.resourceStates.at(srcImage).layout;
-  dstLayout = state.resourceStates.at(dstImage).layout;
+  srcLayout = state.resourceStates.at(reinterpret_cast<void*>(srcImage)).layout;
+  dstLayout = state.resourceStates.at(reinterpret_cast<void*>(dstImage)).layout;
 }
 void CommandBuffer::CopyImageToImage::bake(VkCommandBuffer commandBuffer) {
 #ifndef NDEBUG
@@ -463,7 +465,7 @@ CommandBuffer::PipelineBarrier::PipelineBarrier(const VkPipelineStageFlags srcSt
 void CommandBuffer::PipelineBarrier::preprocess(State& state, PreprocessingFlags flags) {
   if (flags & ModifyPipelineBarriers) {
     for (auto& imageMemoryBarrier: imageMemoryBarriers) {
-      ResourceState& resourceState = state.resourceStates.at(imageMemoryBarrier.image);
+      ResourceState& resourceState = state.resourceStates.at(reinterpret_cast<void*>(imageMemoryBarrier.image));
       if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM)
         imageMemoryBarrier.srcAccessMask = resourceState.access;
       resourceState.access = imageMemoryBarrier.dstAccessMask;

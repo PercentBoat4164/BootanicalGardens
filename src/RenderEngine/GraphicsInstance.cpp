@@ -61,7 +61,7 @@ void GraphicsInstance::create(const std::vector<const char*>& extensions) {
   builder.set_engine_name("Example Engine").set_engine_version(0, 0, 1);
 #ifndef NDEBUG
   builder.enable_validation_layers();
-  builder.set_debug_callback(&GraphicsInstance::debugCallback);
+  builder.set_debug_callback(reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(&GraphicsInstance::debugCallback));
   builder.set_debug_callback_user_data_pointer(&GraphicsInstance::debugData);
 #else
   builder.enable_validation_layers(false);

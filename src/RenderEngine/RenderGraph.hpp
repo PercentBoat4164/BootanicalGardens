@@ -55,7 +55,7 @@ class RenderGraph {
   plf::colony<Instance> instances;
 
   uint64_t frameNumber{};
-  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE};
+  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool = std::unique_ptr<VkDescriptorPool>{new VkDescriptorPool};
 
   std::vector<std::shared_ptr<RenderPass>> renderPasses;
   bool outOfDate = false;
