@@ -10,7 +10,6 @@ template<typename T> class UniformBuffer;
 class OpaqueRenderPass final : public RenderPass {
   struct PassData { glm::mat4 viewProjectionMatrix; };
   RenderGraph& graph;
-  std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
   std::shared_ptr<UniformBuffer<PassData>> uniformBuffer;
 
 public:
@@ -18,6 +17,7 @@ public:
 
   std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments() override;
   void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) override;
+  void writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) override;
   void update(const RenderGraph& graph) override;
   void execute (CommandBuffer& commandBuffer) override;
 };

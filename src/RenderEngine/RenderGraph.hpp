@@ -1,11 +1,15 @@
 #pragma once
 
-#include "src/RenderEngine/DescriptorAllocator.hpp"
+#include "DescriptorSetRequirer.hpp"
+#include "src/RenderEngine/Renderable/Instance.hpp"
 #include "src/Tools/StringHash.h"
 
-#include "plf_colony.h"
+#include <plf_colony.h>
 
-#include <list>
+#include <vulkan/vulkan.h>
+
+#include <functional>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -31,7 +35,7 @@ class RenderGraph {
   std::shared_ptr<UniformBuffer<GraphData>> uniformBuffer{};
 
   class PerFrameData {
-    const std::shared_ptr<GraphicsDevice> device;
+    GraphicsDevice* const device;
     const RenderGraph& graph;
 
   public:
@@ -40,28 +44,27 @@ class RenderGraph {
     VkSemaphore frameFinishedSemaphore{VK_NULL_HANDLE};
     VkSemaphore frameDataSemaphore{VK_NULL_HANDLE};
     VkFence renderFence{VK_NULL_HANDLE};
-    /// Per-frame descriptor set
     std::shared_ptr<VkDescriptorSet> descriptorSet{VK_NULL_HANDLE};
+    std::shared_ptr<VkDescriptorSetLayout> descriptorSetLayout{VK_NULL_HANDLE};
 
-    PerFrameData(const std::shared_ptr<GraphicsDevice>& device, const RenderGraph& graph);
-
+    PerFrameData(GraphicsDevice* device, const RenderGraph& graph);
     ~PerFrameData();
   };
   
   std::vector<PerFrameData> frames;
+  plf::colony<Instance> instances;
 
   uint64_t frameNumber{};
+  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE};
 
-  std::list<std::shared_ptr<RenderPass>> renderPasses;
-  plf::colony<std::shared_ptr<Renderable>> renderables;
+  std::vector<std::shared_ptr<RenderPass>> renderPasses;
   bool outOfDate = false;
 
 public:
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
 
   using AttachmentID = uint32_t;
   using ResolutionGroupID = uint32_t;
-  using PipelineID = uint64_t;
 
 private:
   struct AttachmentProperties {
@@ -73,8 +76,6 @@ private:
   std::unordered_map<ResolutionGroupID, std::tuple<VkExtent3D, std::vector<AttachmentID>>> resolutionGroups;
   std::unordered_map<AttachmentID, AttachmentProperties> attachmentsProperties;
   std::unordered_map<AttachmentID, std::shared_ptr<Image>> backingImages;
-
-  std::unordered_map<PipelineID, std::shared_ptr<Pipeline>> pipelines;
 
 public:
   static uint8_t FRAMES_IN_FLIGHT;
@@ -105,7 +106,7 @@ public:
   [[nodiscard]] const_reverse_iterator crbegin() const { return renderPasses.crbegin(); }
   [[nodiscard]] const_reverse_iterator crend() const { return renderPasses.crend(); }
 
-  explicit RenderGraph(const std::shared_ptr<GraphicsDevice>& device);
+  explicit RenderGraph(GraphicsDevice* device);
   ~RenderGraph();
 
   [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
@@ -113,19 +114,14 @@ public:
   void setResolutionGroup(ResolutionGroupID id, VkExtent3D resolution);
   static constexpr AttachmentID getAttachmentId(const std::string_view name) { return Tools::hash(name); }
   void setAttachment(AttachmentID id, ResolutionGroupID groupId, VkFormat format, VkSampleCountFlags sampleCount);
-  void addRenderable(const std::shared_ptr<Renderable>& renderable);
-  void removeRenderable(const std::shared_ptr<Renderable>& renderable);
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(const const_iterator iterator, Args&&... args) { outOfDate = true; return renderPasses.insert(iterator, std::make_unique<T>(*this, std::forward<Args&&>(args)...)); }
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(Args&&... args) { outOfDate = true; return insert<T>(cend(), std::forward<Args&&>(args)...); }
   bool bake(CommandBuffer& commandBuffer);
 
-  [[nodiscard]] const PerFrameData& getPerFrameData() const;
+  [[nodiscard]] const PerFrameData& getPerFrameData(uint64_t frameIndex=-1) const;
   [[nodiscard]] VkSemaphore waitForNextFrameData() const;
   void update() const;
-  [[nodiscard]] VkSemaphore execute(const std::shared_ptr<Image>& swapchainImage) const;
-
-  void bakePipeline(const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass);
-  std::shared_ptr<Pipeline> getPipeline(uint64_t renderPassCompatibility);
+  void execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore);
 
   inline static const AttachmentID RenderColor = getAttachmentId("RenderColor");
   inline static const AttachmentID RenderDepth = getAttachmentId("RenderDepth");
@@ -142,5 +138,5 @@ private:
    * @param commandBuffer The CommandBuffer to record transitions into
    * @param declarations Declarations of the images in the `backingImages`
    */
-  void transitionImages(CommandBuffer& commandBuffer, const std::unordered_map<AttachmentID, AttachmentDeclaration>& declarations);
+  void transitionImages(CommandBuffer& commandBuffer, const std::map<AttachmentID, AttachmentDeclaration>& declarations);
 };

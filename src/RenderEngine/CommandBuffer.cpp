@@ -1,3 +1,4 @@
+#include "CommandBuffer.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 
 #include "Resources/Buffer.hpp"
@@ -28,7 +29,7 @@ CommandBuffer::BeginRenderPass::BeginRenderPass(std::shared_ptr<RenderPass> rend
       std::vector<ResourceAccess> accesses;
       auto attachments = renderPass->declareAttachments();
       uint32_t index{};
-      for (std::shared_ptr<Image> image : renderPass->getFramebuffer()->getImages()) {
+      for (const std::shared_ptr<Image>& image : renderPass->getFramebuffer()->getImages()) {
         auto& attachment = attachments[index++].second;
         accesses.emplace_back(ResourceAccess::Write, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
         accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
@@ -152,9 +153,9 @@ std::string CommandBuffer::BindPipeline::toString(bool includeArguments) {
 CommandBuffer::BindVertexBuffers::BindVertexBuffers(const std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>& vertexBuffers) :
     Command({}),
     rawBuffers(vertexBuffers.size()) {
-  const auto bufferRange = std::ranges::views::keys(vertexBuffers);
+  const auto bufferRange = std::views::keys(vertexBuffers);
   buffers = {bufferRange.begin(), bufferRange.end()};
-  const auto offsetRange = std::ranges::views::values(vertexBuffers);
+  const auto offsetRange = std::views::values(vertexBuffers);
   offsets = {offsetRange.begin(), offsetRange.end()};
 }
 void CommandBuffer::BindVertexBuffers::preprocess(State& state, PreprocessingFlags flags) {
@@ -417,6 +418,23 @@ std::string CommandBuffer::DrawIndexed::toString(bool includeArguments) {
   return "vkCmdDrawIndexed";
 }
 
+CommandBuffer::DrawIndexedIndirect::DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, const uint32_t count, const VkDeviceSize offset, const uint32_t stride) : Command({}), buffer(buffer), offset(offset), count(count), stride(stride) {}
+void CommandBuffer::DrawIndexedIndirect::preprocess(State& state, PreprocessingFlags flags) {
+  buf = buffer->getBuffer();
+}
+void CommandBuffer::DrawIndexedIndirect::bake(VkCommandBuffer commandBuffer) {
+#ifndef NDEBUG
+  GraphicsInstance::setDebugDataCommand(this);
+#endif
+  vkCmdDrawIndexedIndirect(commandBuffer, buf, offset, count, stride);
+#ifndef NDEBUG
+  GraphicsInstance::setDebugDataCommand(nullptr);
+#endif
+}
+std::string CommandBuffer::DrawIndexedIndirect::toString(bool includeArguments) {
+  return "vkCmdDrawIndexedIndirect";
+}
+
 CommandBuffer::EndRenderPass::EndRenderPass() : Command({}) {}
 void CommandBuffer::EndRenderPass::preprocess(State& state, PreprocessingFlags flags) {
   state.renderPass.reset();
@@ -532,7 +550,7 @@ std::string CommandBuffer::toString() const {
 }
 
 void CommandBuffer::bake(VkCommandBuffer commandBuffer) const {
-  for (std::shared_ptr<Command> command: commands) command->bake(commandBuffer);
+  for (const std::shared_ptr<Command>& command: commands) command->bake(commandBuffer);
 }
 
 void CommandBuffer::clear() {

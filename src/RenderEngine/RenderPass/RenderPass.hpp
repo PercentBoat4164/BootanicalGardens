@@ -1,21 +1,22 @@
 #pragma once
 
+#include "src/RenderEngine/DescriptorSetRequirer.hpp"
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
 
 #include <vulkan/vulkan_core.h>
 
-#include <unordered_set>
 #include <vector>
 
 class CommandBuffer;
 
-class RenderPass : public std::enable_shared_from_this<RenderPass> {
+class RenderPass : public DescriptorSetRequirer, public std::enable_shared_from_this<RenderPass> {
 protected:
   RenderGraph& graph;
   VkRenderPass renderPass{VK_NULL_HANDLE};
   std::shared_ptr<Framebuffer> framebuffer;
-  std::unordered_set<std::shared_ptr<Mesh>> meshes;
+
+  std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>> pipelines;
 
   template<typename L, typename R>
   static constexpr L rollingShiftLeft(L left, R right) {
@@ -35,10 +36,7 @@ public:
   uint64_t compatibility{-1U};
 
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
-  virtual ~RenderPass();
-
-  void addMesh(const std::shared_ptr<Mesh>& mesh);
-  void removeMesh(const std::shared_ptr<Mesh>& mesh);
+  ~RenderPass() override;
 
   virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) = 0;
@@ -47,7 +45,6 @@ public:
 
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] std::shared_ptr<Framebuffer> getFramebuffer() const;
-};
-
+  [[nodiscard]] const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& getPipelines();};
 
 template<> struct std::hash<RenderPass> { size_t operator()(const RenderPass& pass) const noexcept { return pass.compatibility; } };

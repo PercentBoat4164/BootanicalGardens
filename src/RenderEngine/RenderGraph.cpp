@@ -18,7 +18,7 @@
 #include <ranges>
 #include <vector>
 
-RenderGraph::PerFrameData::PerFrameData(const std::shared_ptr<GraphicsDevice>& device, const RenderGraph& graph) : device(device), graph(graph) {
+RenderGraph::PerFrameData::PerFrameData(GraphicsDevice* const device, const RenderGraph& graph) : device(device), graph(graph) {
   /****************************************
    * Initialize Command Recording Objects *
    ****************************************/
@@ -28,7 +28,7 @@ RenderGraph::PerFrameData::PerFrameData(const std::shared_ptr<GraphicsDevice>& d
       .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = device->globalQueueFamilyIndex
   };
-  if (const VkResult result = vkCreateCommandPool(device->device, &commandPoolCreateInfo, nullptr, &commandPool); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create command pool.");
+  if (const VkResult result = vkCreateCommandPool(device->device, &commandPoolCreateInfo, nullptr, &commandPool); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create command pool");
   const VkCommandBufferAllocateInfo commandBufferAllocateInfo{
       .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext              = nullptr,
@@ -36,75 +36,49 @@ RenderGraph::PerFrameData::PerFrameData(const std::shared_ptr<GraphicsDevice>& d
       .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1
   };
-  if (const VkResult result = vkAllocateCommandBuffers(device->device, &commandBufferAllocateInfo, &commandBuffer); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to allocate command buffers.");
+  if (const VkResult result = vkAllocateCommandBuffers(device->device, &commandBufferAllocateInfo, &commandBuffer); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to allocate command buffers");
 
-  /*****************************************
-   * Initialize Synchronization Objections *
-   *****************************************/
+  /**************************************
+   * Initialize Synchronization Objects *
+   **************************************/
   constexpr VkSemaphoreCreateInfo semaphoreCreateInfo {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0
   };
-  if (const VkResult result = vkCreateSemaphore(device->device, &semaphoreCreateInfo, nullptr, &frameDataSemaphore); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create semaphore.");
-  if (const VkResult result = vkCreateSemaphore(device->device, &semaphoreCreateInfo, nullptr, &frameFinishedSemaphore); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create semaphore.");
+  if (const VkResult result = vkCreateSemaphore(device->device, &semaphoreCreateInfo, nullptr, &frameDataSemaphore); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create semaphore");
+  if (const VkResult result = vkCreateSemaphore(device->device, &semaphoreCreateInfo, nullptr, &frameFinishedSemaphore); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create semaphore");
   constexpr VkFenceCreateInfo fenceCreateInfo {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_FENCE_CREATE_SIGNALED_BIT
   };
-  if (const VkResult result = vkCreateFence(device->device, &fenceCreateInfo, nullptr, &renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create fence");
+  if (const VkResult result = vkCreateFence(device->device, &fenceCreateInfo, nullptr, &renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create fence");
 }
 
 RenderGraph::PerFrameData::~PerFrameData() {
-  if (commandPool != VK_NULL_HANDLE) vkDestroyCommandPool(device->device, commandPool, nullptr);
-  commandPool = VK_NULL_HANDLE;
+  vkDestroyCommandPool(device->device, commandPool, nullptr);
   vkQueueWaitIdle(device->globalQueue);
-  if (frameFinishedSemaphore != VK_NULL_HANDLE) vkDestroySemaphore(device->device, frameFinishedSemaphore, nullptr);
-  frameFinishedSemaphore = VK_NULL_HANDLE;
-  if (frameDataSemaphore != VK_NULL_HANDLE) vkDestroySemaphore(device->device, frameDataSemaphore, nullptr);
-  frameDataSemaphore = VK_NULL_HANDLE;
-  if (renderFence != VK_NULL_HANDLE) vkDestroyFence(device->device, renderFence, nullptr);
-  renderFence = VK_NULL_HANDLE;
+  vkDestroySemaphore(device->device, frameFinishedSemaphore, nullptr);
+  vkDestroySemaphore(device->device, frameDataSemaphore, nullptr);
+  vkDestroyFence(device->device, renderFence, nullptr);
 }
 
 uint8_t RenderGraph::FRAMES_IN_FLIGHT = 2;
 
-RenderGraph::RenderGraph(const std::shared_ptr<GraphicsDevice>& device) : device(device) {
+RenderGraph::RenderGraph(GraphicsDevice* const device) : device(device) {
   // Build frame data
-  const std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets = device->perFrameDescriptorAllocator.allocate(FRAMES_IN_FLIGHT);
   frames.reserve(FRAMES_IN_FLIGHT);
-  for (uint32_t i{}; i < FRAMES_IN_FLIGHT; ++i) {
-    frames.emplace_back(device, *this);
-    frames.back().descriptorSet = descriptorSets[i];
-  }
+  for (uint32_t i{}; i < FRAMES_IN_FLIGHT; ++i) frames.emplace_back(device, *this);
 
   uniformBuffer = std::make_shared<UniformBuffer<GraphData>>(device, "RenderGraph UniformBuffer");
-
-  const VkDescriptorBufferInfo bufferInfo {
-    .buffer = uniformBuffer->getBuffer(),
-    .offset = 0,
-    .range = VK_WHOLE_SIZE
-  };
-  std::vector<VkWriteDescriptorSet> writeDescriptorSet(frames.size(), {
-    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .pNext = nullptr,
-    .dstSet = VK_NULL_HANDLE,
-    .dstBinding = 0,
-    .dstArrayElement = 0,
-    .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    .pImageInfo = VK_NULL_HANDLE,
-    .pBufferInfo = &bufferInfo,
-    .pTexelBufferView = VK_NULL_HANDLE
-  });
-  for (uint32_t i{}; i < frames.size(); ++i) writeDescriptorSet[i].dstSet = *frames[i].descriptorSet;
-  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 RenderGraph::~RenderGraph() {
-  const PerFrameData& frameData = getPerFrameData();
-  if (const VkResult result = vkWaitForFences(device->device, 1, &frameData.renderFence, VK_TRUE, UINT64_MAX); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to wait for fence.");
+  // Wait for all submitted frames in this graph to finish rendering so that the resources can be freed.
+  std::vector<VkFence> fences(frames.size());
+  for (uint32_t i{}; i < frames.size(); ++i) fences[i] = frames[i].renderFence;
+  if (const VkResult result = vkWaitForFences(device->device, fences.size(), fences.data(), VK_TRUE, std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1U)).count()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to wait for fences");
 }
 
 void RenderGraph::setResolutionGroup(const ResolutionGroupID id, const VkExtent3D resolution) {
@@ -120,97 +94,191 @@ void RenderGraph::setAttachment(const AttachmentID id, const ResolutionGroupID g
   outOfDate = true;
 }
 
-void RenderGraph::addRenderable(const std::shared_ptr<Renderable>& renderable) {
-  renderables.emplace(renderable);
-  for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
-    for (const std::shared_ptr<RenderPass>& renderPass: renderPasses)
-      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) || (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit))
-        renderPass->addMesh(mesh);
-}
-
-void RenderGraph::removeRenderable(const std::shared_ptr<Renderable>& renderable) {
-  renderables.erase(renderables.get_iterator(&renderable));
-  for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
-    for (const std::shared_ptr<RenderPass>& renderPass: renderPasses)
-      if ((mesh->isOpaque() && renderPass->meshFilter & RenderPass::OpaqueBit) || (mesh->isTransparent() && renderPass->meshFilter & RenderPass::TransparentBit))
-        renderPass->removeMesh(mesh);
-}
-
+/**
+ * Guarantees that the RenderGraph is baked. If the RenderGraph is not out-of-date, then no baking will actually occur.
+ *
+ * @todo: Needs heavy optimization. This function's high speed will be crucial for avoiding hitches or objects popping in. This function should be heavily threaded.
+ *
+ * @param commandBuffer A scratch <c>CommandBuffer</c> that setup commands will be recorded into.
+ * @return <c>true</c> if baking actually happened, <c>false</c> otherwise.
+ */
 bool RenderGraph::bake(CommandBuffer& commandBuffer) {
-  if (!outOfDate) return true;
-  // Understand how attachments are used across render passes
-  std::unordered_map<RenderPass*, std::vector<AttachmentID>> pass2id;
-  std::unordered_map<AttachmentID, std::vector<std::pair<RenderPass*, AttachmentDeclaration>>> id2decl;
-  std::unordered_map<AttachmentID, AttachmentDeclaration> declarations;
-  for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-    auto pairs = renderPass->declareAttachments();
-    auto range = std::ranges::views::keys(pairs);
-    pass2id[renderPass.get()] = std::vector<AttachmentID>{range.begin(), range.end()};
-    for (auto& [id, declaration] : pairs) {
-      declarations[id] = declaration;
-      id2decl[id].emplace_back(renderPass.get(), declaration);
+  if (!outOfDate) return false;
+  /*************************
+   * Process Render Passes *
+   *************************/
+  {
+    // Understand how attachments are used across RenderPasses
+    std::map<RenderPass*, std::vector<AttachmentID>> pass2id;
+    std::map<AttachmentID, std::vector<std::pair<RenderPass*, AttachmentDeclaration>>> id2decl;
+    std::map<AttachmentID, AttachmentDeclaration> declarations;
+    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
+      std::vector<std::pair<AttachmentID, AttachmentDeclaration>> pairs = renderPass->declareAttachments();
+      auto range = std::views::keys(pairs);
+      pass2id[renderPass.get()] = std::vector<AttachmentID>{range.begin(), range.end()};
+      for (auto& [id, declaration] : pairs) {
+        declarations[id] = declaration;
+        id2decl[id].emplace_back(renderPass.get(), declaration);
+      }
+    }
+    buildImages();
+
+    // Bake RenderPasses
+    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
+      const std::vector<AttachmentID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
+      std::vector<VkAttachmentDescription> descriptions;
+      descriptions.reserve(renderPassAttachmentIDs.size());
+      std::vector<std::shared_ptr<Image>> images;
+      images.reserve(renderPassAttachmentIDs.size());
+      for (const AttachmentID& id: renderPassAttachmentIDs) {
+        /**@todo: Add support for aliasing attachmentsProperties.*/
+        /**@todo: Add support for reordering render passes.*/
+        std::shared_ptr<Image> image = backingImages.at(id);
+        auto& attachmentDeclarations = id2decl[id];
+        // Find this renderpass in the declarations of this attachment.
+        const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
+        // Find the next renderpass in the declarations of this attachment.
+        auto nextIt = thisIt;
+        if (++nextIt == attachmentDeclarations.end()) nextIt = attachmentDeclarations.begin();
+        /**@todo: Optimize load and store ops.*/
+        /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
+        const AttachmentDeclaration& thisDeclaration = thisIt->second;
+        const AttachmentDeclaration& nextDeclaration = nextIt->second;
+        descriptions.push_back({
+            .flags = 0U,
+            .format = image->getFormat(),
+            .samples = image->getSampleCount(),
+            .loadOp = nextDeclaration.loadOp,
+            .storeOp = nextDeclaration.storeOp,
+            .stencilLoadOp = nextDeclaration.stencilLoadOp,
+            .stencilStoreOp = nextDeclaration.stencilStoreOp,
+            .initialLayout = thisDeclaration.layout,
+            .finalLayout = nextDeclaration.layout
+        });
+        images.push_back(image);
+      }
+      renderPass->bake(descriptions, images);
+      if (renderPass->compatibility == -1U) GraphicsInstance::showError("`RenderPass::bake(...)` failed to update the RenderPass compatibility.");
+    }
+    transitionImages(commandBuffer, declarations);
+  }
+  /***************************
+   * Process Descriptor Sets *
+   ***************************/
+
+  // Compute the descriptor set requirements
+  std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>> requirements;
+  for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) {
+    for (const std::shared_ptr<Pipeline>& pipeline: renderPass->getPipelines() | std::ranges::views::values) {
+      pipeline->getMaterial()->computeDescriptorSetRequirements(requirements, renderPass, pipeline);
     }
   }
-  buildImages();
-  // Utilize that knowledge to bake each render pass
-  for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-    const std::vector<AttachmentID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
-    std::vector<VkAttachmentDescription> descriptions;
-    descriptions.reserve(renderPassAttachmentIDs.size());
-    std::vector<std::shared_ptr<Image>> images;
-    images.reserve(renderPassAttachmentIDs.size());
-    for (const AttachmentID& id: renderPassAttachmentIDs) {
-      /**@todo: Add support for aliasing attachmentsProperties.*/
-      std::shared_ptr<Image> image = backingImages.at(id);
-      auto& attachmentDeclarations = id2decl[id];
-      // Find this renderpass in the declarations of this attachment.
-      const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
-      // Find the next renderpass in the declarations of this attachment.
-      auto nextIt = thisIt;
-      if (++nextIt == attachmentDeclarations.end()) nextIt = attachmentDeclarations.begin();
-      /**@todo: Optimize load and store ops.*/
-      /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
-      const AttachmentDeclaration& thisDeclaration = thisIt->second;
-      const AttachmentDeclaration& nextDeclaration = nextIt->second;
-      descriptions.push_back({
-        .flags = 0U,
-        .format = image->getFormat(),
-        .samples = image->getSampleCount(),
-        .loadOp = nextDeclaration.loadOp,
-        .storeOp = nextDeclaration.storeOp,
-        .stencilLoadOp = nextDeclaration.stencilLoadOp,
-        .stencilStoreOp = nextDeclaration.stencilStoreOp,
-        .initialLayout = thisDeclaration.layout,
-        .finalLayout = nextDeclaration.layout
-      });
-      images.push_back(image);
-    }
-    renderPass->bake(descriptions, images);
+  std::size_t i = std::numeric_limits<std::size_t>::max();
+  std::map<std::shared_ptr<DescriptorSetRequirer>, std::size_t> requirementIndices;
+  for (const std::shared_ptr<DescriptorSetRequirer>& requirer: requirements | std::ranges::views::keys) requirementIndices[requirer] = ++i;
+  auto perSetDescriptorBindings = requirements | std::ranges::views::values;
+
+  // Create VkDescriptorSetLayout objects
+  std::vector<VkDescriptorSetLayout> layouts(perSetDescriptorBindings.size());
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0
+  };
+  i = std::numeric_limits<std::size_t>::max();
+  for (const std::vector<VkDescriptorSetLayoutBinding>& bindings: perSetDescriptorBindings) {
+    descriptorSetLayoutCreateInfo.bindingCount = bindings.size();
+    descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+    if (const VkResult result = vkCreateDescriptorSetLayout(device->device, &descriptorSetLayoutCreateInfo, nullptr, &layouts[++i]); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create descriptor set layout");
   }
-  transitionImages(commandBuffer, declarations);
-  
-  // Allocate per frame and per render pass descriptor sets
+
+  VkDescriptorSetLayout frameDataLayout = requirementIndices.contains(nullptr) ? layouts.at(requirementIndices.at(nullptr)) : VK_NULL_HANDLE;
+  {  // Bake pipelines
+    std::vector<void*> miscMemoryPool;
+    std::vector<VkGraphicsPipelineCreateInfo> pipelineCreateInfos;
+    std::vector<VkPipeline*> pipelines;
+    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
+      for (const std::shared_ptr<Pipeline>& pipeline : renderPass->getPipelines() | std::views::values) {
+        std::vector setLayouts {
+          frameDataLayout,
+          layouts.at(requirementIndices.at(renderPass)),
+          layouts.at(requirementIndices.at(pipeline))
+        };
+        pipeline->bake(renderPass, setLayouts, miscMemoryPool, pipelineCreateInfos, pipelines);
+      }
+    std::vector<VkPipeline> tempPipelines(pipelines.size());
+    if (!pipelines.empty())
+      if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, pipelineCreateInfos.size(), pipelineCreateInfos.data(), nullptr, tempPipelines.data()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create graphics pipelines");
+    for (uint32_t j{}; j < tempPipelines.size(); ++j) *pipelines.at(j) = tempPipelines.at(j);
+    for (void* memory: miscMemoryPool) free(memory);
+    miscMemoryPool.clear();
+    pipelineCreateInfos.clear();
+    pipelines.clear();
+
+    /****************************
+     * Bake the Command Buffers *
+     ****************************/
+  }
+
+  std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
+  {  // Allocate descriptor sets
+    std::vector<VkDescriptorSetLayout> framesInFlightLayouts;
+    framesInFlightLayouts.reserve(layouts.size() * FRAMES_IN_FLIGHT);  // One layout for each descriptor set for each frame in flight
+    for (const VkDescriptorSetLayout& layout : layouts) for (int j = 0; j < FRAMES_IN_FLIGHT; ++j) framesInFlightLayouts.push_back(layout);
+    std::vector<std::vector<VkDescriptorSetLayoutBinding>> framesInFlightBindings;
+    framesInFlightBindings.reserve(layouts.size() * FRAMES_IN_FLIGHT);
+    for (const std::vector<VkDescriptorSetLayoutBinding>& bindings : perSetDescriptorBindings) for (int j = 0; j < FRAMES_IN_FLIGHT; ++j) framesInFlightBindings.push_back(bindings);
+    descriptorSets = device->descriptorSetAllocator.allocate(framesInFlightBindings, framesInFlightLayouts);
+  }
+
+  {  // Assign descriptor sets
+    std::shared_ptr<VkDescriptorSetLayout> layout;
+    if (frameDataLayout) layout = std::shared_ptr<VkDescriptorSetLayout>(new VkDescriptorSetLayout(frameDataLayout), [this](VkDescriptorSetLayout* layout) {
+      vkDestroyDescriptorSetLayout(device->device, *layout, nullptr);
+      delete layout;
+    });
+    std::vector<void*> miscMemoryPool;
+    std::vector<VkWriteDescriptorSet> writes;
+    for (auto& [descriptorSetRequirer, index]: requirementIndices) {
+      auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
+      if (descriptorSetRequirer) {
+        descriptorSetRequirer->setDescriptorSets({start, start + FRAMES_IN_FLIGHT}, layouts[index]);
+        descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes);
+      }
+      else for (uint32_t j{}; j < frames.size(); ++j) {
+        frames.at(j).descriptorSet = *(start + j);
+        frames.at(j).descriptorSetLayout = layout;
+      }
+    }
+    vkUpdateDescriptorSets(device->device, writes.size(), writes.data(), 0, nullptr);
+    for (void* memory: miscMemoryPool) free(memory);
+  }
+
   outOfDate = false;
   return true;
 }
 
 VkSemaphore RenderGraph::waitForNextFrameData() const {
   const PerFrameData& frameData = getPerFrameData();
-  if (const VkResult result = vkWaitForFences(device->device, 1, &frameData.renderFence, true, UINT64_MAX); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to wait for fence.");
-  if (const VkResult result = vkResetFences(device->device, 1, &frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to reset fence.");
+  if (const VkResult result = vkWaitForFences(device->device, 1, &frameData.renderFence, true, UINT64_MAX); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to wait for fence");
+  if (const VkResult result = vkResetFences(device->device, 1, &frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to reset fence");
   return frameData.frameDataSemaphore;
 }
 
 void RenderGraph::update() const {
-  for (const std::shared_ptr<Renderable>& renderable : renderables)
-    for (const std::shared_ptr<Mesh>& mesh : renderable->getMeshes())
-      mesh->update(*this);
-  for (const std::shared_ptr<Pipeline>& pipeline : std::ranges::views::values(pipelines))
-    pipeline->update();
+  for (const std::shared_ptr<Mesh>& mesh : device->meshes)
+    mesh->update(*this);
+  for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
+    renderPass->update(*this);
   uniformBuffer->update({static_cast<uint32_t>(frameNumber), static_cast<float>(Game::getTime())});
 }
 
-VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) const {
+/**
+ *
+ * @param swapchainImage The image to put the color output onto (usually the swapchain image).
+ * @param semaphore The semaphore to signal when the GPU has finished rendering.
+ */
+void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore) {
   CommandBuffer commandBuffer;
   std::shared_ptr<Image> defaultColorImage = backingImages.at(RenderColor);
   commandBuffer.record<CommandBuffer::ClearDepthStencilImage>(backingImages.at(RenderDepth));
@@ -233,10 +301,7 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
     }
   };
   commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, std::vector{imageMemoryBarrier});
-  for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) {
-    renderPass->update(*this);
-    renderPass->execute(commandBuffer);
-  }
+  for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) renderPass->execute(commandBuffer);
   commandBuffer.record<CommandBuffer::BlitImageToImage>(defaultColorImage, swapchainImage);
   imageMemoryBarrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -271,7 +336,7 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
   vkBeginCommandBuffer(frameData.commandBuffer, &beginInfo);
   commandBuffer.bake(frameData.commandBuffer);
   vkEndCommandBuffer(frameData.commandBuffer);
-  std::array<VkPipelineStageFlags, 1> stageMasks{VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
+  constexpr std::array<VkPipelineStageFlags, 1> stageMasks{VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
   const VkSubmitInfo submitInfo {
       .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
       .pNext                = nullptr,
@@ -281,19 +346,10 @@ VkSemaphore RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage) c
       .commandBufferCount   = 1,
       .pCommandBuffers      = &frameData.commandBuffer,
       .signalSemaphoreCount = 1,
-      .pSignalSemaphores    = &frameData.frameFinishedSemaphore
+      .pSignalSemaphores    = &semaphore
   };
   if (const VkResult result = vkQueueSubmit(device->globalQueue, 1, &submitInfo, frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to submit recorded command buffer to queue");
-  return frameData.frameFinishedSemaphore;
-}
-
-/**@todo: Do not tie Pipelines to specific Materials so that they can be reused more effectively.*/
-void RenderGraph::bakePipeline(const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass) {
-  pipelines[renderPass->compatibility] = std::make_shared<Pipeline>(device, material, renderPass);
-}
-
-std::shared_ptr<Pipeline> RenderGraph::getPipeline(const uint64_t renderPassCompatibility) {
-  return pipelines.at(renderPassCompatibility);
+  ++frameNumber;
 }
 
 void RenderGraph::buildImages() {
@@ -304,10 +360,11 @@ void RenderGraph::buildImages() {
   }
 }
 
-void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::unordered_map<AttachmentID, AttachmentDeclaration>& declarations) {
+void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::map<AttachmentID, AttachmentDeclaration>& declarations) {
+  std::map<VkPipelineStageFlags, std::vector<VkImageMemoryBarrier>> imageBarrierGroups;
   for (auto& [id, image] : backingImages) {
     const AttachmentDeclaration& declaration = declarations.at(id);
-    const VkImageMemoryBarrier imageMemoryBarrier {
+    imageBarrierGroups[declaration.stage].push_back(VkImageMemoryBarrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext = nullptr,
       .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
@@ -318,9 +375,10 @@ void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::unor
       .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
       .image = image->getImage(),
       .subresourceRange = image->getWholeRange()
-    };
-    commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, declaration.stage, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, std::vector{imageMemoryBarrier});
+    });
   }
+  for (const auto& [stage, imageBarriers] : imageBarrierGroups)
+    commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, stage, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageBarriers);
 }
 
-const RenderGraph::PerFrameData& RenderGraph::getPerFrameData() const { return frames[getFrameIndex()]; }
+const RenderGraph::PerFrameData& RenderGraph::getPerFrameData(const uint64_t frameIndex) const { return frames[frameIndex == static_cast<decltype(frameIndex)>(-1) ? getFrameIndex() : frameIndex]; }

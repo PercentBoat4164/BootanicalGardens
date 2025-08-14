@@ -18,14 +18,15 @@ protected:
   VkBuffer buffer{VK_NULL_HANDLE};
   VkBufferView view{VK_NULL_HANDLE};
   VmaAllocation allocation{VK_NULL_HANDLE};
+  VkDeviceSize size;
   VmaAllocationInfo allocationInfo{};
 
 public:
   struct BufferMapping {
-    BufferMapping(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer);
+    BufferMapping(GraphicsDevice* device, const std::shared_ptr<const Buffer>& buffer);
     ~BufferMapping();
 
-    std::shared_ptr<GraphicsDevice> device;
+   GraphicsDevice* const device;
     std::shared_ptr<const Buffer> buffer;
     void* data{};
   };
@@ -40,7 +41,7 @@ public:
    * @param memoryUsage
    * @param flags
    */
-  explicit Buffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
+  explicit Buffer(GraphicsDevice* device, const char* name, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags required, VkMemoryPropertyFlags preferred, VmaMemoryUsage memoryUsage, VmaAllocationCreateFlags flags);
   ~Buffer() override;
 
   [[nodiscard]] VkBuffer getBuffer() const;

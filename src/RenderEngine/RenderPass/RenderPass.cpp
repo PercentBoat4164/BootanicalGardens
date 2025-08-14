@@ -36,7 +36,7 @@ uint64_t RenderPass::computeRenderPassCompatibility(const VkRenderPassCreateInfo
   return compatibility;
 }
 
-RenderPass::RenderPass(RenderGraph& graph, const MeshFilter meshFilter) : graph(graph), meshFilter(meshFilter) {}
+RenderPass::RenderPass(RenderGraph& graph, const MeshFilter meshFilter) : DescriptorSetRequirer(graph.device), graph(graph), meshFilter(meshFilter) {}
 
 RenderPass::~RenderPass() {
   if (renderPass != VK_NULL_HANDLE) {
@@ -45,13 +45,6 @@ RenderPass::~RenderPass() {
   }
 }
 
-void RenderPass::addMesh(const std::shared_ptr<Mesh>& mesh) {
-  meshes.insert(mesh);
-}
-
-void RenderPass::removeMesh(const std::shared_ptr<Mesh>& mesh) {
-  meshes.erase(mesh);
-}
-
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }
 std::shared_ptr<Framebuffer> RenderPass::getFramebuffer() const { return framebuffer; }
+const std::map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& RenderPass::getPipelines() { return pipelines; }

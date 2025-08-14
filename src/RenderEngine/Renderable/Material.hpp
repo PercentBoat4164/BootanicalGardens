@@ -48,7 +48,7 @@ class Material {
 
 public:
   explicit Material(const std::shared_ptr<const Shader>& vertexShader=nullptr, const std::shared_ptr<const Shader>& fragmentShader=nullptr);
-  Material(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
+  Material(GraphicsDevice* device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Material& material);
 
   [[nodiscard]] bool isDoubleSided() const;
   [[nodiscard]] fastgltf::AlphaMode getAlphaMode() const;
@@ -74,6 +74,6 @@ public:
   [[nodiscard]] std::shared_ptr<const Shader> getVertexShader() const;
   void setFragmentShader(const std::shared_ptr<const Shader>& shader);
   [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
-};
 
-template<> struct std::hash<Material> { size_t operator()(const Material& mat) const noexcept { return 0; } };
+  void computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline) const;
+};

@@ -1,5 +1,6 @@
 #include "GraphicsDevice.hpp"
 
+#include "Renderable/Mesh.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
@@ -19,11 +20,7 @@ void getQueues(VkPhysicalDevice physicalDevice, const std::vector<VkQueueFlags>&
   }
 }
 
-GraphicsDevice::GraphicsDevice() :
-    perFrameDescriptorAllocator(*this),
-    perPassDescriptorAllocator (*this),
-    perMaterialDescriptorAllocator(*this),
-    perMeshDescriptorAllocator(*this) {
+GraphicsDevice::GraphicsDevice() {
   vkb::PhysicalDeviceSelector deviceSelector{GraphicsInstance::instance};
   deviceSelector.defer_surface_initialization();
   deviceSelector.prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
@@ -78,7 +75,7 @@ GraphicsDevice::GraphicsDevice() :
     .instance = GraphicsInstance::instance,
     .vulkanApiVersion = std::min(device.instance_version, volkGetInstanceVersion()),
   };
-  if (const VkResult result = vmaCreateAllocator(&allocatorCreateInfo, &allocator); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create VMA allocator.");
+  if (const VkResult result = vmaCreateAllocator(&allocatorCreateInfo, &allocator); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create VMA allocator");
 
   const VkCommandPoolCreateInfo commandPoolCreateInfo {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -86,31 +83,23 @@ GraphicsDevice::GraphicsDevice() :
     .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
     .queueFamilyIndex = globalQueueFamilyIndex,
   };
-  vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool);
-
-  perFrameDescriptorAllocator.prepareAllocation({
-      /// Frame number, Game time
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-  });
-  perPassDescriptorAllocator.prepareAllocation({
-      /// view * projection matrix
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}
-  });
-  perMaterialDescriptorAllocator.prepareAllocation({
-      /// Color Texture
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-  }),
-  perMeshDescriptorAllocator.prepareAllocation({
-      /// model matrix
-      VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}
-  });
+  if (const VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create command pool");
 }
 
 GraphicsDevice::~GraphicsDevice() {
-  destroy();
+  vkDeviceWaitIdle(device);
+  vkDestroyCommandPool(device, commandPool, nullptr);
+  descriptorSetAllocator.destroy();
+  samplers.clear();
+  commandPool = VK_NULL_HANDLE;
+  meshes.clear();
+  if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
+  allocator = VK_NULL_HANDLE;
+  globalQueue = VK_NULL_HANDLE;
+  destroy_device(device);
 }
 
-GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferImmediateAsync(const CommandBuffer& commandBuffer) const {
+GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferAsync(const CommandBuffer& commandBuffer) const {
   const VkCommandBufferAllocateInfo allocateInfo{
       .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext              = nullptr,
@@ -159,15 +148,16 @@ void GraphicsDevice::waitForAsyncCommandBuffer(const ImmediateExecutionContext c
 }
 
 void GraphicsDevice::executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const {
-  waitForAsyncCommandBuffer(executeCommandBufferImmediateAsync(commandBuffer));
+  waitForAsyncCommandBuffer(executeCommandBufferAsync(commandBuffer));
 }
 
 std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificationFilter, const VkFilter minificationFilter, const VkSamplerMipmapMode mipmapMode, const VkSamplerAddressMode addressMode, const float lodBias, const VkBorderColor borderColor) {
   std::size_t samplerID = hash(magnificationFilter, minificationFilter, mipmapMode, addressMode, lodBias, borderColor);
   if (const auto it = samplers.find(samplerID); it != samplers.end())
     if (!it->second.expired()) return it->second.lock();
-    else samplers.erase(it);
-  const VkSamplerCreateInfo createInfo {
+    else
+      samplers.erase(it);
+  const VkSamplerCreateInfo createInfo{
       .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .pNext                   = nullptr,
       .flags                   = 0,
@@ -189,26 +179,10 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
   };
   auto sampler = std::shared_ptr<VkSampler>(new VkSampler, [this, samplerID](VkSampler* sampler) {
     vkDestroySampler(device, *sampler, nullptr);
+    delete sampler;
     samplers.erase(samplerID);
   });
   samplers.emplace(samplerID, sampler);
-  if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create sampler.");
+  if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create sampler");
   return sampler;
-}
-
-void GraphicsDevice::destroy() {
-  samplers.clear();
-  vkDestroyCommandPool(device, commandPool, nullptr);
-  commandPool = VK_NULL_HANDLE;
-  perFrameDescriptorAllocator.destroy();
-  perPassDescriptorAllocator.destroy();
-  perMaterialDescriptorAllocator.destroy();
-  perMeshDescriptorAllocator.destroy();
-  if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
-  allocator = VK_NULL_HANDLE;
-  if (device) {
-    vkDeviceWaitIdle(device);
-    destroy_device(device);
-  }
-  globalQueue = VK_NULL_HANDLE;
 }

@@ -15,7 +15,7 @@
 #include <fastgltf/glm_element_traits.hpp>
 #include <volk/volk.h>
 
-Mesh::Mesh(const std::shared_ptr<GraphicsDevice>& device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
+Mesh::Mesh(GraphicsDevice* const device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
 material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : std::make_shared<Material>()) {
   // Determine this mesh's topology
   switch (primitive.type) {
@@ -36,11 +36,11 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     /**@todo: Add support for other attributes (application specific, animations, more texture coordinates, more colors).*/
     switch (Tools::hash(attribute.name)) { /**@see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes */
       case Tools::hash("POSITION"): fastgltf::copyFromAccessor<decltype(Vertex::position), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, position)); break;
-      case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
-      case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
+      // case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
+      // case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
       case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, textureCoordinates0)); break;
-      case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
-      default: GraphicsInstance::showError(std::string("unknown vertex attribute name: " + attribute.name)); break;
+      // case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
+      default: break;
     }
   }
 
@@ -61,32 +61,10 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
     regions[0].size = indexBuffer->getSize();
     commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(indexBufferTemp, indexBuffer, regions);
   }
-
-  descriptorSets = device->perMeshDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
-  uniformBuffer  = std::make_shared<UniformBuffer<glm::mat4>>(device, "UniformBuffer");
-  VkDescriptorBufferInfo bufferInfo {
-    .buffer = uniformBuffer->getBuffer(),
-    .offset = 0,
-    .range = VK_WHOLE_SIZE
-  };
-  std::vector<VkWriteDescriptorSet> writeDescriptorSet(descriptorSets.size(), {
-    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .pNext            = nullptr,
-    .dstSet           = VK_NULL_HANDLE,
-    .dstBinding       = 0,
-    .dstArrayElement  = 0,
-    .descriptorCount  = 1,
-    .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    .pImageInfo       = nullptr,
-    .pBufferInfo      = &bufferInfo,
-    .pTexelBufferView = nullptr
-  });
-  for (uint32_t i{}; i < writeDescriptorSet.size(); ++i) writeDescriptorSet[i].dstSet = *descriptorSets[i];
-  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
 }
 
 void Mesh::update(const RenderGraph& graph) const {
-  uniformBuffer->update(glm::identity<glm::mat4>());
+  // uniformBuffer->update(glm::identity<glm::mat4>());
 }
 
 bool Mesh::isOpaque() const { return material->getAlphaMode() != fastgltf::AlphaMode::Blend; }
@@ -94,4 +72,3 @@ bool Mesh::isTransparent() const { return material->getAlphaMode() == fastgltf::
 std::shared_ptr<Material> Mesh::getMaterial() const { return material; }
 std::shared_ptr<Buffer> Mesh::getVertexBuffer() const { return vertexBuffer; }
 std::shared_ptr<Buffer> Mesh::getIndexBuffer() const { return indexBuffer; }
-std::shared_ptr<VkDescriptorSet> Mesh::getDescriptorSet(const uint64_t frameIndex) const { return descriptorSets[frameIndex]; }

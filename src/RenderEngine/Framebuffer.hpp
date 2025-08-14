@@ -9,14 +9,14 @@ class GraphicsDevice;
 class Image;
 
 class Framebuffer {
-  const std::shared_ptr<GraphicsDevice> device;
+  GraphicsDevice* const device;
   std::vector<std::shared_ptr<Image>> images;
   VkFramebuffer framebuffer{VK_NULL_HANDLE};
   VkExtent2D extent;
   VkRect2D rect;
 
 public:
-  Framebuffer(std::shared_ptr<GraphicsDevice> device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass);
+  Framebuffer(GraphicsDevice* device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass);
   ~Framebuffer();
 
   [[nodiscard]] VkFramebuffer getFramebuffer() const;

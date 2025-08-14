@@ -4,7 +4,7 @@
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 
-Buffer::BufferMapping::BufferMapping(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
+Buffer::BufferMapping::BufferMapping(GraphicsDevice* const device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
   vmaMapMemory(device->allocator, buffer->allocation, &data);
 }
 
@@ -12,8 +12,9 @@ Buffer::BufferMapping::~BufferMapping() {
   vmaUnmapMemory(device->allocator, buffer->allocation);
 }
 
-Buffer::Buffer(const std::shared_ptr<GraphicsDevice>& device, const char* name, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags required, const VkMemoryPropertyFlags preferred, const VmaMemoryUsage memoryUsage, const VmaAllocationCreateFlags flags) :
-    Resource(Resource::Buffer, device) {
+Buffer::Buffer(GraphicsDevice* const device, const char* name, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags required, const VkMemoryPropertyFlags preferred, const VmaMemoryUsage memoryUsage, const VmaAllocationCreateFlags flags) :
+    Resource(Resource::Buffer, device),
+    size(bufferSize) {
   const VkBufferCreateInfo bufferCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext                 = nullptr,
@@ -50,7 +51,7 @@ VkBuffer Buffer::getBuffer() const {
 }
 
 VkDeviceSize Buffer::getSize() const {
-  return allocationInfo.size;
+  return size;
 }
 
 std::shared_ptr<Buffer::BufferMapping> Buffer::map() {

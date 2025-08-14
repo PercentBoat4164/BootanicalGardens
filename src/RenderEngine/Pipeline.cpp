@@ -1,78 +1,21 @@
 #include "Pipeline.hpp"
 
-#include "GraphicsInstance.hpp"
-#include "RenderPass/RenderPass.hpp"
-#include "Renderable/Material.hpp"
-#include "Renderable/Texture.hpp"
-#include "Renderable/Vertex.hpp"
-#include "Shader.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/RenderPass/RenderPass.hpp"
+#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/Renderable/Texture.hpp"
+#include "src/RenderEngine/Renderable/Vertex.hpp"
+#include "src/RenderEngine/Shader.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <volk/volk.h>
 
-#include <ranges>
+Pipeline::Pipeline(GraphicsDevice* const device, const std::shared_ptr<Material>& material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
 
-Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::shared_ptr<const Material>& material, const std::shared_ptr<const RenderPass>& renderPass) : device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {
-  const std::shared_ptr<const Shader> vertexShader   = material->getVertexShader();
-  const std::shared_ptr<const Shader> fragmentShader = material->getFragmentShader();
-  const std::vector<std::shared_ptr<const Shader>> shaders = {vertexShader, fragmentShader};
-
-  // Obtain reflected descriptor set data
-  std::vector<std::vector<SpvReflectDescriptorSet*>> shaderSets(shaders.size());  // Per-shader sets
-  for (uint32_t i{}; i < shaders.size(); ++i) {
-    uint32_t count;
-    const spv_reflect::ShaderModule* reflectedData = shaders[i]->getReflectedData();
-    reflectedData->EnumerateDescriptorSets(&count, nullptr);
-    shaderSets[i] = std::vector<SpvReflectDescriptorSet*>(count);
-    reflectedData->EnumerateDescriptorSets(&count, shaderSets[i].data());
-  }
-
-  // Find the greatest set number
-  uint32_t maxSet = 0;  // Highest descriptor set index
-  for (const std::vector<SpvReflectDescriptorSet*>& sets : shaderSets) for (const SpvReflectDescriptorSet* set : sets) maxSet = std::max(maxSet, set->set + 1);
-
-  // Generate bindings
-  std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings(maxSet);  // Per-set bindings
-  for (uint32_t i{}; i < shaderSets.size(); ++i) {
-    for (const SpvReflectDescriptorSet* set : shaderSets[i]) {
-      for (uint32_t j{}; j < set->binding_count; ++j) {
-        const SpvReflectDescriptorBinding* binding          = set->bindings[j];  // This reflected set's binding
-        const uint32_t thisBinding                          = binding->binding;  // This reflected binding's bind location
-        std::vector<VkDescriptorSetLayoutBinding>& bindings = setBindings[set->set];  // This set's bindings
-        if (auto it = std::ranges::find_if(bindings, [thisBinding](const VkDescriptorSetLayoutBinding& x) { return x.binding == thisBinding; }); it != bindings.end()) {
-          // If the binding is already in this set, update it.
-          it->descriptorCount = std::max(binding->count, it->descriptorCount);
-          it->stageFlags |= shaders[i]->getStage();
-        } else {
-          // If the binding is not already in this set, add it.
-          bindings.push_back({
-            .binding            = thisBinding,
-            .descriptorType     = static_cast<VkDescriptorType>(binding->descriptor_type),
-            .descriptorCount    = binding->count,
-            .stageFlags         = static_cast<uint32_t>(shaders[i]->getStage()),
-            .pImmutableSamplers = nullptr
-          });
-        }
-      }
-    }
-  }
-
-  // Create the descriptor layouts
-  std::vector<VkDescriptorSetLayout> layouts(maxSet);
-  for (uint32_t i{}; i < setBindings.size(); ++i) {
-    /**@todo: Build a system similar to what exists for VkSampler objects to prevent duplication of VkDescriptorSetLayout objects.*/
-    VkDescriptorSetLayoutCreateInfo createInfo {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .bindingCount = static_cast<uint32_t>(setBindings[i].size()),
-      .pBindings = setBindings[i].data()
-    };
-    if (const VkResult result = vkCreateDescriptorSetLayout(device->device, &createInfo, nullptr, &layouts[i]); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create descriptor set layout");
-  }
-
+/**@todo: Only rebake if out-of-date.*/
+void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
   // Create the pipeline layout
-  VkPipelineLayoutCreateInfo createInfo {
+  const VkPipelineLayoutCreateInfo createInfo {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = nullptr,
       .flags                  = 0,
@@ -83,27 +26,26 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
   };
   if (const VkResult result = vkCreatePipelineLayout(device->device, &createInfo, nullptr, &layout); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create pipeline layout");
 
-  // Destroy the descriptor layout
-  for (const VkDescriptorSetLayout& layout: layouts) vkDestroyDescriptorSetLayout(device->device, layout, nullptr);
-
-  std::vector<VkPipelineShaderStageCreateInfo> stages(shaders.size());
+  /**@todo: Improve the memory allocation scheme across this entire function. Allocations could be greatly reduced both in quantity and size by precomputing the required size, then allocating one memory pool and filling that.*/
+  const std::vector shaders = {material->getVertexShader(), material->getFragmentShader()};
+  std::vector<VkPipelineShaderStageCreateInfo>& stages = *static_cast<std::vector<VkPipelineShaderStageCreateInfo>*>(miscMemoryPool.emplace_back(new std::vector<VkPipelineShaderStageCreateInfo>(shaders.size())));
   for (uint32_t i{}; i < shaders.size(); ++i) {
-    const auto& shader = shaders[i];
-    stages[i] = VkPipelineShaderStageCreateInfo {
-      .sType               = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .pNext               = nullptr,
-      .flags               = 0,
-      .stage               = shader->getStage(),
-      .module              = shader->getModule(),
-      .pName               = shader->getEntryPoint().data(),
-      .pSpecializationInfo = VK_NULL_HANDLE
+    const std::shared_ptr<const Shader>& shader = shaders[i];
+    stages[i]                                   = VkPipelineShaderStageCreateInfo{
+        .sType               = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext               = nullptr,
+        .flags               = 0,
+        .stage               = shader->getStage(),
+        .module              = shader->getModule(),
+        .pName               = shader->getEntryPoint().data(),
+        .pSpecializationInfo = VK_NULL_HANDLE
     };
   }
 
   /**@todo: Reflect the vertex format.*/
-  constexpr VkVertexInputBindingDescription bindingDescription               = Vertex::getBindingDescription();
-  const std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex::getAttributeDescriptions();
-  const VkPipelineVertexInputStateCreateInfo vertexInputState {
+  const VkVertexInputBindingDescription& bindingDescription = *static_cast<VkVertexInputBindingDescription*>(miscMemoryPool.emplace_back(new VkVertexInputBindingDescription{Vertex::getBindingDescription()}));
+  const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = *static_cast<std::vector<VkVertexInputAttributeDescription>*>(miscMemoryPool.emplace_back(new std::vector{std::move(Vertex::getAttributeDescriptions())}));
+  const VkPipelineVertexInputStateCreateInfo& vertexInputState = *static_cast<VkPipelineVertexInputStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineVertexInputStateCreateInfo{
       .sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .pNext                           = nullptr,
       .flags                           = 0,
@@ -111,30 +53,33 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .pVertexBindingDescriptions      = &bindingDescription,
       .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
       .pVertexAttributeDescriptions    = attributeDescriptions.data()
-  };
-  constexpr VkPipelineInputAssemblyStateCreateInfo inputAssemblyState {
+  }));
+  const VkPipelineInputAssemblyStateCreateInfo& inputAssemblyState = *static_cast<VkPipelineInputAssemblyStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineInputAssemblyStateCreateInfo{
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .pNext                  = nullptr,
       .flags                  = 0,
       .topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, /**@todo: Support multiple topologies. Low priority. Topology is recorded on a per-mesh basis.*/
       .primitiveRestartEnable = VK_FALSE
-  };
-  constexpr VkViewport viewport{
+  }));
+  const VkViewport& viewport = *static_cast<VkViewport*>(miscMemoryPool.emplace_back(new VkViewport{
       .x        = 0,
       .y        = 0,
       .width    = 1,
       .height   = 1,
       .minDepth = 0,
       .maxDepth = 1
-  };
-  constexpr VkRect2D scissor{
+  }));
+  const VkRect2D& scissor = *static_cast<VkRect2D*>(miscMemoryPool.emplace_back(new VkRect2D{
       .offset = {
           .x = 0,
           .y = 0
       },
-      .extent = {.width = 1, .height = 1}
-  };
-  const VkPipelineViewportStateCreateInfo viewPortState {
+      .extent = {
+          .width = 1,
+          .height = 1
+      }
+  }));
+  const VkPipelineViewportStateCreateInfo& viewPortState = *static_cast<VkPipelineViewportStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineViewportStateCreateInfo{
       .sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .pNext         = nullptr,
       .flags         = 0,
@@ -142,8 +87,8 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .pViewports    = &viewport,
       .scissorCount  = 1,
       .pScissors     = &scissor
-  };
-  const VkPipelineRasterizationStateCreateInfo rasterizationState{
+  }));
+  const VkPipelineRasterizationStateCreateInfo& rasterizationState = *static_cast<VkPipelineRasterizationStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineRasterizationStateCreateInfo{
       .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .pNext                   = nullptr,
       .flags                   = 0,
@@ -157,8 +102,8 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .depthBiasClamp          = 0.0,
       .depthBiasSlopeFactor    = 0.0,
       .lineWidth               = 1.0
-  };
-  constexpr VkPipelineMultisampleStateCreateInfo multisampleState{
+  }));
+  const VkPipelineMultisampleStateCreateInfo& multisampleState = *static_cast<VkPipelineMultisampleStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineMultisampleStateCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .pNext                 = nullptr,
       .flags                 = 0,
@@ -168,8 +113,8 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .pSampleMask           = nullptr,
       .alphaToCoverageEnable = VK_FALSE,
       .alphaToOneEnable      = VK_FALSE
-  };
-  constexpr VkPipelineDepthStencilStateCreateInfo depthStencilState{
+  }));
+  const VkPipelineDepthStencilStateCreateInfo& depthStencilState = *static_cast<VkPipelineDepthStencilStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineDepthStencilStateCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
       .pNext                 = nullptr,
       .flags                 = 0,
@@ -179,27 +124,20 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .depthBoundsTestEnable = VK_FALSE,
       .stencilTestEnable     = VK_FALSE,
       .front                 = {
-        .failOp      = VK_STENCIL_OP_KEEP,
-        .passOp      = VK_STENCIL_OP_KEEP,
-        .depthFailOp = VK_STENCIL_OP_KEEP,
-        .compareOp   = VK_COMPARE_OP_LESS,
-        .compareMask = 0,
-        .writeMask   = 0,
-        .reference   = 0
+          .failOp      = VK_STENCIL_OP_KEEP,
+          .passOp      = VK_STENCIL_OP_KEEP,
+          .depthFailOp = VK_STENCIL_OP_KEEP,
+          .compareOp   = VK_COMPARE_OP_LESS,
+          .compareMask = 0,
+          .writeMask   = 0,
+          .reference   = 0
       },
-      .back = {
-        .failOp = VK_STENCIL_OP_KEEP,
-        .passOp = VK_STENCIL_OP_KEEP,
-        .depthFailOp = VK_STENCIL_OP_KEEP,
-        .compareOp = VK_COMPARE_OP_LESS,
-        .compareMask = 0,
-        .writeMask = 0,
-        .reference = 0
-      },
+      .back           = {.failOp = VK_STENCIL_OP_KEEP, .passOp = VK_STENCIL_OP_KEEP, .depthFailOp = VK_STENCIL_OP_KEEP, .compareOp = VK_COMPARE_OP_LESS, .compareMask = 0, .writeMask = 0, .reference = 0},
       .minDepthBounds = 0.0,
       .maxDepthBounds = 1.0
-  };
-  const std::vector<VkPipelineColorBlendAttachmentState> blendAttachmentStates(1, {/**@todo: Make this reflect the number of color attachments the renderPass has.*/
+  }));
+  /**@todo: Make this reflect the number of color attachments the renderPass has.*/
+  const std::vector<VkPipelineColorBlendAttachmentState>& blendAttachmentStates = *static_cast<std::vector<VkPipelineColorBlendAttachmentState>*>(miscMemoryPool.emplace_back(new std::vector<VkPipelineColorBlendAttachmentState>(1, {
       .blendEnable         = VK_FALSE,
       .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
       .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
@@ -208,8 +146,8 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
       .alphaBlendOp        = VK_BLEND_OP_ADD,
       .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-  });
-  const VkPipelineColorBlendStateCreateInfo colorBlendState {
+  })));
+  const VkPipelineColorBlendStateCreateInfo& colorBlendState                    = *static_cast<VkPipelineColorBlendStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineColorBlendStateCreateInfo{
       .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
       .pNext           = nullptr,
       .flags           = 0,
@@ -218,19 +156,19 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .attachmentCount = static_cast<uint32_t>(blendAttachmentStates.size()),
       .pAttachments    = blendAttachmentStates.data(),
       .blendConstants  = {0, 0, 0, 0}
-  };
-  constexpr VkDynamicState dynamicStates[] {
+  }));
+  const VkDynamicState(&dynamicStates)[] = *static_cast<VkDynamicState(*)[]>(miscMemoryPool.emplace_back(new VkDynamicState[]{
       VK_DYNAMIC_STATE_VIEWPORT,
       VK_DYNAMIC_STATE_SCISSOR
-  };
-  const VkPipelineDynamicStateCreateInfo dynamicState {
+  }));
+  const VkPipelineDynamicStateCreateInfo& dynamicState = *static_cast<VkPipelineDynamicStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineDynamicStateCreateInfo{
       .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
       .pNext             = nullptr,
       .flags             = 0,
-      .dynamicStateCount = std::extent_v<decltype(dynamicStates)>,
+      .dynamicStateCount = 2,
       .pDynamicStates    = dynamicStates
-  };
-  const VkGraphicsPipelineCreateInfo pipelineCreateInfo {
+  }));
+  createInfos.push_back(VkGraphicsPipelineCreateInfo{
       .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
       .pNext               = nullptr,
       .flags               = 0,
@@ -250,20 +188,32 @@ Pipeline::Pipeline(const std::shared_ptr<GraphicsDevice>& device, const std::sha
       .subpass             = 0,
       .basePipelineHandle  = VK_NULL_HANDLE,
       .basePipelineIndex   = -1,
-  };
-  if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create graphics pipeline.");
-
-  descriptorSets = device->perMaterialDescriptorAllocator.allocate(RenderGraph::FRAMES_IN_FLIGHT);
-  VkDescriptorImageInfo imageInfo{
-      .sampler     = material->getAlbedoTexture()->getSampler(),
-      .imageView   = material->getAlbedoTexture()->getImageView(),
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-  };
-  std::vector<VkWriteDescriptorSet> writeDescriptorSet(descriptorSets.size(), {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pNext = nullptr, .dstSet = VK_NULL_HANDLE, .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &imageInfo, .pBufferInfo = nullptr, .pTexelBufferView = nullptr});
-  for (uint64_t i{}; i < descriptorSets.size(); ++i)
-    writeDescriptorSet[i].dstSet = *descriptorSets[i];
-  vkUpdateDescriptorSets(device->device, writeDescriptorSet.size(), writeDescriptorSet.data(), 0, nullptr);
+  });
+  pipelines.push_back(&pipeline);
 }
+
+void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
+  const auto imageInfo  = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+       .sampler     = material->getAlbedoTexture()->getSampler(),
+       .imageView   = material->getAlbedoTexture()->getImageView(),
+       .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  }));
+  const uint32_t offset = writes.size();
+  writes.resize(offset + descriptorSets.size(), {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .pImageInfo = imageInfo,
+      .pBufferInfo = nullptr,
+      .pTexelBufferView = nullptr
+  });
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+}
+
+void Pipeline::update() {}
 
 Pipeline::~Pipeline() {
   vkDestroyPipelineLayout(device->device, layout, nullptr);
@@ -274,5 +224,4 @@ Pipeline::~Pipeline() {
 
 VkPipeline Pipeline::getPipeline() const { return pipeline; }
 VkPipelineLayout Pipeline::getLayout() const { return layout; }
-std::shared_ptr<VkDescriptorSet> Pipeline::getDescriptorSet(const uint64_t frameIndex) const { return descriptorSets[frameIndex]; }
-void Pipeline::update() {}
+std::shared_ptr<Material> Pipeline::getMaterial() const { return material; }

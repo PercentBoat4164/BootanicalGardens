@@ -31,8 +31,8 @@ public:
     Compute = VK_IMAGE_USAGE_STORAGE_BIT,
   };
 
-  Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
-  Image(const std::shared_ptr<GraphicsDevice>& device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT);
+  Image(GraphicsDevice* device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
+  Image(GraphicsDevice* device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT);
   ~Image() override;
 
   void rebuild(VkExtent3D newExtent);
