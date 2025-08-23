@@ -17,7 +17,7 @@ set(FASTGLTF_ENABLE_TESTS OFF)
 set(FASTGLTF_ENABLE_EXAMPLES OFF)
 set(FASTGLTF_ENABLE_DOCS OFF)
 CPMAddPackage("gh:spnda/fastgltf#v0.8.0")
-CPMAddPackage("gh:mattreecebentley/plf_colony#82ec3ba91088992c5d07ea1ee5dfc3b733be8c5a")  # v7.5.5
+CPMAddPackage("gh:mattreecebentley/plf_colony#ce7a8ab6e8a2923407f614291635a1ec0e3648f8")  # v7.5.26
 CPMAddPackage(
         NAME glm
         GIT_TAG 1.0.1
