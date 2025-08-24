@@ -66,26 +66,34 @@ void loadTexture(GraphicsDevice* const device, CommandBuffer& commandBuffer, con
     default: format = VK_FORMAT_UNDEFINED;
   }
   *texture = std::make_shared<Texture>(device, std::string{image.name}, format, VkExtent3D{static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), 1U}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-  std::vector<VkBufferImageCopy> regions{{.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0, .imageSubresource = VkImageSubresourceLayers{
-                                                                                                               .aspectMask     = (*texture)->getAspect(),
-                                                                                                               .mipLevel       = 0,
-                                                                                                               .baseArrayLayer = 0,
-                                                                                                               .layerCount     = (*texture)->getLayerCount(),
-                                                                                                           },
-                                          .imageOffset = {},
-                                          .imageExtent = (*texture)->getExtent()}};
+  std::vector<VkBufferImageCopy> regions{
+    {
+      .bufferOffset = 0,
+      .bufferRowLength = 0,
+      .bufferImageHeight = 0,
+      .imageSubresource = VkImageSubresourceLayers{
+        .aspectMask     = (*texture)->getAspect(),
+        .mipLevel       = 0,
+        .baseArrayLayer = 0,
+        .layerCount     = (*texture)->getLayerCount(),
+      },
+      .imageOffset = {},
+      .imageExtent = (*texture)->getExtent()
+    }
+  };
   commandBuffer.record<CommandBuffer::CopyBufferToImage>(buffer, *texture, regions);
   std::vector<VkImageMemoryBarrier> imageMemoryBarriers{
-      {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-       .pNext               = nullptr,
-       .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-       .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
-       .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-       .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-       .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
-       .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-       .image               = (*texture)->getImage(),
-       .subresourceRange    = (*texture)->getWholeRange()
+      {
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext               = nullptr,
+        .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
+        .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
+        .image               = (*texture)->getImage(),
+        .subresourceRange    = (*texture)->getWholeRange()
       }
   };
   commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageMemoryBarriers);
@@ -142,7 +150,12 @@ void Material::setVertexShader(const std::shared_ptr<const Shader>& shader) { ve
 std::shared_ptr<const Shader> Material::getVertexShader() const { return vertexShader; }
 void Material::setFragmentShader(const std::shared_ptr<const Shader>& shader) { fragmentShader = shader; }
 std::shared_ptr<const Shader> Material::getFragmentShader() const { return fragmentShader; }
-void Material::computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline) const {
+const std::unordered_map<uint32_t, Material::Binding>* Material::getBindings(const uint8_t set) const {
+  if (const auto it = perSetBindings.find(set); it != perSetBindings.end()) return &it->second;
+  return nullptr;
+}
+
+void Material::computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline) {
   const std::vector shaders = {vertexShader, fragmentShader};
 
   // Obtain reflected descriptor set data
@@ -163,13 +176,14 @@ void Material::computeDescriptorSetRequirements(std::map<std::shared_ptr<Descrip
   std::vector<std::vector<bool>> bindingsDefined(sets.size());
   for (uint32_t i{}; i < sets.size(); ++i) {
     const SpvReflectDescriptorSet& set = *sets.at(i);
+    std::unordered_map<uint32_t, Binding>& setBinding = perSetBindings[set.set];
     // Find out which object this set belongs to
     std::vector<VkDescriptorSetLayoutBinding>* psetRequirements = nullptr;
     switch (set.set) {
       case 0: psetRequirements = &requirements[nullptr]; break;
       case 1: psetRequirements = &requirements[renderPass]; break;
       case 2: psetRequirements = &requirements[std::reinterpret_pointer_cast<DescriptorSetRequirer>(pipeline)]; break;
-      default: return GraphicsInstance::showError("bad set: " + set.set);
+      default: return GraphicsInstance::showError("bad set: " + std::to_string(set.set));
     }
     std::vector<VkDescriptorSetLayoutBinding>& setRequirements = *psetRequirements;
     // Build a map that will be used to merge all bindings at the same location
@@ -191,6 +205,14 @@ void Material::computeDescriptorSetRequirements(std::map<std::shared_ptr<Descrip
           .descriptorCount = binding.count,
           .stageFlags = shaderStages.at(i),
           .pImmutableSamplers = VK_NULL_HANDLE
+        };
+        setBinding[binding.binding] = {
+#if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES
+          .name = binding.name,
+#endif
+          .nameHash = Tools::hash(binding.name),
+          .type = static_cast<VkDescriptorType>(binding.descriptor_type),
+          .count = binding.count
         };
       }
     }

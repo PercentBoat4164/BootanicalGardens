@@ -1,5 +1,8 @@
 #include "Pipeline.hpp"
 
+#include "Resources/UniformBuffer.hpp"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
@@ -13,7 +16,7 @@
 Pipeline::Pipeline(GraphicsDevice* const device, const std::shared_ptr<Material>& material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
 
 /**@todo: Only rebake if out-of-date.*/
-void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
+void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_t subpassIndex, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
   // Create the pipeline layout
   const VkPipelineLayoutCreateInfo createInfo {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -58,7 +61,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::sp
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .pNext                  = nullptr,
       .flags                  = 0,
-      .topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, /**@todo: Support multiple topologies. Low priority. Topology is recorded on a per-mesh basis.*/
+      .topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,  /**@todo: Support multiple topologies. Low priority. Topology is recorded on a per-mesh basis.*/
       .primitiveRestartEnable = VK_FALSE
   }));
   const VkViewport& viewport = *static_cast<VkViewport*>(miscMemoryPool.emplace_back(new VkViewport{
@@ -136,8 +139,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::sp
       .minDepthBounds = 0.0,
       .maxDepthBounds = 1.0
   }));
-  /**@todo: Make this reflect the number of color attachments the renderPass has.*/
-  const std::vector<VkPipelineColorBlendAttachmentState>& blendAttachmentStates = *static_cast<std::vector<VkPipelineColorBlendAttachmentState>*>(miscMemoryPool.emplace_back(new std::vector<VkPipelineColorBlendAttachmentState>(1, {
+  const std::vector<VkPipelineColorBlendAttachmentState>& blendAttachmentStates = *static_cast<std::vector<VkPipelineColorBlendAttachmentState>*>(miscMemoryPool.emplace_back(new std::vector<VkPipelineColorBlendAttachmentState>(renderPass->subpassData.at(subpassIndex).colorImages.size(), {
       .blendEnable         = VK_FALSE,
       .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
       .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
@@ -147,7 +149,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::sp
       .alphaBlendOp        = VK_BLEND_OP_ADD,
       .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
   })));
-  const VkPipelineColorBlendStateCreateInfo& colorBlendState                    = *static_cast<VkPipelineColorBlendStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineColorBlendStateCreateInfo{
+  const VkPipelineColorBlendStateCreateInfo& colorBlendState = *static_cast<VkPipelineColorBlendStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineColorBlendStateCreateInfo{
       .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
       .pNext           = nullptr,
       .flags           = 0,
@@ -185,32 +187,111 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, std::sp
       .pDynamicState       = &dynamicState,
       .layout              = layout,
       .renderPass          = renderPass->getRenderPass(),
-      .subpass             = 0,
+      .subpass             = subpassIndex,
       .basePipelineHandle  = VK_NULL_HANDLE,
       .basePipelineIndex   = -1,
   });
   pipelines.push_back(&pipeline);
 }
 
-void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
-  const auto imageInfo  = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
-       .sampler     = material->getAlbedoTexture()->getSampler(),
-       .imageView   = material->getAlbedoTexture()->getImageView(),
-       .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-  }));
-  const uint32_t offset = writes.size();
-  writes.resize(offset + descriptorSets.size(), {
+void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
+  struct MaterialData {
+    glm::mat4 light_ViewProjectionMatrix;
+  };
+  static auto uniformBuffer = std::make_shared<UniformBuffer<MaterialData>>(device, "Light Data");  /**@todo: Store this with the material. This is the cause of the memory leaks right now.*/
+  const std::unordered_map<uint32_t, Material::Binding>* bindings = material->getBindings(2);
+  std::unordered_map<uint32_t, std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>> descriptorInfos;
+  for (auto& [binding, info] : *bindings) {
+    switch (info.nameHash) {
+      case Tools::hash("albedo"): {
+        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
+        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
+          data.emplace<std::vector<VkDescriptorImageInfo>>();
+        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
+          .sampler     = material->getAlbedoTexture()->getSampler(),
+          .imageView   = material->getAlbedoTexture()->getImageView(),
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
+        break;
+      }
+      case Tools::hash("shadowMap"): {
+        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
+        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
+          data.emplace<std::vector<VkDescriptorImageInfo>>();
+        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
+          .sampler     = *graph.device->getSampler(),
+          .imageView   = graph.getAttachmentImage(RenderGraph::getAttachmentId("ShadowDepth"))->getImageView(),
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
+        break;
+      }
+      case Tools::hash("lightData"): {
+        const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, -15.f, 15.f);
+        const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(1, 10, 1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
+        const MaterialData materialData {projectionMatrix * viewMatrix};
+        uniformBuffer->update(materialData);
+        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
+        if (!std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(data))
+          data.emplace<std::vector<VkDescriptorBufferInfo>>();
+        std::get<std::vector<VkDescriptorBufferInfo>>(data).push_back({
+          .buffer = uniformBuffer->getBuffer(),
+          .offset = 0,
+          .range  = uniformBuffer->getSize()
+        });
+        break;
+      }
+      default:
+#if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES
+        GraphicsInstance::showError("unknown object " + info.name);
+#else
+        GraphicsInstance::showError("unknown object with hash " + std::to_string(info.nameHash));
+#endif
+        break;
+    }
+  }
+
+  // Fill in the writes.
+  uint32_t offset = writes.size();
+  writes.resize(offset + descriptorInfos.size() * descriptorSets.size());
+  for (auto& [binding, info] : descriptorInfos) {
+    VkWriteDescriptorSet write {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .pNext = nullptr,
-      .dstBinding = 0,
+      .dstBinding = binding,
       .dstArrayElement = 0,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo = imageInfo,
+      .descriptorCount = bindings->at(binding).count,
+      .descriptorType = bindings->at(binding).type,
+      .pImageInfo = nullptr,
       .pBufferInfo = nullptr,
       .pTexelBufferView = nullptr
-  });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+    };
+
+    // Move the data to the miscMemoryPool before adding a pointer to the appropriate element of this write.
+    if (std::holds_alternative<std::vector<VkDescriptorImageInfo>>(info)) {
+      std::vector<VkDescriptorImageInfo>& data = std::get<std::vector<VkDescriptorImageInfo>>(info);
+      auto* pInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkDescriptorImageInfo))));
+      memcpy(pInfo, data.data(), data.size() * sizeof(VkDescriptorImageInfo));
+      write.pImageInfo = pInfo;
+    }
+    else if (std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(info)) {
+      std::vector<VkDescriptorBufferInfo>& data = std::get<std::vector<VkDescriptorBufferInfo>>(info);
+      auto* pInfo = static_cast<VkDescriptorBufferInfo*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkDescriptorBufferInfo))));
+      memcpy(pInfo, data.data(), data.size() * sizeof(VkDescriptorBufferInfo));
+      write.pBufferInfo = pInfo;
+    }
+    else if (std::holds_alternative<std::vector<VkBufferView>>(info)) {
+      std::vector<VkBufferView>& data = std::get<std::vector<VkBufferView>>(info);
+      auto* pInfo = static_cast<VkBufferView*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkBufferView))));
+      memcpy(pInfo, data.data(), data.size() * sizeof(VkBufferView));
+      write.pTexelBufferView = pInfo;
+    }
+
+    // Generate a VkWriteDescriptorSet for each descriptor set.
+    for (uint64_t i{}; i < descriptorSets.size(); ++i) {
+      write.dstSet = *getDescriptorSet(i);
+      writes[offset++] = write;
+    }
+  }
 }
 
 void Pipeline::update() {}

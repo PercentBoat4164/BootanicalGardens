@@ -2,7 +2,7 @@
 #include "BooLib.glsl"
 
 layout (location = 0) in vec3 inPosition;
-layout (location = 3) in vec2 inTextureCoordinates0;
+layout (location = 3) in vec2 inTextureCoordinates;
 
 layout (set=PER_FRAME_SET, binding=0) uniform FrameData {
     uint frameNumber;
@@ -14,8 +14,10 @@ layout (set=PER_PASS_SET, binding=0) uniform PassData {
 } passData;
 
 layout (location = 0) out vec2 outTextureCoordinates;
+layout (location = 1) out vec3 outWorldSpacePosition;
 
 void main() {
-    gl_Position = passData.viewProjectionMatrix * vec4(inPosition, 1);
-    outTextureCoordinates = inTextureCoordinates0;
+    outWorldSpacePosition = inPosition;
+    outTextureCoordinates = inTextureCoordinates;
+    gl_Position = passData.viewProjectionMatrix * vec4(outWorldSpacePosition, 1);
 }

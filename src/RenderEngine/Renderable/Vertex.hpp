@@ -58,8 +58,6 @@ public:
   glm::vec3 position;
   glm::vec2 textureCoordinates0;
 
-  bool operator==(const Vertex& other) const;
-
   template<typename T> static constexpr VkFormat formatOf() { return detail::formatOf<T>(); }
 
   static constexpr VkVertexInputBindingDescription getBindingDescription() {

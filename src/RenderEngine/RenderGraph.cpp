@@ -88,10 +88,15 @@ void RenderGraph::setResolutionGroup(const ResolutionGroupID id, const VkExtent3
   outOfDate = true;
 }
 
-void RenderGraph::setAttachment(const AttachmentID id, const ResolutionGroupID groupId, const VkFormat format, const VkSampleCountFlags sampleCount) {
+void RenderGraph::setAttachment(const AttachmentID id, const std::string_view& name, const ResolutionGroupID groupId, const VkFormat format, const VkSampleCountFlags sampleCount) {
+  if (!name.empty()) attachmentNames[id] = name;
   attachmentsProperties[id] = {groupId, format, sampleCount};
   std::get<1>(resolutionGroups[groupId]).push_back(id);
   outOfDate = true;
+}
+
+std::shared_ptr<Image> RenderGraph::getAttachmentImage(const AttachmentID id) const {
+  return backingImages.at(id);
 }
 
 /**
@@ -109,19 +114,27 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
    *************************/
   {
     // Understand how attachments are used across RenderPasses
-    std::map<RenderPass*, std::vector<AttachmentID>> pass2id;
-    std::map<AttachmentID, std::vector<std::pair<RenderPass*, AttachmentDeclaration>>> id2decl;
-    std::map<AttachmentID, AttachmentDeclaration> declarations;
+    std::unordered_map<RenderPass*, std::vector<AttachmentID>> pass2id;
+    std::unordered_map<AttachmentID, std::vector<std::pair<RenderPass*, AttachmentDeclaration>>> id2decl;
+    std::unordered_map<AttachmentID, AttachmentDeclaration> declarations;
+    std::unordered_map<AttachmentID, VkImageUsageFlags> usages {
+      {GBufferAlbedo, VK_IMAGE_USAGE_TRANSFER_SRC_BIT},
+      {GBufferDepth, VK_IMAGE_USAGE_SAMPLED_BIT},
+      {GBufferPosition, VK_IMAGE_USAGE_SAMPLED_BIT},
+      {getAttachmentId("ShadowDepth"), VK_IMAGE_USAGE_SAMPLED_BIT}};
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
       std::vector<std::pair<AttachmentID, AttachmentDeclaration>> pairs = renderPass->declareAttachments();
       auto range = std::views::keys(pairs);
       pass2id[renderPass.get()] = std::vector<AttachmentID>{range.begin(), range.end()};
       for (auto& [id, declaration] : pairs) {
+        /**@todo: Log the name of the render pass and the attachment.*/
+        if (!attachmentsProperties.contains(id)) GraphicsInstance::showError("Unregistered AttachmentID!");
         declarations[id] = declaration;
+        usages[id] |= declaration.usage;
         id2decl[id].emplace_back(renderPass.get(), declaration);
       }
     }
-    buildImages();
+    buildImages(usages);
 
     // Bake RenderPasses
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
@@ -134,7 +147,7 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
         /**@todo: Add support for aliasing attachmentsProperties.*/
         /**@todo: Add support for reordering render passes.*/
         std::shared_ptr<Image> image = backingImages.at(id);
-        auto& attachmentDeclarations = id2decl[id];
+        auto& attachmentDeclarations = id2decl.at(id);
         // Find this renderpass in the declarations of this attachment.
         const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
         // Find the next renderpass in the declarations of this attachment.
@@ -142,15 +155,20 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
         if (++nextIt == attachmentDeclarations.end()) nextIt = attachmentDeclarations.begin();
         /**@todo: Optimize load and store ops.*/
         /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
+        /**@todo: Log an error if this the loadOp is CLEAR and the attachment is an input attachment.*/
         const AttachmentDeclaration& thisDeclaration = thisIt->second;
         const AttachmentDeclaration& nextDeclaration = nextIt->second;
+        // VkAttachmentLoadOp loadOp = thisDeclaration.loadOp;
+        // if (loadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE) {
+        //   if (nextDeclaration)
+        // }
         descriptions.push_back({
             .flags = 0U,
             .format = image->getFormat(),
             .samples = image->getSampleCount(),
-            .loadOp = nextDeclaration.loadOp,
+            .loadOp = thisDeclaration.loadOp,
             .storeOp = nextDeclaration.storeOp,
-            .stencilLoadOp = nextDeclaration.stencilLoadOp,
+            .stencilLoadOp = thisDeclaration.stencilLoadOp,
             .stencilStoreOp = nextDeclaration.stencilStoreOp,
             .initialLayout = thisDeclaration.layout,
             .finalLayout = nextDeclaration.layout
@@ -197,14 +215,15 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
     std::vector<void*> miscMemoryPool;
     std::vector<VkGraphicsPipelineCreateInfo> pipelineCreateInfos;
     std::vector<VkPipeline*> pipelines;
+    std::vector<VkDescriptorSetLayout> setLayouts;
+    setLayouts.reserve(3);
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
       for (const std::shared_ptr<Pipeline>& pipeline : renderPass->getPipelines() | std::views::values) {
-        std::vector setLayouts {
-          frameDataLayout,
-          layouts.at(requirementIndices.at(renderPass)),
-          layouts.at(requirementIndices.at(pipeline))
-        };
-        pipeline->bake(renderPass, setLayouts, miscMemoryPool, pipelineCreateInfos, pipelines);
+        setLayouts.clear();
+        if (frameDataLayout) setLayouts.emplace_back(frameDataLayout);
+        if (requirementIndices.contains(renderPass)) setLayouts.emplace_back(layouts.at(requirementIndices.at(renderPass)));
+        if (requirementIndices.contains(pipeline)) setLayouts.emplace_back(layouts.at(requirementIndices.at(pipeline)));
+        pipeline->bake(renderPass, 0, setLayouts, miscMemoryPool, pipelineCreateInfos, pipelines);
       }
     std::vector<VkPipeline> tempPipelines(pipelines.size());
     if (!pipelines.empty())
@@ -214,12 +233,11 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
     miscMemoryPool.clear();
     pipelineCreateInfos.clear();
     pipelines.clear();
-
-    /****************************
-     * Bake the Command Buffers *
-     ****************************/
   }
 
+  /****************************
+   * Bake the Command Buffers *
+   ****************************/
   std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
   {  // Allocate descriptor sets
     std::vector<VkDescriptorSetLayout> framesInFlightLayouts;
@@ -243,7 +261,7 @@ bool RenderGraph::bake(CommandBuffer& commandBuffer) {
       auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
       if (descriptorSetRequirer) {
         descriptorSetRequirer->setDescriptorSets({start, start + FRAMES_IN_FLIGHT}, layouts[index]);
-        descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes);
+        descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes, *this);
       }
       else for (uint32_t j{}; j < frames.size(); ++j) {
         frames.at(j).descriptorSet = *(start + j);
@@ -269,61 +287,30 @@ void RenderGraph::update() const {
   for (const std::shared_ptr<Mesh>& mesh : device->meshes)
     mesh->update(*this);
   for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
-    renderPass->update(*this);
+    renderPass->update();
   uniformBuffer->update({static_cast<uint32_t>(frameNumber), static_cast<float>(Game::getTime())});
 }
 
-/**
- *
- * @param swapchainImage The image to put the color output onto (usually the swapchain image).
- * @param semaphore The semaphore to signal when the GPU has finished rendering.
- */
 void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore) {
   CommandBuffer commandBuffer;
-  std::shared_ptr<Image> defaultColorImage = backingImages.at(RenderColor);
-  commandBuffer.record<CommandBuffer::ClearDepthStencilImage>(backingImages.at(RenderDepth));
-  VkImageMemoryBarrier imageMemoryBarrier {
-    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-    .pNext = nullptr,
-    .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-    .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .image = defaultColorImage->getImage(),
-    .subresourceRange = {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel = 0,
-      .levelCount = 1,
-      .baseArrayLayer = 0,
-      .layerCount = 1
-    }
-  };
-  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, std::vector{imageMemoryBarrier});
+  std::shared_ptr<Image> defaultColorImage = backingImages.at(GBufferAlbedo);
   for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) renderPass->execute(commandBuffer);
   commandBuffer.record<CommandBuffer::BlitImageToImage>(defaultColorImage, swapchainImage);
-  imageMemoryBarrier = {
-    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-    .pNext = nullptr,
-    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
-    .image = swapchainImage->getImage(),
-    .subresourceRange = {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel = 0,
-      .levelCount = 1,
-      .baseArrayLayer = 0,
-      .layerCount = 1
-    }
+  std::vector<VkImageMemoryBarrier> imageBarriers{
+    {
+      .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .pNext               = nullptr,
+      .srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
+      .dstAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
+      .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+      .srcQueueFamilyIndex = device->globalQueueFamilyIndex,
+      .dstQueueFamilyIndex = device->globalQueueFamilyIndex,
+      .image               = swapchainImage->getImage(),
+      .subresourceRange    = swapchainImage->getWholeRange()
+    },
   };
-  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, std::vector{imageMemoryBarrier});
-  // commandBuffer.preprocess({.resourceStates = {{static_cast<Resource*>(swapchainImage.get())->getObject(), CommandBuffer::ResourceState{VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_TRANSFER_READ_BIT}}}});
-  // @todo: Providing state to a CommandBuffer as seen above is causes preprocessing to fail. Fix this.
+  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageBarriers);
   commandBuffer.preprocess();
 
   const PerFrameData& frameData = getPerFrameData();
@@ -352,15 +339,14 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
   ++frameNumber;
 }
 
-void RenderGraph::buildImages() {
+void RenderGraph::buildImages(const std::unordered_map<AttachmentID, VkImageUsageFlags>& usages) {
   backingImages.clear();
   for (const auto& [id, properties]: attachmentsProperties) {
-    /**@todo: Generate the correct image usage flags for each image based on how it is used.*/
-    backingImages[id] = std::make_shared<Image>(device, "", properties.format, std::get<0>(resolutionGroups[properties.resolutionGroup]), properties.format == VK_FORMAT_D32_SFLOAT ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    backingImages[id] = std::make_shared<Image>(device, attachmentNames.at(id), properties.format, std::get<0>(resolutionGroups[properties.resolutionGroup]), usages.at(id));
   }
 }
 
-void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::map<AttachmentID, AttachmentDeclaration>& declarations) {
+void RenderGraph::transitionImages(CommandBuffer& commandBuffer, const std::unordered_map<AttachmentID, AttachmentDeclaration>& declarations) {
   std::map<VkPipelineStageFlags, std::vector<VkImageMemoryBarrier>> imageBarrierGroups;
   for (auto& [id, image] : backingImages) {
     const AttachmentDeclaration& declaration = declarations.at(id);

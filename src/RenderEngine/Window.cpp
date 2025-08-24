@@ -28,8 +28,32 @@ Window::Window(GraphicsDevice* const device) : device{device} {
   swapchainImages.reserve(swapchain.image_count);
   std::vector<VkImage> images = swapchain.get_images().value();
   std::vector<VkImageView> views = swapchain.get_image_views().value();
-  for (uint32_t i{}; i < swapchain.image_count; ++i)
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+  std::string windowTitle = SDL_GetWindowTitle(window);
+  std::string swapchainImageNameTemplate = windowTitle + " | Swapchain Image [";
+  std::string swapchainImageViewNameTemplate = windowTitle + " | Swapchain Image View [";
+#endif
+  for (uint32_t i{}; i < swapchain.image_count; ++i) {
     swapchainImages.emplace_back(std::make_shared<Image>(device, "swapchainImage" + std::to_string(i), images[i], swapchain.image_format, VkExtent3D{swapchain.extent.width, swapchain.extent.height, 1}, swapchain.image_usage_flags, 1, VK_SAMPLE_COUNT_1_BIT, views[i]));
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+    if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
+      std::string name = swapchainImageNameTemplate + std::to_string(i) + "]";
+      VkDebugUtilsObjectNameInfoEXT nameInfo {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = nullptr,
+        .objectType = VK_OBJECT_TYPE_IMAGE,
+        .objectHandle = reinterpret_cast<uint64_t>(images[i]),
+        .pObjectName = name.c_str()
+      };
+      if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+      name = swapchainImageViewNameTemplate + std::to_string(i) + "]";
+      nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
+      nameInfo.objectHandle = reinterpret_cast<uint64_t>(views[i]),
+      nameInfo.pObjectName = name.c_str();
+      if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+    }
+#endif
+  }
   VkSemaphoreCreateInfo semaphoreCreateInfo{
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     .pNext = nullptr,

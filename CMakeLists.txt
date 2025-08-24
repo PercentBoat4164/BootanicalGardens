@@ -4,6 +4,7 @@ project("Bootanical Gardens")
 set(CMAKE_CXX_STANDARD 26)
 
 find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 set(CPM_SOURCE_CACHE external)
 include(cmake/CPM.cmake)
@@ -44,8 +45,10 @@ add_executable(BootanicalGardens
         src/RenderEngine/GraphicsInstance.cpp
         src/RenderEngine/Pipeline.cpp
         src/RenderEngine/RenderGraph.cpp
-        src/RenderEngine/RenderPass/OpaqueRenderPass.cpp
+        src/RenderEngine/RenderPass/CollectShadowsRenderPass.cpp
+        src/RenderEngine/RenderPass/GBufferRenderPass.cpp
         src/RenderEngine/RenderPass/RenderPass.cpp
+        src/RenderEngine/RenderPass/ShadowRenderPass.cpp
         src/RenderEngine/Renderable/Material.cpp
         src/RenderEngine/Renderable/Mesh.cpp
         src/RenderEngine/Renderable/Renderable.cpp
@@ -69,8 +72,14 @@ target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
 target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
 target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_ttf::SDL3_ttf-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace efsw)
-target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
-
+if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
+    target_compile_definitions(BootanicalGardens PRIVATE
+            BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer.
+            BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS                                               # provides names for Vulkan objects in graphics debuggers.
+            BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION="BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION"  # enables vulkan validation if an environment variable matching this string is present
+            BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES                                   # provides human readable names for each shader variable.
+    )
+endif ()
 # Move all .dlls to the exe
 if (WIN32)
     add_custom_command(TARGET BootanicalGardens POST_BUILD

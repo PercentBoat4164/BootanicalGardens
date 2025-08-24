@@ -33,7 +33,7 @@ public:
   };
 
   struct ResourceState {
-    VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
+    VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
     VkAccessFlags access{VK_ACCESS_FLAG_BITS_MAX_ENUM};
   };
 
@@ -59,8 +59,8 @@ public:
       std::vector<VkImageLayout> allowedLayouts{};
     };
     std::vector<ResourceAccess> accesses;
-#ifndef NDEBUG
-    cpptrace::stacktrace stacktrace;
+#if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
+    cpptrace::raw_trace trace;
 #endif
 
     explicit Command(std::vector<ResourceAccess> accesses);
@@ -107,13 +107,14 @@ public:
   };
 
   struct BindDescriptorSets final : Command {
-    explicit BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets);
+    explicit BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets, uint32_t firstSet=0);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
     std::vector<VkDescriptorSet> descriptorSets;
+    uint32_t firstSet;
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   };
 
@@ -257,7 +258,7 @@ public:
   };
 
   struct Draw final : Command {
-    explicit Draw();
+    explicit Draw(uint32_t vertexCount=0);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -335,5 +336,6 @@ public:
    */
   void bake(VkCommandBuffer commandBuffer) const;
   void clear();
-  State getDefaultState();
+
+  void getDefaultState(State&state);
 };

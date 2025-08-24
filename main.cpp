@@ -4,18 +4,18 @@
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
-#include "src/RenderEngine/RenderPass/OpaqueRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/CollectShadowsRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
+#include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
 #include "src/RenderEngine/Renderable/Renderable.hpp"
 #include "src/RenderEngine/Shader.hpp"
 #include "src/RenderEngine/Window.hpp"
 
-#include <volk/volk.h>
-
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
-  GraphicsInstance::create({});
+  GraphicsInstance::create({VK_EXT_DEBUG_UTILS_EXTENSION_NAME});
   {
     GraphicsDevice graphicsDevice;
 
@@ -24,17 +24,25 @@ int main() {
     // Build the RenderGraph
     RenderGraph renderGraph{&graphicsDevice};
     renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution());
-    renderGraph.setAttachment(RenderGraph::RenderColor, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setAttachment(RenderGraph::RenderDepth, RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.insert<OpaqueRenderPass>();
+    renderGraph.setAttachment(RenderGraph::GBufferAlbedo, "GBufferAlbdeo", RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setAttachment(RenderGraph::GBufferPosition, "GBufferPosition", RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SNORM, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setAttachment(RenderGraph::GBufferDepth, "GBufferDepth", RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setResolutionGroup(RenderGraph::getResolutionGroupId("Shadow"), VkExtent3D{1024, 1024, 1});
+    renderGraph.setAttachment(RenderGraph::getAttachmentId("ShadowDepth"), "ShadowDepth", RenderGraph::getResolutionGroupId("Shadow"), VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.insert<GBufferRenderPass>();
+    renderGraph.insert<ShadowRenderPass>();
+    renderGraph.insert<CollectShadowsRenderPass>();
 
     // graphicsDevice->loadMeshes(std::filesystem::canonical("../res/FlightHelmet.glb"));
+
+    auto fragmentShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.frag"));
+    auto vertexShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.vert"));
 
     const auto renderable = std::make_shared<Renderable>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
     const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
     for (const std::shared_ptr<Mesh>& mesh: meshes) {
-      mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.frag")));
-      mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.vert")));
+      mesh->getMaterial()->setFragmentShader(fragmentShader);
+      mesh->getMaterial()->setVertexShader(vertexShader);
     }
     graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
 
@@ -57,3 +65,13 @@ int main() {
   GraphicsInstance::destroy();
   return 0;
 }
+
+// A RenderGraph, when baked, produces a MalleableCommandBuffer which can be baked multiple times with different arguments.
+// A MalleableCommandBuffer, when baked, produces a fully baked and ready-to-go CommandBuffer that has the arguments for that bake built-in.
+// This system separates the data from the commands being executed meaning that one could feasibly execute the same RenderGraph with two different views on two different threads at the same time.
+//
+// Currently, this can only be achieved in a single-threaded way:
+//    renderGraph.update(); renderGraph.execute(); renderGraph.update(); renderGraph.execute();
+//  It should be possible to make it threadable with two renderGraphs:
+//    RenderGraph renderGraph1{}; //... build renderGraph1 ...; RenderGraph renderGraph2{renderGraph}; renderGraph1.update(); renderGraph2.update(); renderGraph1.execute(); renderGraph2.execute();
+//  While multiple RenderGraphs can be executed at the same time, each RenderGraph can only be executing at most once at any point in time.

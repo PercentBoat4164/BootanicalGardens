@@ -4,6 +4,7 @@
 
 
 #include <fastgltf/core.hpp>
+
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
@@ -15,8 +16,22 @@ class GraphicsDevice;
 class CommandBuffer;
 
 class Material {
+public:
+  struct Binding {
+#if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES
+    std::string name;
+#endif
+    uint32_t nameHash;
+    VkDescriptorType type;
+    uint32_t count;
+  };
+
+private:
   std::shared_ptr<const Shader> vertexShader;
   std::shared_ptr<const Shader> fragmentShader;
+
+  // A map of shader bindings for the material set to hashes of the names
+  std::unordered_map<uint32_t, std::unordered_map<uint32_t, Binding>> perSetBindings;
 
   bool doubleSided = true;
   fastgltf::AlphaMode alphaMode = fastgltf::AlphaMode::Opaque;
@@ -74,6 +89,7 @@ public:
   [[nodiscard]] std::shared_ptr<const Shader> getVertexShader() const;
   void setFragmentShader(const std::shared_ptr<const Shader>& shader);
   [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
+  [[nodiscard]] const std::unordered_map<uint32_t, Binding>* getBindings(uint8_t set) const;
 
-  void computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline) const;
+  void computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline);
 };
