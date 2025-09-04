@@ -19,19 +19,17 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
   );
 }
 
-std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> CollectShadowsRenderPass::declareAttachments() {
-  return {
-      {RenderGraph::GBufferAlbedo,
-          RenderGraph::AttachmentDeclaration{
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-            .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE
-          }
-      }
-  };
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::declareAccesses() {
+  std::array materials{material};
+  setup(materials);
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
+  results.reserve(colorAttachments.size() + resolveAttachments.size() + inputAttachments.size() + boundImages.size() + depthStencilAttachments.size());
+  results.append_range(colorAttachments);
+  results.append_range(resolveAttachments);
+  results.append_range(inputAttachments);
+  results.append_range(boundImages);
+  results.append_range(depthStencilAttachments);
+  return results;
 }
 
 void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
@@ -88,13 +86,8 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
 }
 
 void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
-  // The g-buffer position
-  const auto imageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
-    .sampler     = *graph.device->getSampler(),
-    .imageView   = graph.getAttachmentImage(RenderGraph::GBufferPosition)->getImageView(),
-    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-  }));
-  const uint32_t offset = writes.size();
+  // The g-buffer albedo
+  uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .pNext = nullptr,
@@ -102,11 +95,37 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo = imageInfo,
+      .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+        .sampler     = *graph.device->getSampler(),
+        .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferAlbedo)).image->getImageView(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      })),
       .pBufferInfo = nullptr,
       .pTexelBufferView = nullptr
   });
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  // The g-buffer position
+  offset = writes.size();
+  writes.resize(offset + descriptorSets.size(), {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstBinding = 1,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+        .sampler     = *graph.device->getSampler(),
+        .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferPosition)).image->getImageView(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      })),
+      .pBufferInfo = nullptr,
+      .pTexelBufferView = nullptr
+  });
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+}
+
+std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::getDepthStencilAttachmentAccess() {
+  return{};
 }
 
 void CollectShadowsRenderPass::update() {
@@ -118,37 +137,8 @@ void CollectShadowsRenderPass::update() {
 }
 
 void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
-  /**@todo: Do not require the hardcoding of this PipelineBarrier.*/
-  auto shadowDepth = graph.getAttachmentImage(RenderGraph::getAttachmentId("ShadowDepth"));
-  auto renderDepth = graph.getAttachmentImage(RenderGraph::GBufferDepth);
-  const std::vector<VkImageMemoryBarrier> imageBarriers {
-    {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      .pNext = nullptr,
-      .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-      .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .srcQueueFamilyIndex = graph.device->globalQueueFamilyIndex,
-      .dstQueueFamilyIndex = graph.device->globalQueueFamilyIndex,
-      .image = shadowDepth->getImage(),
-      .subresourceRange = shadowDepth->getWholeRange()
-    }, {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      .pNext = nullptr,
-      .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-      .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .srcQueueFamilyIndex = graph.device->globalQueueFamilyIndex,
-      .dstQueueFamilyIndex = graph.device->globalQueueFamilyIndex,
-      .image = renderDepth->getImage(),
-      .subresourceRange = renderDepth->getWholeRange()
-    }
-  };
-  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageBarriers);
   commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this());
-  std::shared_ptr<Pipeline> pipeline = pipelines[material];
+  std::shared_ptr<Pipeline> pipeline = pipelines.at(material);
   const uint64_t frameIndex = graph.getFrameIndex();
   commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
   commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);

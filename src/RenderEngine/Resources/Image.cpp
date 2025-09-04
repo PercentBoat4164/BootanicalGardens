@@ -9,7 +9,7 @@
 
 #include <utility>
 
-Image::Image(GraphicsDevice* const device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits sampleCount, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {
+Image::Image(GraphicsDevice* const device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
   if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
     VkDebugUtilsObjectNameInfoEXT nameInfo {
@@ -29,7 +29,7 @@ Image::Image(GraphicsDevice* const device, std::string name, VkImage image, cons
 #endif
 }
 
-Image::Image(GraphicsDevice* const device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlagBits sampleCount) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
+Image::Image(GraphicsDevice* const device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
   const VkImageCreateInfo imageCreateInfo {
     .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext         = nullptr,
@@ -39,7 +39,7 @@ Image::Image(GraphicsDevice* const device, std::string name, const VkFormat form
     .extent        = _extent,
     .mipLevels     = _mipLevels,
     .arrayLayers   = 1,
-    .samples       = _sampleCount,
+    .samples       = static_cast<VkSampleCountFlagBits>(_sampleCount),
     .tiling        = VK_IMAGE_TILING_OPTIMAL,
     .usage         = _usage,
     .sharingMode   = VK_SHARING_MODE_EXCLUSIVE,
@@ -109,14 +109,15 @@ Image::~Image() {
   allocation = VK_NULL_HANDLE;
 }
 
-void Image::rebuild(VkExtent3D newExtent) {
+void Image::rebuild(const VkExtent3D newExtent, const VkSampleCountFlags newSampleCount) {
   std::string name = _name;
   VkFormat format = _format;
   VkImageUsageFlags usage = _usage;
   uint32_t mipLevels = _mipLevels;
-  VkSampleCountFlagBits sampleCount = _sampleCount;
+  VkSampleCountFlags sampleCount = newSampleCount == VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM ? _sampleCount : newSampleCount;
+  VkExtent3D extent = newExtent.width == 0 || newExtent.height == 0 || newExtent.depth == 0 ? _extent : newExtent;
   std::destroy_at(this);
-  std::construct_at(this, device, name, format, newExtent, usage, mipLevels, sampleCount);
+  std::construct_at(this, device, name, format, extent, usage, mipLevels, sampleCount);
 }
 
 VkImage Image::getImage() const {
@@ -163,7 +164,7 @@ uint32_t Image::getLayerCount() const {
   return _layerCount;
 }
 
-VkSampleCountFlagBits Image::getSampleCount() const {
+VkSampleCountFlags Image::getSampleCount() const {
   return _sampleCount;
 }
 

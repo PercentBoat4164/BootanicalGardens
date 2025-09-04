@@ -18,19 +18,17 @@ ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, Opaqu
   );
 }
 
-std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> ShadowRenderPass::declareAttachments() {
-  return {
-    {RenderGraph::getAttachmentId("ShadowDepth"),
-        RenderGraph::AttachmentDeclaration{
-          .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-          .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-          .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-          .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-          .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-          .storeOp = VK_ATTACHMENT_STORE_OP_STORE
-        }
-    }
-  };
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::declareAccesses() {
+  std::array materials{material};
+  setup(materials);
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
+  results.reserve(colorAttachments.size() + resolveAttachments.size() + inputAttachments.size() + boundImages.size() + depthStencilAttachments.size());
+  results.append_range(colorAttachments);
+  results.append_range(resolveAttachments);
+  results.append_range(inputAttachments);
+  results.append_range(boundImages);
+  results.append_range(depthStencilAttachments);
+  return results;
 }
 
 void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
@@ -105,6 +103,19 @@ void ShadowRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, s
       .pTexelBufferView = nullptr
   });
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+}
+
+std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::getImageId(RenderGraph::ShadowDepth), {
+    .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+  }}};
 }
 
 void ShadowRenderPass::update() {

@@ -43,11 +43,19 @@ public:
   };
   std::vector<SubpassData> subpassData;
 
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> colorAttachments;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> resolveAttachments;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> inputAttachments;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> boundImages;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> depthStencilAttachments;
+
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
   ~RenderPass() override;
 
-  virtual std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments()                       = 0;
+  void setup(std::span<std::shared_ptr<Material>> materials);
+  virtual std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> declareAccesses()                                         = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) = 0;
+  virtual std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess()                       = 0;
   virtual void update()                                                                                                                    = 0;
   virtual void execute(CommandBuffer& commandBuffer)                                                                                       = 0;
 

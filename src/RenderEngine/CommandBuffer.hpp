@@ -47,11 +47,11 @@ public:
 
   struct Command {
     struct ResourceAccess {
-      enum TypeBits : uint32_t {
-        Read = 0x1,
-        Write = 0x2
+      enum TypeBits : uint8_t {
+        Read  = 1 << 0,
+        Write = 1 << 1
       };
-      using Type = uint32_t;
+      using Type = uint8_t;
       Type type{Read};
       Resource* resource{nullptr};
       VkPipelineStageFlags stage{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
@@ -59,11 +59,17 @@ public:
       std::vector<VkImageLayout> allowedLayouts{};
     };
     std::vector<ResourceAccess> accesses;
+    enum Type : uint8_t {
+      Synchronization,
+      StateChange,
+      Copy,
+      Draw
+    } type;
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
     cpptrace::raw_trace trace;
 #endif
 
-    explicit Command(std::vector<ResourceAccess> accesses);
+    explicit Command(std::vector<ResourceAccess> accesses, Type type);
     virtual ~Command() = default;
 
   protected:

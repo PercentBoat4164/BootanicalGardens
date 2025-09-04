@@ -214,13 +214,13 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
         });
         break;
       }
-      case Tools::hash("shadowMap"): {
+      case RenderGraph::getImageId(RenderGraph::ShadowDepth): {
         std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
         if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
           data.emplace<std::vector<VkDescriptorImageInfo>>();
         std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
           .sampler     = *graph.device->getSampler(),
-          .imageView   = graph.getAttachmentImage(RenderGraph::getAttachmentId("ShadowDepth"))->getImageView(),
+          .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::ShadowDepth)).image->getImageView(),
           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         });
         break;

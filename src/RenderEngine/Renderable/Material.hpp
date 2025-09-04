@@ -32,6 +32,7 @@ private:
 
   // A map of shader bindings for the material set to hashes of the names
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, Binding>> perSetBindings;
+  std::string name;
 
   bool doubleSided = true;
   fastgltf::AlphaMode alphaMode = fastgltf::AlphaMode::Opaque;
@@ -72,6 +73,7 @@ public:
   [[nodiscard]] float getIor() const;
   [[nodiscard]] float getDispersion() const;
   [[nodiscard]] std::shared_ptr<Texture> getAlbedoTexture() const;
+  [[nodiscard]] std::string getAlbedoTextureName() const;
   [[nodiscard]] glm::vec4 getAlbedoFactor() const;
   [[nodiscard]] std::shared_ptr<Texture> getNormalTexture() const;
   [[nodiscard]] float getNormalFactor() const;
@@ -90,6 +92,10 @@ public:
   void setFragmentShader(const std::shared_ptr<const Shader>& shader);
   [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
   [[nodiscard]] const std::unordered_map<uint32_t, Binding>* getBindings(uint8_t set) const;
+
+  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeColorAttachmentAccesses() const;
+  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeInputAttachmentAccesses() const;
+  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeBoundImageAccesses() const;
 
   void computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline);
 };

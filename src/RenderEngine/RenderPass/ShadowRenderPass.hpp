@@ -13,9 +13,11 @@ class ShadowRenderPass : public RenderPass {
 public:
   explicit ShadowRenderPass(RenderGraph& graph);
 
-  std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> declareAttachments() override;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> declareAccesses() override;
   void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>&) override;
   void writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) override;
+
+  std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess() override;
   void update() override;
   void execute(CommandBuffer& commandBuffer) override;
 };

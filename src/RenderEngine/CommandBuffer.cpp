@@ -1,5 +1,6 @@
 #include "CommandBuffer.hpp"
 
+#include "Renderable/Material.hpp"
 #include "Resources/Buffer.hpp"
 #include "Resources/Image.hpp"
 #include "Resources/Resource.hpp"
@@ -15,26 +16,24 @@
 #include <algorithm>
 #include <ranges>
 #include <utility>
-#include <iostream>
 
-CommandBuffer::Command::Command(std::vector<ResourceAccess> accesses) : accesses(std::move(accesses))
+CommandBuffer::Command::Command(std::vector<ResourceAccess> accesses, const Type type) : accesses(std::move(accesses)), type(type)
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
-, trace(cpptrace::generate_raw_trace())
+, trace(cpptrace::generate_raw_trace(4))  // Skipping 4 layers brings us to either the first of two calls to `record`, or the place that record was initially called.
 #endif
 {}
 
 CommandBuffer::BeginRenderPass::BeginRenderPass(std::shared_ptr<RenderPass> renderPass, const VkRect2D renderArea, std::vector<VkClearValue> clearValues) :
     Command([&]->std::vector<ResourceAccess>{
-      std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> attachments = renderPass->declareAttachments();
+      std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->declareAccesses();
       std::vector<ResourceAccess> accesses;
       accesses.reserve(attachments.size());
-      uint32_t index{};
-      for (const std::shared_ptr<Image>& image : renderPass->getFramebuffer()->getImages()) {
-        RenderGraph::AttachmentDeclaration& attachment = attachments[index++].second;
-        accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, image.get(), attachment.stage, attachment.access, std::vector{attachment.layout});
+      for (const auto& [id, access]: attachments) {
+        /**@todo: Only select read or write.*/
+        accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, renderPass->getGraph().getImage(id).image.get(), access.stage, access.access, std::vector{access.layout});
       }
       return accesses;
-    }()),
+    }(), StateChange),
     renderPass(std::move(renderPass)),
     renderArea(renderArea.offset.x == 0 && renderArea.offset.y == 0 && renderArea.extent.width == 0 && renderArea.extent.height == 0 ? this->renderPass->getFramebuffer()->getRect() : renderArea),
     clearValues(std::move(clearValues)),
@@ -50,11 +49,10 @@ void CommandBuffer::BeginRenderPass::preprocess(State& state, PreprocessingFlags
     .pClearValues    = clearValues.data()
   };
   state.renderPass = renderPass;
-  for (const std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>& declaration: renderPass->declareAttachments()) {
-    state.resourceStates[reinterpret_cast<void*>(renderPass->getGraph().getAttachmentImage(declaration.first)->getImage())] = ResourceState {
-      .layout = declaration.second.layout,
-      .access = declaration.second.access
-    };
+  for (const auto& [id, access]: renderPass->declareAccesses()) {
+    ResourceState& resourceState = state.resourceStates[reinterpret_cast<void*>(renderPass->getGraph().getImage(id).image->getImage())];
+    resourceState.layout = access.layout;
+    resourceState.access = access.access;
   }
 }
 void CommandBuffer::BeginRenderPass::bake(VkCommandBuffer commandBuffer) {
@@ -86,7 +84,7 @@ std::string CommandBuffer::BeginRenderPass::toString(const bool includeArguments
 }
 
 CommandBuffer::BindDescriptorSets::BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets, const uint32_t firstSet) :
-    Command({}),
+    Command({}, StateChange),
     descriptorSets(descriptorSets),
     firstSet(firstSet) {}
 void CommandBuffer::BindDescriptorSets::preprocess(State& state, PreprocessingFlags flags) {
@@ -112,7 +110,7 @@ std::string CommandBuffer::BindDescriptorSets::toString(bool includeArguments) {
 }
 
 CommandBuffer::BindIndexBuffers::BindIndexBuffers(std::shared_ptr<Buffer> indexBuffer) :
-    Command({}),
+    Command({}, StateChange),
     buffer(std::move(indexBuffer)) {}
 void CommandBuffer::BindIndexBuffers::preprocess(State& state, PreprocessingFlags flags) {
   state.indexBuffer = buffer;
@@ -131,7 +129,7 @@ std::string CommandBuffer::BindIndexBuffers::toString(bool includeArguments) {
 }
 
 CommandBuffer::BindPipeline::BindPipeline(std::shared_ptr<Pipeline> pipeline) :
-    Command({}),
+    Command({}, StateChange),
     pipeline(std::move(pipeline)),
     extent{} {}
 void CommandBuffer::BindPipeline::preprocess(State& state, PreprocessingFlags flags) {
@@ -157,7 +155,7 @@ std::string CommandBuffer::BindPipeline::toString(bool includeArguments) {
 }
 
 CommandBuffer::BindVertexBuffers::BindVertexBuffers(const std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>& vertexBuffers) :
-    Command({}),
+    Command({}, StateChange),
     rawBuffers(vertexBuffers.size()) {
   const auto bufferRange = vertexBuffers | std::ranges::views::keys;
   buffers = {bufferRange.begin(), bufferRange.end()};
@@ -184,7 +182,7 @@ std::string CommandBuffer::BindVertexBuffers::toString(bool includeArguments) {
 CommandBuffer::BlitImageToImage::BlitImageToImage(std::shared_ptr<Image> src, std::shared_ptr<Image> dst, std::vector<VkImageBlit> regions, const VkFilter filter) :
     Command({ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
              ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}
-    }),
+    }, Copy),
     src(std::move(src)),
     dst(std::move(dst)),
     regions(std::move(regions)),
@@ -215,7 +213,7 @@ std::string CommandBuffer::BlitImageToImage::toString(bool includeArguments) {
 }
 
 CommandBuffer::ClearColorImage::ClearColorImage(std::shared_ptr<Image> img, const VkClearColorValue value, std::vector<VkImageSubresourceRange> subresourceRanges) :
-    Command({ResourceAccess{ResourceAccess::Write, img.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}),
+    Command({ResourceAccess{ResourceAccess::Write, img.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
     img(std::move(img)),
     value(value),
     subresourceRanges(std::move(subresourceRanges)) {}
@@ -238,7 +236,7 @@ std::string CommandBuffer::ClearColorImage::toString(bool includeArguments) {
 }
 
 CommandBuffer::ClearDepthStencilImage::ClearDepthStencilImage(std::shared_ptr<Image> img, const VkClearDepthStencilValue value, std::vector<VkImageSubresourceRange> subresourceRanges) :
-    Command({ResourceAccess{ResourceAccess::Write, img.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}),
+    Command({ResourceAccess{ResourceAccess::Write, img.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
     img(std::move(img)),
     value(value),
     subresourceRanges(std::move(subresourceRanges)) {}
@@ -262,7 +260,8 @@ std::string CommandBuffer::ClearDepthStencilImage::toString(bool includeArgument
 
 CommandBuffer::CopyBufferToBuffer::CopyBufferToBuffer(std::shared_ptr<Buffer> src, std::shared_ptr<Buffer> dst, std::vector<VkBufferCopy> regions) :
     Command({ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
-             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}}),
+             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+             Copy),
     src(std::move(src)),
     dst(std::move(dst)),
     regions(std::move(regions)) {}
@@ -290,7 +289,8 @@ std::string CommandBuffer::CopyBufferToBuffer::toString(bool includeArguments) {
 
 CommandBuffer::CopyBufferToImage::CopyBufferToImage(std::shared_ptr<Buffer> src, std::shared_ptr<Image> dst, std::vector<VkBufferImageCopy> regions) :
     Command({ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
-             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}),
+             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+             Copy),
     src(std::move(src)),
     dst(std::move(dst)),
     regions(std::move(regions)) {}
@@ -322,7 +322,8 @@ std::string CommandBuffer::CopyBufferToImage::toString(bool includeArguments) {
 
 CommandBuffer::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<Image> src, std::shared_ptr<Buffer> dst, std::vector<VkBufferImageCopy> regions) :
     Command({ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}}),
+             ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+             Copy),
     src(std::move(src)),
     dst(std::move(dst)),
     regions(std::move(regions)) {}
@@ -356,7 +357,8 @@ CommandBuffer::CopyImageToImage::CopyImageToImage(std::shared_ptr<Image> src, st
     Command(src == dst ? std::vector{ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
                                      ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}
                        : std::vector{ResourceAccess{ResourceAccess::Read, src.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-                                     ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}),
+                                     ResourceAccess{ResourceAccess::Write, dst.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+            Copy),
     src(std::move(src)),
     dst(std::move(dst)),
     regions(std::move(regions)) {}
@@ -386,8 +388,10 @@ std::string CommandBuffer::CopyImageToImage::toString(bool includeArguments) {
   return "vkCmdCopyImage";
 }
 
-CommandBuffer::Draw::Draw(const uint32_t vertexCount) : Command({}), vertexCount(vertexCount) {}
+CommandBuffer::Draw::Draw(const uint32_t vertexCount) : Command({}, Command::Draw), vertexCount(vertexCount) {}
 void CommandBuffer::Draw::preprocess(State& state, PreprocessingFlags flags) {
+  if (state.renderPass.expired()) GraphicsInstance::showError("must call BeginRenderPass before Draw");
+  if (state.pipeline.expired()) GraphicsInstance::showError("must call BindPipeline before Draw");
   if (vertexCount != 0) return;
   if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindVertexBuffers before Draw, unless vertexCount (" + std::to_string(vertexCount) + ") != 0");
   vertexCount = state.vertexBuffers.at(0).lock()->getSize() / sizeof(Vertex);
@@ -405,8 +409,10 @@ std::string CommandBuffer::Draw::toString(bool includeArguments) {
   return "vkCmdDraw";
 }
 
-CommandBuffer::DrawIndexed::DrawIndexed() : Command({}) {}
+CommandBuffer::DrawIndexed::DrawIndexed() : Command({}, Draw) {}
 void CommandBuffer::DrawIndexed::preprocess(State& state, PreprocessingFlags flags) {
+  if (state.renderPass.expired()) GraphicsInstance::showError("must call BeginRenderPass before DrawIndexed");
+  if (state.pipeline.expired()) GraphicsInstance::showError("must call BindPipeline before DrawIndexed");
   if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindIndexBuffer before DrawIndexed");
   indexCount = state.indexBuffer.lock()->getSize() / sizeof(uint32_t);
   if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindVertexBuffers before DrawIndexed");
@@ -425,8 +431,10 @@ std::string CommandBuffer::DrawIndexed::toString(bool includeArguments) {
   return "vkCmdDrawIndexed";
 }
 
-CommandBuffer::DrawIndexedIndirect::DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, const uint32_t count, const VkDeviceSize offset, const uint32_t stride) : Command({}), buffer(buffer), offset(offset), count(count), stride(stride) {}
+CommandBuffer::DrawIndexedIndirect::DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, const uint32_t count, const VkDeviceSize offset, const uint32_t stride) : Command({}, Draw), buffer(buffer), offset(offset), count(count), stride(stride) {}
 void CommandBuffer::DrawIndexedIndirect::preprocess(State& state, PreprocessingFlags flags) {
+  if (state.renderPass.expired()) GraphicsInstance::showError("must call BeginRenderPass before DrawIndexedIndirect");
+  if (state.pipeline.expired()) GraphicsInstance::showError("must call BindPipeline before DrawIndexedIndirect");
   buf = buffer->getBuffer();
 }
 void CommandBuffer::DrawIndexedIndirect::bake(VkCommandBuffer commandBuffer) {
@@ -442,9 +450,10 @@ std::string CommandBuffer::DrawIndexedIndirect::toString(bool includeArguments) 
   return "vkCmdDrawIndexedIndirect";
 }
 
-CommandBuffer::EndRenderPass::EndRenderPass() : Command({}) {}
+CommandBuffer::EndRenderPass::EndRenderPass() : Command({}, StateChange) {}
 void CommandBuffer::EndRenderPass::preprocess(State& state, PreprocessingFlags flags) {
   state.renderPass.reset();
+  state.pipeline.reset();
 }
 void CommandBuffer::EndRenderPass::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -460,24 +469,24 @@ std::string CommandBuffer::EndRenderPass::toString(bool includeArguments) {
 }
 
 CommandBuffer::PipelineBarrier::PipelineBarrier(const VkPipelineStageFlags srcStageMask, const VkPipelineStageFlags dstStageMask, const VkDependencyFlags dependencyFlags, std::vector<VkMemoryBarrier> memoryBarriers, std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers, std::vector<VkImageMemoryBarrier> imageMemoryBarriers) :
-    Command({}),
+    Command({}, Synchronization),
     srcStageMask(srcStageMask),
     dstStageMask(dstStageMask),
     dependencyFlags(dependencyFlags),
     memoryBarriers(std::move(memoryBarriers)),
     bufferMemoryBarriers(std::move(bufferMemoryBarriers)),
     imageMemoryBarriers(std::move(imageMemoryBarriers)) {}
-void CommandBuffer::PipelineBarrier::preprocess(State& state, PreprocessingFlags flags) {
-  if (flags & ModifyPipelineBarriers) {
+void CommandBuffer::PipelineBarrier::preprocess(State& state, const PreprocessingFlags flags) {
     for (auto& imageMemoryBarrier: imageMemoryBarriers) {
-      ResourceState& resourceState = state.resourceStates.at(imageMemoryBarrier.image);
-      if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM)
-        imageMemoryBarrier.srcAccessMask = resourceState.access;
-      resourceState.access = imageMemoryBarrier.dstAccessMask;
-      imageMemoryBarrier.oldLayout = resourceState.layout;
+      ResourceState& resourceState = state.resourceStates[imageMemoryBarrier.image];
+      if (flags & ModifyPipelineBarriers) {
+        imageMemoryBarrier.oldLayout = resourceState.layout;
+        if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM) imageMemoryBarrier.srcAccessMask = resourceState.access;
+      }
       resourceState.layout = imageMemoryBarrier.newLayout;
+      resourceState.access = imageMemoryBarrier.dstAccessMask;
+      // imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
-  }
 }
 void CommandBuffer::PipelineBarrier::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -510,40 +519,54 @@ CommandBuffer::State CommandBuffer::preprocess(State state, const PreprocessingF
   /**@todo: Optimize PipelineBarrier commands. (Not necessarily in order)
    *    - Acknowledge pre-existing PipelineBarrier commands.
    *    - AGGRESSIVELY merge PipelineBarrier commands.
-   *    - Replace PipelineBarriers with SetEvent and WaitEvents if enough work can be submitted between them.
+   *    - Support promoting PipelineBarriers to SetEvent / WaitEvents.
    *    - Rearrange commands to reduce synchronization needs.
    */
   getDefaultState(state);
   std::unordered_map<Resource*, Command::ResourceAccess> previousAccesses;
+  uint32_t i = ~0U;
   for (auto it = commands.begin(); it != commands.end(); ++it) {
-    for (const Command::ResourceAccess& access: (*it)->accesses) {
-      ResourceState& resourceState            = state.resourceStates[access.resource->getObject()];
-      Command::ResourceAccess& previousAccess = previousAccesses[access.resource];
-      if (flags & AddPipelineBarriers) {
+    ++i;
+    // Add pipeline barriers to ensure correct resource access synchronization
+    if (flags & AddPipelineBarriers) {
+      for (const Command::ResourceAccess& access: (*it)->accesses) {
+        ResourceState& resourceState            = state.resourceStates[access.resource->getObject()];
+        Command::ResourceAccess& previousAccess = previousAccesses[access.resource];
         std::vector<VkImageMemoryBarrier> imageMemoryBarriers;
         std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers;
-        if (access.resource->type == Resource::Image && !std::ranges::contains(access.allowedLayouts, resourceState.layout)) {
+        if (access.resource->type == Resource::Image && (!std::ranges::contains(access.allowedLayouts, resourceState.layout) || (access.mask & resourceState.access) == access.mask)) {
           Image& image = *dynamic_cast<Image*>(access.resource);
+          const VkImageLayout layout = access.allowedLayouts[0];
           imageMemoryBarriers.push_back({.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext               = nullptr,
             .srcAccessMask       = previousAccess.mask,
             .dstAccessMask       = access.mask,
             .oldLayout           = resourceState.layout,
-            .newLayout           = access.allowedLayouts[0],  // We always prefer the layout listed first.
-            .srcQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex,
-            .dstQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex,
+            .newLayout           = layout,  // We always prefer the layout listed first. @todo: Choose a layout that reduces the number of memory barriers / transitions needed most if one exists.
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image               = image.getImage(),
             .subresourceRange    = image.getWholeRange()
           });
-          resourceState.layout = access.allowedLayouts[0];
+          // resourceState.layout = layout;
+          // resourceState.access = access.mask;
         }
         if (access.resource->type == Resource::Buffer) {
           Buffer& buffer = *dynamic_cast<Buffer*>(access.resource);
-          bufferMemoryBarriers.push_back({.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, .pNext = nullptr, .srcAccessMask = previousAccess.mask, .dstAccessMask = access.mask, .srcQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex, .dstQueueFamilyIndex = access.resource->device->globalQueueFamilyIndex, .buffer = buffer.getBuffer(), .offset = 0, .size = VK_WHOLE_SIZE});
+          bufferMemoryBarriers.push_back({
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = previousAccess.mask,
+            .dstAccessMask = access.mask,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = buffer.getBuffer(),
+            .offset = 0,
+            .size = VK_WHOLE_SIZE});
         }
-        if (apply && !imageMemoryBarriers.empty() || !bufferMemoryBarriers.empty()) record<PipelineBarrier>(it, previousAccess.stage, access.stage, 0, std::vector<VkMemoryBarrier>{}, bufferMemoryBarriers, imageMemoryBarriers);
+        if (apply && !imageMemoryBarriers.empty() || !bufferMemoryBarriers.empty()) (*record<PipelineBarrier>(it, previousAccess.stage, access.stage, 0, std::vector<VkMemoryBarrier>{}, bufferMemoryBarriers, imageMemoryBarriers))->preprocess(state, flags);
+        previousAccess = access;
       }
-      previousAccess = access;
     }
     (*it)->preprocess(state, flags);
   }

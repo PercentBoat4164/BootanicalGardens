@@ -18,37 +18,19 @@
 
 GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {}
 
-std::vector<std::pair<RenderGraph::AttachmentID, RenderGraph::AttachmentDeclaration>> GBufferRenderPass::declareAttachments() {
-  return {
-      {RenderGraph::GBufferPosition,
-          RenderGraph::AttachmentDeclaration{
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE
-          }
-      },  {RenderGraph::GBufferAlbedo,
-          RenderGraph::AttachmentDeclaration{
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE
-          }
-      }, {RenderGraph::GBufferDepth,
-          RenderGraph::AttachmentDeclaration{
-            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-            .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE
-          }
-      },
-  };
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::declareAccesses() {
+  std::vector<std::shared_ptr<Material>> materials;
+  materials.reserve(graph.device->meshes.size());
+  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) materials.push_back(mesh->getMaterial());
+  setup(materials);
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
+  results.reserve(colorAttachments.size() + resolveAttachments.size() + inputAttachments.size() + boundImages.size() + depthStencilAttachments.size());
+  results.append_range(colorAttachments);
+  results.append_range(resolveAttachments);
+  results.append_range(inputAttachments);
+  results.append_range(boundImages);
+  results.append_range(depthStencilAttachments);
+  return results;
 }
 
 void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
@@ -134,6 +116,19 @@ void GBufferRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, 
       .pTexelBufferView = nullptr
   });
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+}
+
+std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::getImageId(RenderGraph::GBufferDepth), {
+    .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+  }}};
 }
 
 void GBufferRenderPass::update() {

@@ -1,6 +1,9 @@
 #include "RenderPass.hpp"
 
 #include "src/RenderEngine/GraphicsDevice.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/Renderable/Mesh.hpp"
 
 #include <volk/volk.h>
 
@@ -71,7 +74,7 @@ void RenderPass::setRenderPassInfo(const VkRenderPassCreateInfo& createInfo, con
     }
     // Handle the depth/stencil attachment
     if (subpass.pDepthStencilAttachment != nullptr) {
-      if (const uint32_t attachmentIndex = subpass.pDepthStencilAttachment->attachment; attachmentIndex == VK_ATTACHMENT_UNUSED) depthImage = images.at(attachmentIndex);
+      if (const uint32_t attachmentIndex = subpass.pDepthStencilAttachment->attachment; attachmentIndex != VK_ATTACHMENT_UNUSED) depthImage = images.at(attachmentIndex);
     } else depthImage = nullptr;
   }
 }
@@ -82,6 +85,42 @@ RenderPass::~RenderPass() {
   if (renderPass != VK_NULL_HANDLE) {
     vkDestroyRenderPass(graph.device->device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
+  }
+}
+
+void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
+  // Prepare data for this render pass
+  for (const std::shared_ptr<Material>& material: materials) {
+    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& colorAttachmentAccesses = material->computeColorAttachmentAccesses();
+    for (auto& [id, access]: colorAttachmentAccesses) {
+      auto it = std::ranges::find(colorAttachments, id, &decltype(colorAttachments)::value_type::first);
+      if (it == colorAttachments.end()) colorAttachments.emplace_back(id, access);
+      /**@todo: If the order of rendering is known (e.g. if the meshes are sorted), then this error can go away and we can just use the first and last layouts that the image is in.*/
+      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
+    }
+    /**@todo: Add automatic support for resolve attachments.*/
+    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
+    for (auto& [id, access]: inputAttachmentAccesses) {
+      auto it = std::ranges::find(inputAttachments, id, &decltype(inputAttachments)::value_type::first);
+      if (it == inputAttachments.end()) inputAttachments.emplace_back(id, access);
+      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
+    }
+    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& boundImageAccesses = material->computeBoundImageAccesses();
+    for (auto& [id, access]: boundImageAccesses) {
+      auto it = std::ranges::find(boundImages, id, &decltype(boundImages)::value_type::first);
+      if (it == boundImages.end()) boundImages.emplace_back(id, access);
+      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
+    }
+  }
+  colorAttachments.shrink_to_fit();
+  resolveAttachments.shrink_to_fit();
+  inputAttachments.shrink_to_fit();
+  boundImages.shrink_to_fit();
+  if (const std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {
+    auto [id, access] = optionalDepthStencilAttachmentAccess.value();
+    auto it = std::ranges::find(depthStencilAttachments, id, &decltype(depthStencilAttachments)::value_type::first);
+    if (it == depthStencilAttachments.end()) depthStencilAttachments.emplace_back(id, access);
+    else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
   }
 }
 

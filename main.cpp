@@ -23,20 +23,19 @@ int main() {
 
     // Build the RenderGraph
     RenderGraph renderGraph{&graphicsDevice};
-    renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution());
-    renderGraph.setAttachment(RenderGraph::GBufferAlbedo, "GBufferAlbdeo", RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setAttachment(RenderGraph::GBufferPosition, "GBufferPosition", RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SNORM, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setAttachment(RenderGraph::GBufferDepth, "GBufferDepth", RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setResolutionGroup(RenderGraph::getResolutionGroupId("Shadow"), VkExtent3D{1024, 1024, 1});
-    renderGraph.setAttachment(RenderGraph::getAttachmentId("ShadowDepth"), "ShadowDepth", RenderGraph::getResolutionGroupId("Shadow"), VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution(), VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setImage(RenderGraph::RenderColor, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, false);
+    renderGraph.setImage(RenderGraph::GBufferAlbedo, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, true);
+    renderGraph.setImage(RenderGraph::GBufferPosition, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SFLOAT, true);
+    renderGraph.setImage(RenderGraph::GBufferDepth, RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, true);
+    renderGraph.setResolutionGroup(RenderGraph::ShadowResolution, VkExtent3D{1024, 1024, 1}, VK_SAMPLE_COUNT_1_BIT);
+    renderGraph.setImage(RenderGraph::ShadowDepth, RenderGraph::ShadowResolution, VK_FORMAT_D32_SFLOAT, true);
     renderGraph.insert<GBufferRenderPass>();
     renderGraph.insert<ShadowRenderPass>();
     renderGraph.insert<CollectShadowsRenderPass>();
 
-    // graphicsDevice->loadMeshes(std::filesystem::canonical("../res/FlightHelmet.glb"));
-
-    auto fragmentShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.frag"));
-    auto vertexShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.vert"));
+    const auto fragmentShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.frag"));
+    const auto vertexShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.vert"));
 
     const auto renderable = std::make_shared<Renderable>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
     const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
@@ -46,9 +45,7 @@ int main() {
     }
     graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
 
-    CommandBuffer commandBuffer;
-    renderGraph.bake(commandBuffer);
-    graphicsDevice.executeCommandBufferImmediate(commandBuffer);
+    renderGraph.bake();
 
     do {
       // Make sure that the CPU is not getting too far ahead of the GPU
