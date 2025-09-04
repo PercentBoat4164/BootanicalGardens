@@ -98,7 +98,7 @@ void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
   }
   colorAttachmentOffset = imageAccesses.size();
   for (const std::shared_ptr<Material>& material: materials) {
-    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& colorAttachmentAccesses = material->computeColorAttachmentAccesses();
+    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& colorAttachmentAccesses = material->computeColorAttachmentAccesses();
     for (auto& [id, access]: colorAttachmentAccesses) {
       auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
       if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
@@ -111,7 +111,7 @@ void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
   inputAttachmentOffset = imageAccesses.size();
   for (const std::shared_ptr<Material>& material: materials) {
     /**@todo: Add automatic support for resolve attachments.*/
-    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
+    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
     for (auto& [id, access]: inputAttachmentAccesses) {
       auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
       if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
@@ -122,7 +122,7 @@ void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
   else inputAttachmentCount = imageAccesses.size() - inputAttachmentOffset;
   boundImageOffset = imageAccesses.size();
   for (const std::shared_ptr<Material>& material: materials) {
-    const std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess>& boundImageAccesses = material->computeBoundImageAccesses();
+    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& boundImageAccesses = material->computeBoundImageAccesses();
     for (auto& [id, access]: boundImageAccesses) {
       auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
       if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);

@@ -127,8 +127,9 @@ void GBufferRenderPass::update() {
 }
 
 void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
+  constexpr VkClearValue black{.color={0, 0, 0, 0}};
   constexpr VkClearValue far{.depthStencil = {.depth = 1.0F, .stencil = 0}};
-  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{far});
+  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{far, black, black, black});
   for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
     if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
       continue;

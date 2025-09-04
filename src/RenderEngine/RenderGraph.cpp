@@ -141,9 +141,9 @@ bool RenderGraph::bake() {
       {getImageId(RenderColor), VK_IMAGE_USAGE_TRANSFER_SRC_BIT}
     };
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-      std::vector<std::pair<ImageID, ImageAccess>> pairs = renderPass->declareAccesses();
+      std::vector<std::pair<ImageID, ImageAccess>> accesses = renderPass->declareAccesses();
       std::vector<ImageID> ids;
-      for (auto& [id, access] : pairs) {
+      for (auto& [id, access] : accesses) {
         usages[id] |= access.usage;
         if (!images.contains(id))
           continue;
