@@ -23,44 +23,30 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRe
   materials.reserve(graph.device->meshes.size());
   for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) materials.push_back(mesh->getMaterial());
   setup(materials);
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
-  results.reserve(colorAttachments.size() + resolveAttachments.size() + inputAttachments.size() + boundImages.size() + depthStencilAttachments.size());
-  results.append_range(colorAttachments);
-  results.append_range(resolveAttachments);
-  results.append_range(inputAttachments);
-  results.append_range(boundImages);
-  results.append_range(depthStencilAttachments);
-  return results;
+  return imageAccesses;
 }
 
 void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
-  const std::array attachmentReferences{
-      VkAttachmentReference{
-          .attachment = 0,
-          .layout     = attachmentDescriptions[0].initialLayout
-      },
-      VkAttachmentReference{
-          .attachment = 1,
-          .layout     = attachmentDescriptions[1].initialLayout
-      },
-      VkAttachmentReference{
-          .attachment = 2,
-          .layout     = attachmentDescriptions[2].initialLayout
-      }
-  };
-  const std::array subpassDescriptions{
-      VkSubpassDescription{
-          .flags                   = 0,
-          .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-          .inputAttachmentCount    = 0,
-          .pInputAttachments       = nullptr,
-          .colorAttachmentCount    = 2,
-          .pColorAttachments       = &attachmentReferences[0],
-          .pResolveAttachments     = nullptr,
-          .pDepthStencilAttachment = &attachmentReferences[2],
-          .preserveAttachmentCount = 0,
-          .pPreserveAttachments    = nullptr
-      }
+  std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
+  uint32_t i{~0U};
+  for (VkAttachmentReference& attachmentReference: attachmentReferences) {
+    attachmentReference.attachment = ++i;
+    attachmentReference.layout     = attachmentDescriptions[i].initialLayout;
+  }
+
+  const std::array subpassDescriptions{  /**@todo: Once multiple subpasses can be properly handled, this can be fully automated by a function defined in the RenderPass class.*/
+    VkSubpassDescription{
+      .flags                   = 0,
+      .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .inputAttachmentCount    = inputAttachmentCount,
+      .pInputAttachments       = inputAttachmentOffset == ~0U ? nullptr : &attachmentReferences[inputAttachmentOffset],
+      .colorAttachmentCount    = colorAttachmentCount,
+      .pColorAttachments       = colorAttachmentOffset == ~0U ? nullptr : &attachmentReferences[colorAttachmentOffset],
+      .pResolveAttachments     = nullptr,
+      .pDepthStencilAttachment = depthStencilAttachmentOffset == ~0U ? nullptr : &attachmentReferences[depthStencilAttachmentOffset],
+      .preserveAttachmentCount = 0,
+      .pPreserveAttachments    = nullptr
+    }
   };
   const VkRenderPassCreateInfo renderPassCreateInfo{
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -141,9 +127,8 @@ void GBufferRenderPass::update() {
 }
 
 void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
-  constexpr VkClearValue black{.color={0.0F, 0.0F, 0.0F, 1.0F}};
   constexpr VkClearValue far{.depthStencil = {.depth = 1.0F, .stencil = 0}};
-  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{black, black, far});
+  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{far});
   for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
     if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
       continue;

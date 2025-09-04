@@ -43,11 +43,15 @@ public:
   };
   std::vector<SubpassData> subpassData;
 
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> colorAttachments;
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> resolveAttachments;
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> inputAttachments;
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> boundImages;
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> depthStencilAttachments;
+  uint32_t depthStencilAttachmentOffset{~0U};
+  uint32_t colorAttachmentCount{0};
+  uint32_t colorAttachmentOffset{~0U};
+  uint32_t resolveAttachmentOffset{~0U};
+  uint32_t inputAttachmentCount{0};
+  uint32_t inputAttachmentOffset{~0U};
+  uint32_t boundImageCount{0};
+  uint32_t boundImageOffset{~0U};
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> imageAccesses;
 
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
   ~RenderPass() override;

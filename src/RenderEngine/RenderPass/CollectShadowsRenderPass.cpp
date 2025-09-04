@@ -22,34 +22,29 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::declareAccesses() {
   std::array materials{material};
   setup(materials);
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
-  results.reserve(colorAttachments.size() + resolveAttachments.size() + inputAttachments.size() + boundImages.size() + depthStencilAttachments.size());
-  results.append_range(colorAttachments);
-  results.append_range(resolveAttachments);
-  results.append_range(inputAttachments);
-  results.append_range(boundImages);
-  results.append_range(depthStencilAttachments);
-  return results;
+  return imageAccesses;
 }
 
 void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
-  const std::array attachmentReferences{
-    VkAttachmentReference{
-      .attachment = 0,
-      .layout     = attachmentDescriptions[0].initialLayout,
-    }
-  };
+  std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
+  uint32_t i{~0U};
+  for (VkAttachmentReference& attachmentReference: attachmentReferences) {
+    attachmentReference.attachment = ++i;
+    attachmentReference.layout     = attachmentDescriptions[i].initialLayout;
+  }
 
-  const std::array subpassDescriptions{
+  const std::array subpassDescriptions{  /**@todo: Once multiple subpasses can be properly handled, this can be fully automated by a function defined in the RenderPass class.*/
     VkSubpassDescription{
       .flags                   = 0,
       .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-      .inputAttachmentCount    = 0,
-      .pInputAttachments       = nullptr,
-      .colorAttachmentCount    = 1,
-      .pColorAttachments       = &attachmentReferences[0],
+      .inputAttachmentCount    = inputAttachmentCount,
+      .pInputAttachments       = inputAttachmentOffset == ~0U ? nullptr : &attachmentReferences[inputAttachmentOffset],
+      .colorAttachmentCount    = colorAttachmentCount,
+      .pColorAttachments       = colorAttachmentOffset == ~0U ? nullptr : &attachmentReferences[colorAttachmentOffset],
       .pResolveAttachments     = nullptr,
-      .pDepthStencilAttachment = nullptr
+      .pDepthStencilAttachment = depthStencilAttachmentOffset == ~0U ? nullptr : &attachmentReferences[depthStencilAttachmentOffset],
+      .preserveAttachmentCount = 0,
+      .pPreserveAttachments    = nullptr
     }
   };
 
