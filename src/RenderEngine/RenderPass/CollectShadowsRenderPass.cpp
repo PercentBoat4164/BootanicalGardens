@@ -89,7 +89,7 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstBinding = 0,
       .dstArrayElement = 0,
       .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
       .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferAlbedo)).image->getImageView(),
@@ -107,7 +107,7 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstBinding = 1,
       .dstArrayElement = 0,
       .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
       .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferPosition)).image->getImageView(),
@@ -125,7 +125,7 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstBinding = 2,
       .dstArrayElement = 0,
       .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
       .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferNormal)).image->getImageView(),

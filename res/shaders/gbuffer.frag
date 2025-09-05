@@ -20,6 +20,5 @@ void main() {
     vec3 T = normalize(inTangent);
     vec3 B = cross(N, T);
     mat3 TBN = mat3(T, B, N);
-    vec3 tnorm = TBN * normalize(texture(normal, inTextureCoordinates).xyz);
-    gBufferNormal = tnorm;
+    gBufferNormal = TBN * normalize(texture(normal, inTextureCoordinates).xyz);
 }

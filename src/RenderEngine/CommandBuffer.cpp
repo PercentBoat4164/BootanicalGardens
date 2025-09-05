@@ -548,8 +548,6 @@ CommandBuffer::State CommandBuffer::preprocess(State state, const PreprocessingF
             .image               = image.getImage(),
             .subresourceRange    = image.getWholeRange()
           });
-          // resourceState.layout = layout;
-          // resourceState.access = access.mask;
         }
         if (access.resource->type == Resource::Buffer) {
           Buffer& buffer = *dynamic_cast<Buffer*>(access.resource);
@@ -564,7 +562,10 @@ CommandBuffer::State CommandBuffer::preprocess(State state, const PreprocessingF
             .offset = 0,
             .size = VK_WHOLE_SIZE});
         }
-        if (apply && !imageMemoryBarriers.empty() || !bufferMemoryBarriers.empty()) (*record<PipelineBarrier>(it, previousAccess.stage, access.stage, 0, std::vector<VkMemoryBarrier>{}, bufferMemoryBarriers, imageMemoryBarriers))->preprocess(state, flags);
+        if (apply && !imageMemoryBarriers.empty() || !bufferMemoryBarriers.empty()) {
+          ++i;
+          (*record<PipelineBarrier>(it, previousAccess.stage, access.stage, 0, std::vector<VkMemoryBarrier>{}, bufferMemoryBarriers, imageMemoryBarriers))->preprocess(state, flags);
+        }
         previousAccess = access;
       }
     }

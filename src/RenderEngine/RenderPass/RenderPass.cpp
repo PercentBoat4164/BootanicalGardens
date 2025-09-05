@@ -131,6 +131,7 @@ void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
   }
   if (boundImageOffset == imageAccesses.size()) boundImageOffset = ~0U;
   else boundImageCount = imageAccesses.size() - boundImageOffset;
+  imageAccesses.shrink_to_fit();
 }
 
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }

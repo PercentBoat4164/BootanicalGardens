@@ -3,9 +3,9 @@
 
 layout (location = 0) in vec2 screenSpaceCoordinates;
 
-layout (set=PER_PASS_SET, binding=0) uniform sampler2D gBufferAlbedo;  /**@todo: Convert me to an input attachment.*/
-layout (set=PER_PASS_SET, binding=1) uniform sampler2D gBufferPosition;  /**@todo: Convert me to an input attachment.*/
-layout (set=PER_PASS_SET, binding=2) uniform sampler2D gBufferNormal;  /**@todo: Convert me to an input attachment.*/
+layout (input_attachment_index=0, set=PER_PASS_SET, binding=0) uniform subpassInput gBufferAlbedo;
+layout (input_attachment_index=1, set=PER_PASS_SET, binding=1) uniform subpassInput gBufferPosition;
+layout (input_attachment_index=2, set=PER_PASS_SET, binding=2) uniform subpassInput gBufferNormal;
 
 layout (set=PER_MATERIAL_SET, binding=0) uniform LightData {
     mat4 light_ViewProjectionMatrix;
@@ -20,9 +20,9 @@ const vec3 lightColor = vec3(1);  // The color of the light.
 const float ambientLight = 0.05;  // The base light factor to add unconditionally. This is not effected by lightColor, and *can* make the output of the shader go above 1.0.
 
 void main() {
-    renderColor = texture(gBufferAlbedo, screenSpaceCoordinates);
-    vec4 position = vec4(texture(gBufferPosition, screenSpaceCoordinates).xyz, 1);
-    vec3 normal = texture(gBufferNormal, screenSpaceCoordinates).xyz;
+    renderColor = subpassLoad(gBufferAlbedo);
+    vec4 position = vec4(subpassLoad(gBufferPosition).xyz, 1);
+    vec3 normal = subpassLoad(gBufferNormal).xyz;
 
     /*************************************************************************
      * Extract the depth value for the corresponding pixel in the shadow map *

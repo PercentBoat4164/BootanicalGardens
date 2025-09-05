@@ -143,6 +143,32 @@ const std::unordered_map<uint32_t, Material::Binding>* Material::getBindings(con
   return nullptr;
 }
 
+VkPipelineStageFlags getPipelineStages(const VkShaderStageFlags shaderStages) {
+  VkPipelineStageFlags pipelineStages = 0;
+  if (shaderStages & VK_SHADER_STAGE_VERTEX_BIT) pipelineStages |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+  if (shaderStages & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) pipelineStages |= VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT;
+  if (shaderStages & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) pipelineStages |= VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
+  if (shaderStages & VK_SHADER_STAGE_GEOMETRY_BIT) pipelineStages |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
+  if (shaderStages & VK_SHADER_STAGE_FRAGMENT_BIT) pipelineStages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  if (shaderStages & VK_SHADER_STAGE_COMPUTE_BIT) pipelineStages |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  if (shaderStages & VK_SHADER_STAGE_ALL_GRAPHICS) pipelineStages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+  if (shaderStages & VK_SHADER_STAGE_ALL) pipelineStages |= VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+#if VK_KHR_ray_query | VK_KHR_ray_tracing_pipeline
+  if (shaderStages & VK_SHADER_STAGE_RAYGEN_BIT_KHR ||
+      shaderStages & VK_SHADER_STAGE_ANY_HIT_BIT_KHR ||
+      shaderStages & VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR ||
+      shaderStages & VK_SHADER_STAGE_MISS_BIT_KHR ||
+      shaderStages & VK_SHADER_STAGE_INTERSECTION_BIT_KHR ||
+      shaderStages & VK_SHADER_STAGE_CALLABLE_BIT_KHR)
+    pipelineStages |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+#endif
+#if VK_EXT_mesh_shader
+  if (shaderStages & VK_SHADER_STAGE_TASK_BIT_EXT) pipelineStages |= VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT;
+  if (shaderStages & VK_SHADER_STAGE_MESH_BIT_EXT) pipelineStages |= VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT;
+#endif
+  return pipelineStages;
+}
+
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeColorAttachmentAccesses() const {
   const spv_reflect::ShaderModule* reflectedData = fragmentShader->getReflectedData();
   uint32_t count;
@@ -198,7 +224,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
               .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               .usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
               .access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT,
-              .stage = static_cast<VkPipelineStageFlags>(shader.getStage()),
+              .stage = getPipelineStages(shader.getStage()),
               .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
               .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
               .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
@@ -237,37 +263,15 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
           case RenderGraph::getImageId("normal"): id = RenderGraph::getImageId(getNormalTextureName()); break;
           default: break;
         }
-        RenderGraph::ImageAccess& access = results.emplace_back(
+        results.emplace_back(
           id,
           RenderGraph::ImageAccess {
             .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .usage = VK_IMAGE_USAGE_SAMPLED_BIT,
-            .access = VK_ACCESS_SHADER_READ_BIT
+            .access = VK_ACCESS_SHADER_READ_BIT,
+            .stage = getPipelineStages(shader.getStage())
           }
-        ).second;
-        switch (shader.getStage()) {
-          case VK_SHADER_STAGE_VERTEX_BIT:                  access.stage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT; break;
-          case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:    access.stage = VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT; break;
-          case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT: access.stage = VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT; break;
-          case VK_SHADER_STAGE_GEOMETRY_BIT:                access.stage = VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT; break;
-          case VK_SHADER_STAGE_FRAGMENT_BIT:                access.stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT; break;
-          case VK_SHADER_STAGE_COMPUTE_BIT:                 access.stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; break;
-          case VK_SHADER_STAGE_ALL_GRAPHICS:                access.stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT; break;
-          case VK_SHADER_STAGE_ALL:                         access.stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; break;
-#if VK_KHR_ray_query | VK_KHR_ray_tracing_pipeline
-          case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
-          case VK_SHADER_STAGE_ANY_HIT_BIT_KHR:
-          case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
-          case VK_SHADER_STAGE_MISS_BIT_KHR:
-          case VK_SHADER_STAGE_INTERSECTION_BIT_KHR:
-          case VK_SHADER_STAGE_CALLABLE_BIT_KHR:     access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
-#endif
-#if VK_EXT_mesh_shader
-          case VK_SHADER_STAGE_TASK_BIT_EXT: access.stage = VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT; break;
-          case VK_SHADER_STAGE_MESH_BIT_EXT: access.stage = VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT; break;
-#endif
-          default: access.stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; break;
-        }
+        );
       }
     }
   }
