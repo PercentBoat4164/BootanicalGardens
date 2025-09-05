@@ -22,7 +22,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRe
   std::vector<std::shared_ptr<Material>> materials;
   materials.reserve(graph.device->meshes.size());
   for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) materials.push_back(mesh->getMaterial());
-  setup(materials);
+  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 

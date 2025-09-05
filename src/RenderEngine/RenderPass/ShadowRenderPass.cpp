@@ -20,7 +20,7 @@ ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, Opaqu
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::declareAccesses() {
   std::array materials{material};
-  setup(materials);
+  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 

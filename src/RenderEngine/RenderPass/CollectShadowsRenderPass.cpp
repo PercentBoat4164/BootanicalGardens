@@ -21,7 +21,7 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::declareAccesses() {
   std::array materials{material};
-  setup(materials);
+  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 
