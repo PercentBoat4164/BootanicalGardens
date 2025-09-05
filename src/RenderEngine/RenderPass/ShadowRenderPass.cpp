@@ -114,7 +114,7 @@ std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowR
 
 void ShadowRenderPass::update() {
   const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, -15.f, 15.f);
-  const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(1, 10, 1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
+  const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(-1, 10, -1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
   const PassData passData {
     .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,
   };

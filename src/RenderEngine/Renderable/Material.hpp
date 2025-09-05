@@ -76,6 +76,7 @@ public:
   [[nodiscard]] std::string getAlbedoTextureName() const;
   [[nodiscard]] glm::vec4 getAlbedoFactor() const;
   [[nodiscard]] std::shared_ptr<Texture> getNormalTexture() const;
+  [[nodiscard]] std::string getNormalTextureName() const;
   [[nodiscard]] float getNormalFactor() const;
   [[nodiscard]] std::shared_ptr<Texture> getOcclusionTexture() const;
   [[nodiscard]] float getOcclusionFactor() const;
@@ -93,9 +94,9 @@ public:
   [[nodiscard]] std::shared_ptr<const Shader> getFragmentShader() const;
   [[nodiscard]] const std::unordered_map<uint32_t, Binding>* getBindings(uint8_t set) const;
 
-  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeColorAttachmentAccesses() const;
-  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeInputAttachmentAccesses() const;
-  [[nodiscard]] std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> computeBoundImageAccesses() const;
+  [[nodiscard]] std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> computeColorAttachmentAccesses() const;
+  [[nodiscard]] std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> computeInputAttachmentAccesses() const;
+  [[nodiscard]] std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> computeBoundImageAccesses() const;
 
   void computeDescriptorSetRequirements(std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>>& requirements, const std::shared_ptr<RenderPass>& renderPass, const std::shared_ptr<Pipeline>& pipeline);
 };

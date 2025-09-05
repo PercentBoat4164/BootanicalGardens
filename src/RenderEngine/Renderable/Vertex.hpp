@@ -56,11 +56,13 @@ namespace detail {
 class Vertex {
 public:
   glm::vec3 position;
-  glm::vec2 textureCoordinates0;
+  glm::vec2 textureCoordinates;
+  glm::vec3 normal;
+  glm::vec4 tangent;
 
-  template<typename T> static constexpr VkFormat formatOf() { return detail::formatOf<T>(); }
+  template<typename T> static consteval VkFormat formatOf() { return detail::formatOf<T>(); }
 
-  static constexpr VkVertexInputBindingDescription getBindingDescription() {
+  static consteval VkVertexInputBindingDescription getBindingDescription() {
     return {
       .binding = 0,
       .stride = sizeof(Vertex),
@@ -76,10 +78,20 @@ public:
           .format   = formatOf<decltype(position)>(),
           .offset   = offsetof(Vertex, position)
         }, {
+          .location = 1,
+          .binding  = 0,
+          .format   = formatOf<decltype(textureCoordinates)>(),
+          .offset   = offsetof(Vertex, textureCoordinates)
+        }, {
+          .location = 2,
+          .binding  = 0,
+          .format   = formatOf<decltype(normal)>(),
+          .offset   = offsetof(Vertex, normal)
+        }, {
           .location = 3,
           .binding  = 0,
-          .format   = formatOf<decltype(textureCoordinates0)>(),
-          .offset   = offsetof(Vertex, textureCoordinates0)
+          .format   = formatOf<decltype(tangent)>(),
+          .offset   = offsetof(Vertex, tangent)
         }
     };
   }

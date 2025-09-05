@@ -152,6 +152,7 @@ public:
   static constexpr std::string_view RenderResolution    = "Render";
   static constexpr std::string_view GBufferAlbedo       = "gBufferAlbedo";
   static constexpr std::string_view GBufferPosition     = "gBufferPosition";
+  static constexpr std::string_view GBufferNormal       = "gBufferNormal";
   static constexpr std::string_view GBufferDepth        = "gBufferDepth";
   static constexpr std::string_view RenderColor         = "renderColor";
   static constexpr std::string_view ShadowResolution    = "Shadow";

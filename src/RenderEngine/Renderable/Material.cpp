@@ -105,7 +105,7 @@ Material::Material(GraphicsDevice* const device, CommandBuffer& commandBuffer, c
    *    I refrained from doing these things because I do not know what the multi-threading of this game is going to look like yet, and I am not ready to make that decision (especially without Ethan).
    */
   loadTexture<decltype(material.pbrData.baseColorTexture)::value_type>(device, commandBuffer, asset, &albedoTexture, &material.pbrData.baseColorTexture);
-  // loadTexture<decltype(material.normalTexture)::value_type>(device, commandBuffer, asset, &normalTexture, &material.normalTexture);
+  loadTexture<decltype(material.normalTexture)::value_type>(device, commandBuffer, asset, &normalTexture, &material.normalTexture);
   // loadTexture<decltype(material.occlusionTexture)::value_type>(device, commandBuffer, asset, &occlusionTexture, &material.occlusionTexture);
   // loadTexture<decltype(material.emissiveTexture)::value_type>(device, commandBuffer, asset, &emissiveTexture, &material.emissiveTexture);
   // if (material.anisotropy) loadTexture<decltype(material.anisotropy->anisotropyTexture)::value_type>(device, commandBuffer, asset, &anisotropyTexture, &material.anisotropy->anisotropyTexture);
@@ -122,6 +122,7 @@ std::shared_ptr<Texture> Material::getAlbedoTexture() const { return albedoTextu
 std::string Material::getAlbedoTextureName() const { if (albedoTexture) return name + " | Albedo Texture"; return std::string(RenderGraph::VoidImage); }
 glm::vec4 Material::getAlbedoFactor() const { return albedoFactor; }
 std::shared_ptr<Texture> Material::getNormalTexture() const { return normalTexture; }
+std::string Material::getNormalTextureName() const { if (albedoTexture) return name + " | Normal Texture"; return std::string(RenderGraph::VoidImage); }
 float Material::getNormalFactor() const { return normalFactor; }
 std::shared_ptr<Texture> Material::getOcclusionTexture() const { return occlusionTexture; }
 float Material::getOcclusionFactor() const { return occlusionFactor; }
@@ -142,36 +143,40 @@ const std::unordered_map<uint32_t, Material::Binding>* Material::getBindings(con
   return nullptr;
 }
 
-std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::computeColorAttachmentAccesses() const {
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeColorAttachmentAccesses() const {
   const spv_reflect::ShaderModule* reflectedData = fragmentShader->getReflectedData();
   uint32_t count;
   reflectedData->EnumerateOutputVariables(&count, nullptr);
   std::vector<SpvReflectInterfaceVariable*> vars(count);
   reflectedData->EnumerateOutputVariables(&count, vars.data());
-  std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> results;
-  results.reserve(count);
+  std::map<uint32_t, std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> framebufferAttachments;
   for (const SpvReflectInterfaceVariable* output: vars) {
-    results.emplace(
-      RenderGraph::getImageId(output->name),
-      RenderGraph::ImageAccess{
-        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
+    framebufferAttachments.emplace(
+      output->location,
+      std::pair {
+        RenderGraph::getImageId(output->name),
+        RenderGraph::ImageAccess{
+          .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+          .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+          .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+          .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+          .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+          .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+          .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+          .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
+        }
       }
     );
   }
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
+  results.insert_range(results.begin(), framebufferAttachments | std::ranges::views::values);
   return results;
 }
 
-std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::computeInputAttachmentAccesses() const {
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeInputAttachmentAccesses() const {
   const std::vector shaders = {vertexShader, fragmentShader};
 
-  std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> results;
+  std::map<uint32_t, std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> inputAttachments;
   for (uint32_t i{}; i < shaders.size(); ++i) {
     std::vector<SpvReflectDescriptorSet*> sets;
     std::vector<SpvReflectInterfaceVariable*> vars;
@@ -185,30 +190,34 @@ std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::com
       for (uint32_t j{}; j < set->binding_count; ++j) {
         const auto* binding = set->bindings[j];
         if (binding->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) continue;
-        results.emplace(
-          RenderGraph::getImageId(binding->name),
-          RenderGraph::ImageAccess {
-            .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
-            .access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT,
-            .stage = static_cast<VkPipelineStageFlags>(shader.getStage()),
-            .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
+        inputAttachments.emplace(
+          binding->binding,
+          std::pair {
+            RenderGraph::getImageId(binding->name),
+            RenderGraph::ImageAccess {
+              .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              .usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+              .access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT,
+              .stage = static_cast<VkPipelineStageFlags>(shader.getStage()),
+              .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+              .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+              .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+              .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
+            }
           }
         );
       }
     }
   }
-
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
+  results.insert_range(results.begin(), inputAttachments | std::ranges::views::values);
   return results;
 }
 
-std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::computeBoundImageAccesses() const {
+std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeBoundImageAccesses() const {
   const std::vector shaders = {vertexShader, fragmentShader};
 
-  std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> results;
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
   for (uint32_t i{}; i < shaders.size(); ++i) {
     std::vector<SpvReflectDescriptorSet*> sets;
     std::vector<SpvReflectInterfaceVariable*> vars;
@@ -225,16 +234,17 @@ std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::com
         RenderGraph::ImageID id = RenderGraph::getImageId(binding->name);
         switch (id) {
           case RenderGraph::getImageId("albedo"): id = RenderGraph::getImageId(getAlbedoTextureName()); break;
+          case RenderGraph::getImageId("normal"): id = RenderGraph::getImageId(getNormalTextureName()); break;
           default: break;
         }
-        RenderGraph::ImageAccess& access = results.emplace(
+        RenderGraph::ImageAccess& access = results.emplace_back(
           id,
           RenderGraph::ImageAccess {
             .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .usage = VK_IMAGE_USAGE_SAMPLED_BIT,
             .access = VK_ACCESS_SHADER_READ_BIT
           }
-        ).first->second;
+        ).second;
         switch (shader.getStage()) {
           case VK_SHADER_STAGE_VERTEX_BIT:                  access.stage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT; break;
           case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:    access.stage = VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT; break;
@@ -245,11 +255,11 @@ std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::com
           case VK_SHADER_STAGE_ALL_GRAPHICS:                access.stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT; break;
           case VK_SHADER_STAGE_ALL:                         access.stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; break;
 #if VK_KHR_ray_query | VK_KHR_ray_tracing_pipeline
-          case VK_SHADER_STAGE_RAYGEN_BIT_KHR:       access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
-          case VK_SHADER_STAGE_ANY_HIT_BIT_KHR:      access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
-          case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:  access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
-          case VK_SHADER_STAGE_MISS_BIT_KHR:         access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
-          case VK_SHADER_STAGE_INTERSECTION_BIT_KHR: access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
+          case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
+          case VK_SHADER_STAGE_ANY_HIT_BIT_KHR:
+          case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
+          case VK_SHADER_STAGE_MISS_BIT_KHR:
+          case VK_SHADER_STAGE_INTERSECTION_BIT_KHR:
           case VK_SHADER_STAGE_CALLABLE_BIT_KHR:     access.stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR; break;
 #endif
 #if VK_EXT_mesh_shader
@@ -261,7 +271,6 @@ std::unordered_map<RenderGraph::ImageID, RenderGraph::ImageAccess> Material::com
       }
     }
   }
-
   return results;
 }
 

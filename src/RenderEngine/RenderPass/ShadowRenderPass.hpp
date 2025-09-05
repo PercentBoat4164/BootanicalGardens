@@ -5,7 +5,9 @@ class Material;
 template<typename> class UniformBuffer;
 
 class ShadowRenderPass : public RenderPass {
-  struct PassData { glm::mat4 light_ViewProjectionMatrix; };
+  struct PassData {
+    glm::mat4 light_ViewProjectionMatrix;
+  };
   std::shared_ptr<UniformBuffer<PassData>> uniformBuffer;
 
   std::shared_ptr<Material> material;

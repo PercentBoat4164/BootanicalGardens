@@ -191,16 +191,26 @@ bool RenderGraph::bake() {
 
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
       for (const std::shared_ptr<Material>& material: renderPass->getPipelines() | std::views::keys) {
-        std::shared_ptr<Texture> albedo = material->getAlbedoTexture();
-        if (albedo == nullptr) continue;
-        std::string name = material->getAlbedoTextureName();
-        images[getImageId(name)] = {
-          .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-          .format = albedo->getFormat(),
-          .inheritSampleCount = false,
-          .image = albedo,
-          .name = name
-        };
+        if (std::shared_ptr<Texture> albedo = material->getAlbedoTexture(); albedo != nullptr) {
+          std::string name = material->getAlbedoTextureName();
+          images[getImageId(name)] = {
+            .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
+            .format = albedo->getFormat(),
+            .inheritSampleCount = false,
+            .image = albedo,
+            .name = name
+          };
+        }
+        if (std::shared_ptr<Texture> normal = material->getNormalTexture(); normal != nullptr) {
+          std::string name = material->getNormalTextureName();
+          images[getImageId(name)] = {
+            .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
+            .format = normal->getFormat(),
+            .inheritSampleCount = false,
+            .image = normal,
+            .name = name
+          };
+        }
       }
     }
   }

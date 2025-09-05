@@ -197,6 +197,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_
 void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
   struct MaterialData {
     glm::mat4 light_ViewProjectionMatrix;
+    glm::vec3 light_Position;
   };
   static auto uniformBuffer = std::make_shared<UniformBuffer<MaterialData>>(device, "Light Data");  /**@todo: Store this with the material. This is the cause of the memory leaks right now.*/
   const std::unordered_map<uint32_t, Material::Binding>* bindings = material->getBindings(2);
@@ -214,6 +215,17 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
         });
         break;
       }
+      case Tools::hash("normal"): {
+        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
+        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
+          data.emplace<std::vector<VkDescriptorImageInfo>>();
+        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
+          .sampler     = material->getNormalTexture()->getSampler(),
+          .imageView   = material->getNormalTexture()->getImageView(),
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
+        break;
+      }
       case RenderGraph::getImageId(RenderGraph::ShadowDepth): {
         std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
         if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
@@ -227,8 +239,11 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
       }
       case Tools::hash("lightData"): {
         const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, -15.f, 15.f);
-        const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(1, 10, 1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
-        const MaterialData materialData {projectionMatrix * viewMatrix};
+        const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(-1, 10, -1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
+        const MaterialData materialData {
+          .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,
+          .light_Position             = glm::vec3(-1, 10, -1)
+        };
         uniformBuffer->update(materialData);
         std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
         if (!std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(data))
