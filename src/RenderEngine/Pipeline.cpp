@@ -283,19 +283,19 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
 
     // Move the data to the miscMemoryPool before adding a pointer to the appropriate element of this write.
     if (std::holds_alternative<std::vector<VkDescriptorImageInfo>>(info)) {
-      std::vector<VkDescriptorImageInfo>& data = std::get<std::vector<VkDescriptorImageInfo>>(info);
+      auto& data = std::get<std::vector<VkDescriptorImageInfo>>(info);
       auto* pInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkDescriptorImageInfo))));
       memcpy(pInfo, data.data(), data.size() * sizeof(VkDescriptorImageInfo));
       write.pImageInfo = pInfo;
     }
     else if (std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(info)) {
-      std::vector<VkDescriptorBufferInfo>& data = std::get<std::vector<VkDescriptorBufferInfo>>(info);
+      auto& data = std::get<std::vector<VkDescriptorBufferInfo>>(info);
       auto* pInfo = static_cast<VkDescriptorBufferInfo*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkDescriptorBufferInfo))));
       memcpy(pInfo, data.data(), data.size() * sizeof(VkDescriptorBufferInfo));
       write.pBufferInfo = pInfo;
     }
     else if (std::holds_alternative<std::vector<VkBufferView>>(info)) {
-      std::vector<VkBufferView>& data = std::get<std::vector<VkBufferView>>(info);
+      auto& data = std::get<std::vector<VkBufferView>>(info);
       auto* pInfo = static_cast<VkBufferView*>(miscMemoryPool.emplace_back(malloc(data.size() * sizeof(VkBufferView))));
       memcpy(pInfo, data.data(), data.size() * sizeof(VkBufferView));
       write.pTexelBufferView = pInfo;
