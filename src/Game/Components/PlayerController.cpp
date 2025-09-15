@@ -9,35 +9,6 @@
 #include <iostream>
 #include <functional>
 
-class Iput {
-public:  // Way 1
-    struct OnKeyDown {
-        virtual void onKeyDown(int key) = 0;
-    };
-    struct OnKeyUp {
-        virtual void onKeyUp(int key) = 0;
-    };
-
-public:  // Way 2
-    static std::vector<std::function<void(int key)>> onKeyDowns;
-
-    static void registerKeyDown(std::function<void(int key)> oKD) {
-        onKeyDowns.push_back(oKD);
-    }
-};
-
-// Inheritance is only required for way 1
-class PCont : public Iput::OnKeyDown, public Iput::OnKeyUp {
-public: // Way 2
-    PCont() {
-        Iput::registerKeyDown([this](auto key){onKeyDown(key);});
-    }
-
-public: // Way 1
-    void onKeyDown(int key) override {};
-    void onKeyUp(int key) override {};
-};
-
 PlayerController::PlayerController(const std::uint64_t id, Entity& entity) : Component(id, entity) {}
 
 void PlayerController::onTick() {

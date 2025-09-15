@@ -18,7 +18,6 @@ class Mesh {
   VkPrimitiveTopology topology{VK_PRIMITIVE_TOPOLOGY_MAX_ENUM};
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-  std::shared_ptr<Material> material{nullptr};
   std::shared_ptr<Buffer> vertexBuffer{nullptr};
   std::shared_ptr<Buffer> indexBuffer{nullptr};
 
@@ -29,7 +28,6 @@ public:
 
   [[nodiscard]] bool isOpaque() const;
   [[nodiscard]] bool isTransparent() const;
-  [[nodiscard]] std::shared_ptr<Material> getMaterial() const;
   [[nodiscard]] std::shared_ptr<Buffer> getVertexBuffer() const;
   [[nodiscard]] std::shared_ptr<Buffer> getIndexBuffer() const;
 };

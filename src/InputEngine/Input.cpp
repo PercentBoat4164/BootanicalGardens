@@ -15,8 +15,8 @@ std::unordered_map<SDL_Keycode, float> Input::keys{};
  */
 void Input::onEvent(SDL_Event event) {
   SDL_Keycode code = event.key.key;
-  if (event.type == SDL_EVENT_KEY_DOWN) keys[code] = 0;
-  else if (event.type == SDL_EVENT_KEY_UP) keys[code] = -0;
+  if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) keys[code] = -0.0f;
+  else if (event.type == SDL_EVENT_KEY_UP) keys[code] = 0.0f;
 }
 
 /**

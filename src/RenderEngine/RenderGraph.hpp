@@ -23,7 +23,7 @@ class GraphicsDevice;
 class Pipeline;
 class RenderPass;
 class Image;
-class Renderable;
+class MeshGroup;
 template <typename T> class UniformBuffer;
 
 class RenderGraph {

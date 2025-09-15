@@ -52,7 +52,7 @@ add_executable(BootanicalGardens
         src/RenderEngine/RenderPass/RenderPass.cpp
         src/RenderEngine/Renderable/Material.cpp
         src/RenderEngine/Renderable/Mesh.cpp
-        src/RenderEngine/Renderable/Renderable.cpp
+        src/RenderEngine/Renderable/MeshGroup.cpp
         src/RenderEngine/Renderable/Texture.cpp
         src/RenderEngine/Renderable/Vertex.cpp
         src/RenderEngine/Resources/Buffer.cpp
@@ -65,15 +65,14 @@ add_executable(BootanicalGardens
 
         src/Tools/ClassName.h
         src/Tools/StringHash.h
+        src/Tools/Json/Json_glm.cpp
 
         src/Filesystem/UpdateListener.cpp
-        src/Filesystem/UpdateListener.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
 target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${SDL_ttf_SOURCE_DIR}/include ${SDL_image_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
 target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared SDL3_image::SDL3_image-shared glm::glm yyjson fastgltf cpptrace::cpptrace efsw)
-target_link_options(BootanicalGardens PRIVATE -Wl,-rpath=$ORIGIN)
 
 # Move all .dlls to the exe
 if (WIN32)

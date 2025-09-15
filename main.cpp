@@ -7,7 +7,7 @@
 #include "src/RenderEngine/RenderPass/OpaqueRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Renderable.hpp"
+#include "src/RenderEngine/Renderable/MeshGroup.hpp"
 #include "src/RenderEngine/Shader.hpp"
 #include "src/RenderEngine/Window.hpp"
 
@@ -29,20 +29,22 @@ int main() {
     renderGraph.insert<OpaqueRenderPass>();
 
     // graphicsDevice->loadMeshes(std::filesystem::canonical("../res/FlightHelmet.glb"));
-
-    const auto renderable = std::make_shared<Renderable>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
+/*
+    const auto helmetMesh = std::make_shared<MeshGroup>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
     const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
     for (const std::shared_ptr<Mesh>& mesh: meshes) {
       mesh->getMaterial()->setFragmentShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.frag")));
       mesh->getMaterial()->setVertexShader(std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/default.vert")));
     }
     graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
-
+*/
     CommandBuffer commandBuffer;
     renderGraph.bake(commandBuffer);
     graphicsDevice.executeCommandBufferImmediate(commandBuffer);
 
     do {
+      std::cout << Input::keyDown(SDLK_I) << " Down\n";
+      std::cout << Input::keyUp(SDLK_I) << " Up\n";
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();
       // Make sure that the GPU is appropriately waiting for the display (V-Sync)

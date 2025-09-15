@@ -10,8 +10,6 @@ struct yyjson_val;
  * Allows the player to control an entity using keyboard input.
  */
 class PlayerController : public Component {
-private:
-
   float movementSpeed{1};
 
 public:

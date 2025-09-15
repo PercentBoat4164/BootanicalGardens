@@ -45,6 +45,12 @@ public:
   explicit Entity(std::uint64_t id, glm::vec3 position = glm::vec3(), glm::dquat rotation = glm::dquat(), glm::vec3 scale = glm::vec3());
 
   /**
+   * Construct an empty Entity with the given position, rotation, and scale.
+   * @param transform a transformation matrix containing position, rotation, and scale
+   */
+  explicit Entity(glm::mat4 transform);
+
+  /**
    * Constructs an empty Entity with the same position, rotation, and scale as the given Entity.
    * @param other the entity this is based on
    */

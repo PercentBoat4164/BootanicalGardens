@@ -1,18 +1,41 @@
 {
   "entities": [
     {
-      "position": [1, 2, 3],
+      "transformation": [
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+      ],
       "components": [
         {
-          "type": "Renderable",
-          "mesh": "playermesh.gltf"
+          "type": "MeshGroup",
+          "transformation": [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+          ],
+          "meshes": [0],
+          "materials": [0],
+          "transformations": [
+            [[0, 0, 0, 0],
+             [0, 0, 0, 0],
+             [0, 0, 0, 0],
+             [0, 0, 0, 0]]
+          ]
         },
         {
           "type": "PlayerController"
         }
       ]
     }, {
-      "position": [5, 0, 0],
+      "transformation": [
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+      ],
       "components": [
         {
           "type": "Plant"

@@ -9,6 +9,37 @@
 
 #include <volk/volk.h>
 
+#include <yyjson.h>
+
+
+class GraphicsData {
+  yyjson_doc* doc;
+  yyjson_val* meshes;
+  yyjson_val* materials;
+  yyjson_val* shaders;
+  yyjson_val* textures;
+
+  GraphicsData() {
+    // Create JSON objects
+    doc = yyjson_read_file("res/graphicsData.json", YYJSON_READ_ALLOW_INF_AND_NAN | YYJSON_READ_ALLOW_COMMENTS, nullptr, nullptr);
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    meshes = yyjson_obj_get(root, "meshes");
+    materials = yyjson_obj_get(root, "materials");
+    shaders = yyjson_obj_get(root, "shaders");
+    textures = yyjson_obj_get(root, "textures");
+  }
+public:
+  static GraphicsData* get() {
+    static GraphicsData data;
+    return &data;
+  }
+
+  yyjson_val* getMesh(const uint64_t id) const { return yyjson_arr_get(meshes, id); }
+  yyjson_val* getMaterial(const uint64_t id) const { return yyjson_arr_get(materials, id); }
+  yyjson_val* getShader(const uint64_t id) const { return yyjson_arr_get(shaders, id); }
+  yyjson_val* getTexture(const uint64_t id) const { return yyjson_arr_get(textures, id); }
+};
+
 void getQueues(VkPhysicalDevice physicalDevice, const std::vector<VkQueueFlags>& required, const std::vector<VkQueueFlags>& requested) {
   uint32_t count{};
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
@@ -185,4 +216,11 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
   samplers.emplace(samplerID, sampler);
   if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create sampler");
   return sampler;
+}
+
+std::shared_ptr<Mesh> GraphicsDevice::createMesh(const uint64_t id, CommandBuffer commandBuffer) {
+  const auto it = meshes.find(id);
+  if (it != meshes.end()) return it->second;
+  std::filesystem::path path =
+  meshes.insert(it, std::make_pair(id, std::make_shared<Mesh>(this, commandBuffer, path)));
 }

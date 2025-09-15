@@ -11,7 +11,7 @@ std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Ent
 };
 
 bool Entity::registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*)) {
-  if (componentConstructors.find(name) != componentConstructors.end()) return false;
+  if (componentConstructors.contains(name)) return false;
   componentConstructors.insert({name, function});
   return true;
 }
@@ -25,7 +25,7 @@ Entity::Entity(std::uint64_t id, const Entity& other)
 Component* Entity::addComponent(yyjson_val* componentData) {
   auto it = componentConstructors.find(yyjson_get_str(yyjson_obj_get(componentData, "type")));
   if (it == componentConstructors.end()) return nullptr;
-  std::shared_ptr<Component> component = (it->second)(++nextComponentId, *this, componentData);
+  std::shared_ptr<Component> component = it->second(++nextComponentId, *this, componentData);
   return components.emplace(component->getId(), std::move(component)).first->second.get();
 }
 

@@ -26,7 +26,7 @@ Entity& LevelParser::loadEntity(yyjson_val* entityData) {
 void LevelParser::loadLevel(const std::filesystem::path& filename) {
   //read the file, throwing an error if it is not valid
   yyjson_read_err error;
-  doc = yyjson_read_file(filename.string().c_str(), YYJSON_READ_ALLOW_INF_AND_NAN, nullptr, &error);
+  doc = yyjson_read_file(filename.string().c_str(), YYJSON_READ_ALLOW_INF_AND_NAN | YYJSON_READ_ALLOW_COMMENTS, nullptr, &error);
   if (doc == nullptr) { /**@todo: Read `error`.*/ }
 
   //add each entity to the entities in Game

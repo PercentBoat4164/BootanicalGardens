@@ -1,29 +1,197 @@
 {
+  "materials": [
+    {
+      "name": "FlightHelmet | GlassPlastic",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "unlit": false,
+      "ior": null,
+      "dispersion": 0,
+      "albedoTexture": 0,
+      "albedoFactor": [1, 1, 1, 1],
+      "normalTexture": 1,
+      "normalFactor": 1,
+      "occlusionTexture": 2,
+      "occlusionFactor": 1,
+      "emissiveTexture": null,
+      "emissiveFactor": null,
+      "anisotropyTexture": null,
+      "anisotropyFactor": null,
+      "anisotropyRotation": null,
+      "metallicRoughnessTexture": 2,
+      "metallicFactor": 1,
+      "roughnessFactor": 1
+    }, {
+      "name": "FlightHelmet | Hose",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "unlit": false,
+      "ior": null,
+      "dispersion": 0,
+      "albedoTexture": 3,
+      "albedoFactor": [1, 1, 1, 1],
+      "normalTexture": 4,
+      "normalFactor": 1,
+      "occlusionTexture": 5,
+      "occlusionFactor": 1,
+      "emissiveTexture": null,
+      "emissiveFactor": null,
+      "anisotropyTexture": null,
+      "anisotropyFactor": null,
+      "anisotropyRotation": null,
+      "metallicRoughnessTexture": 5,
+      "metallicFactor": 1,
+      "roughnessFactor": 1
+    }, {
+      "name": "FlightHelmet | Leather",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "unlit": false,
+      "ior": null,
+      "dispersion": 0,
+      "albedoTexture": 6,
+      "albedoFactor": [1, 1, 1, 1],
+      "normalTexture": 7,
+      "normalFactor": 1,
+      "occlusionTexture": 8,
+      "occlusionFactor": 1,
+      "emissiveTexture": null,
+      "emissiveFactor": null,
+      "anisotropyTexture": null,
+      "anisotropyFactor": null,
+      "anisotropyRotation": null,
+      "metallicRoughnessTexture": 8,
+      "metallicFactor": 1,
+      "roughnessFactor": 1
+    }, {
+      "name": "FlightHelmet | Lenses",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": true,
+      "alphaMode": 2,
+      "alphaCutoff": null,
+      "unlit": false,
+      "ior": 1.52,
+      "dispersion": 0,
+      "albedoTexture": 9,
+      "albedoFactor": [1, 1, 1, 1],
+      "normalTexture": 10,
+      "normalFactor": 1,
+      "occlusionTexture": 11,
+      "occlusionFactor": 1,
+      "emissiveTexture": null,
+      "emissiveFactor": null,
+      "anisotropyTexture": null,
+      "anisotropyFactor": null,
+      "anisotropyRotation": null,
+      "metallicRoughnessTexture": 11,
+      "metallicFactor": 1,
+      "roughnessFactor": 1
+    }, {
+      "name": "FlightHelmet | Metal",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "unlit": false,
+      "ior": null,
+      "dispersion": 0,
+      "albedoTexture": 12,
+      "albedoFactor": [1, 1, 1, 1],
+      "normalTexture": 13,
+      "normalFactor": 1,
+      "occlusionTexture": 14,
+      "occlusionFactor": 1,
+      "emissiveTexture": null,
+      "emissiveFactor": null,
+      "anisotropyTexture": null,
+      "anisotropyFactor": null,
+      "anisotropyRotation": null,
+      "metallicRoughnessTexture": 14,
+      "metallicFactor": 1,
+      "roughnessFactor": 1
+    }
+  ],
+  "meshes": [
+    {
+      "path": "FlightHelmet.obj"
+    }
+  ],
   "shaders": [
     {
-      "source": "res/basic.vert",
-      "code": [23473425],
-      "stage": 536234,
-      "entry points": [
-        {
-          "name": "main"
-        }
-      ]
+      "path": "default.vert"
+    }, {
+      "path": "default.frag"
     }
   ],
-  "pipelines": [
+  "textures": [
     {
-      "bind point": 43025,
-      "shaders": [0]
+      "path": "FlightHelmet/GlassPlastic/albedo.exr",
+      "channels": [0, 1, 2]
+    }, {
+      "path": "FlightHelmet/GlassPlastic/normal.exr",
+      "channels": [4, 5, 6]
+    }, {
+      "path": "FlightHelmet/GlassPlastic/occlusionRoughnessMetallic.exr",
+      "channels": [7, 9, 8]
+    }, {
+      "path": "FlightHelmet/Hose/albedo.exr",
+      "channels": [0, 1, 2]
+    }, {
+      "path": "FlightHelmet/Hose/normal.exr",
+      "channels": [4, 5, 6]
+    }, {
+      "path": "FlightHelmet/Hose/occlusionRoughnessMetallic.exr",
+      "channels": [7, 9, 8]
+    }, {
+      "path": "FlightHelmet/Leather/albedo.exr",
+      "channels": [0, 1, 2]
+    }, {
+      "path": "FlightHelmet/Leather/normal.exr",
+      "channels": [4, 5, 6]
+    }, {
+      "path": "FlightHelmet/Leather/occlusionRoughnessMetallic.exr",
+      "channels": [7, 9, 8]
+    }, {
+      "path": "FlightHelmet/Lenses/albedo.exr",
+      "channels": [0, 1, 2, 3]
+    }, {
+      "path": "FlightHelmet/Lenses/normal.exr",
+      "channels": [4, 5, 6]
+    }, {
+      "path": "FlightHelmet/Lenses/occlusionRoughnessMetallic.exr",
+      "channels": [7, 9, 8]
+    }, {
+      "path": "FlightHelmet/Metal/albedo.exr",
+      "channels": [0, 1, 2]
+    }, {
+      "path": "FlightHelmet/Metal/normal.exr",
+      "channels": [4, 5, 6]
+    }, {
+      "path": "FlightHelmet/Metal/occlusionRoughnessMetallic.exr",
+      "channels": [7, 9, 8]
     }
   ],
-  "render passes": [
-    {
-      "subpasses": [
-        {
-
-        }
-      ]
-    }
+  "channels": [
+    "albedoRed",
+    "albedoGreen",
+    "albedoBlue",
+    "albedoAlpha",
+    "normalX",
+    "normalY",
+    "normalZ",
+    "occlusion",
+    "metallic",
+    "roughness"
   ]
 }

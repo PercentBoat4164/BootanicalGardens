@@ -7,7 +7,7 @@
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
 #include "src/RenderEngine/Renderable/Mesh.hpp"
-#include "src/RenderEngine/Renderable/Renderable.hpp"
+#include "src/RenderEngine/Renderable/MeshGroup.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/Window.hpp"
