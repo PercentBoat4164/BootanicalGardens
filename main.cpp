@@ -19,6 +19,7 @@ int main() {
   {
     GraphicsDevice graphicsDevice;
 
+    // Declare the window
     Window window{&graphicsDevice};
 
     // Build the RenderGraph
