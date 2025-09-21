@@ -1,19 +1,16 @@
 #include "src/RenderEngine/Renderable/Mesh.hpp"
 
-#include "../Resources/Buffer.hpp"
-#include "../Resources/StagingBuffer.hpp"
-#include "glm/ext/matrix_transform.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
+#include "src/RenderEngine/Resources/StagingBuffer.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Texture.hpp"
 #include "src/RenderEngine/Renderable/Vertex.hpp"
-#include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/Tools/StringHash.h"
 
 #include <fastgltf/glm_element_traits.hpp>
-#include <volk/volk.h>
+#include <fastgltf/core.hpp>
 
 Mesh::Mesh(GraphicsDevice* const device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive) :
 material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device, commandBuffer, asset, asset.materials[primitive.materialIndex.value()]) : std::make_shared<Material>()) {
@@ -35,16 +32,13 @@ material(primitive.materialIndex.has_value() ? std::make_shared<Material>(device
   for (const fastgltf::Attribute& attribute: primitive.attributes) {
     /**@todo: Add support for other attributes (application specific, animations, more texture coordinates, more colors).*/
     switch (Tools::hash(attribute.name)) { /**@see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes */
-      case Tools::hash("POSITION"): fastgltf::copyFromAccessor<decltype(Vertex::position), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, position)); break;
-      // case Tools::hash("NORMAL"): fastgltf::copyFromAccessor<decltype(Vertex::normal), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal)); break;
-      // case Tools::hash("TANGENT"): fastgltf::copyFromAccessor<decltype(Vertex::tangent), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent)); break;
-      case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, textureCoordinates0)); break;
-      // case Tools::hash("COLOR_0"): fastgltf::copyFromAccessor<decltype(Vertex::color0), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, color0)); break;
+      case Tools::hash("POSITION"):   fastgltf::copyFromAccessor<decltype(Vertex::position),           sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, position));           break;
+      case Tools::hash("TEXCOORD_0"): fastgltf::copyFromAccessor<decltype(Vertex::textureCoordinates), sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, textureCoordinates)); break;
+      case Tools::hash("NORMAL"):     fastgltf::copyFromAccessor<decltype(Vertex::normal),             sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, normal));             break;
+      case Tools::hash("TANGENT"):    fastgltf::copyFromAccessor<decltype(Vertex::tangent),            sizeof(Vertex)>(asset, asset.accessors[attribute.accessorIndex], reinterpret_cast<char*>(vertices.data()) + offsetof(Vertex, tangent));            break;
       default: break;
     }
   }
-
-  // for (Vertex& vertex : vertices) vertex.position.z *= -1;
 
   auto vertexBufferTemp = std::make_shared<StagingBuffer>(device, "vertex upload buffer", vertices.data(), vertices.size());
   vertexBuffer          = std::make_shared<Buffer>(device, "vertex buffer", vertexBufferTemp->getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);

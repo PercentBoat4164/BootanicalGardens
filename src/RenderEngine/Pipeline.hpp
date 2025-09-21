@@ -20,8 +20,10 @@ public:
   VkPipelineBindPoint bindPoint;
 
   Pipeline(GraphicsDevice* device, const std::shared_ptr<Material>& material);
-  void bake(const std::shared_ptr<const RenderPass>& renderPass, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines);
-  void writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) override;
+  void bake(const std::shared_ptr<const RenderPass>&renderPass, uint32_t subpassIndex, std::span<VkDescriptorSetLayout> layouts, std
+            ::vector<void*>&miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>&createInfos, std::vector<VkPipeline*>&
+            pipelines);
+  void writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) override;
   void update();
   ~Pipeline() override;
 

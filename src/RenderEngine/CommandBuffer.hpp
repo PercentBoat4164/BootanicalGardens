@@ -33,7 +33,7 @@ public:
   };
 
   struct ResourceState {
-    VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
+    VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
     VkAccessFlags access{VK_ACCESS_FLAG_BITS_MAX_ENUM};
   };
 
@@ -47,11 +47,11 @@ public:
 
   struct Command {
     struct ResourceAccess {
-      enum TypeBits : uint32_t {
-        Read = 0x1,
-        Write = 0x2
+      enum TypeBits : uint8_t {
+        Read  = 1 << 0,
+        Write = 1 << 1
       };
-      using Type = uint32_t;
+      using Type = uint8_t;
       Type type{Read};
       Resource* resource{nullptr};
       VkPipelineStageFlags stage{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
@@ -59,11 +59,17 @@ public:
       std::vector<VkImageLayout> allowedLayouts{};
     };
     std::vector<ResourceAccess> accesses;
-#ifndef NDEBUG
-    cpptrace::stacktrace stacktrace;
+    enum Type : uint8_t {
+      Synchronization,
+      StateChange,
+      Copy,
+      Draw
+    } type;
+#if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
+    cpptrace::raw_trace trace;
 #endif
 
-    explicit Command(std::vector<ResourceAccess> accesses);
+    explicit Command(std::vector<ResourceAccess> accesses, Type type);
     virtual ~Command() = default;
 
   protected:
@@ -107,13 +113,14 @@ public:
   };
 
   struct BindDescriptorSets final : Command {
-    explicit BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets);
+    explicit BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets, uint32_t firstSet=0);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
     std::vector<VkDescriptorSet> descriptorSets;
+    uint32_t firstSet;
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   };
 
@@ -257,7 +264,7 @@ public:
   };
 
   struct Draw final : Command {
-    explicit Draw();
+    explicit Draw(uint32_t vertexCount=0);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -335,5 +342,6 @@ public:
    */
   void bake(VkCommandBuffer commandBuffer) const;
   void clear();
-  State getDefaultState();
+
+  void getDefaultState(State&state);
 };

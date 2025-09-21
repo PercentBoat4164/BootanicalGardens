@@ -3,53 +3,10 @@
 #include "Renderable/Mesh.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
 #include "src/RenderEngine/Shader.hpp"
 #include "src/Tools/Hashing.hpp"
 
 #include <volk/volk.h>
-
-#include <yyjson.h>
-
-
-class GraphicsData {
-  yyjson_doc* doc;
-  yyjson_val* meshes;
-  yyjson_val* materials;
-  yyjson_val* shaders;
-  yyjson_val* textures;
-
-  GraphicsData() {
-    // Create JSON objects
-    doc = yyjson_read_file("res/graphicsData.json", YYJSON_READ_ALLOW_INF_AND_NAN | YYJSON_READ_ALLOW_COMMENTS, nullptr, nullptr);
-    yyjson_val* root = yyjson_doc_get_root(doc);
-    meshes = yyjson_obj_get(root, "meshes");
-    materials = yyjson_obj_get(root, "materials");
-    shaders = yyjson_obj_get(root, "shaders");
-    textures = yyjson_obj_get(root, "textures");
-  }
-public:
-  static GraphicsData* get() {
-    static GraphicsData data;
-    return &data;
-  }
-
-  yyjson_val* getMesh(const uint64_t id) const { return yyjson_arr_get(meshes, id); }
-  yyjson_val* getMaterial(const uint64_t id) const { return yyjson_arr_get(materials, id); }
-  yyjson_val* getShader(const uint64_t id) const { return yyjson_arr_get(shaders, id); }
-  yyjson_val* getTexture(const uint64_t id) const { return yyjson_arr_get(textures, id); }
-};
-
-void getQueues(VkPhysicalDevice physicalDevice, const std::vector<VkQueueFlags>& required, const std::vector<VkQueueFlags>& requested) {
-  uint32_t count{};
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
-  std::vector<VkQueueFamilyProperties> properties(count);
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, properties.data());
-  std::vector<unsigned> unallocatedQueues(count);
-  for (VkQueueFamilyProperties property : properties) {
-    unallocatedQueues.push_back(property.queueCount);
-  }
-}
 
 GraphicsDevice::GraphicsDevice() {
   vkb::PhysicalDeviceSelector deviceSelector{GraphicsInstance::instance};
@@ -62,6 +19,23 @@ GraphicsDevice::GraphicsDevice() {
   const auto builderResult = deviceBuilder.build();
   if (!builderResult.has_value()) GraphicsInstance::showError(builderResult.vk_result(), "Failed to create the Vulkan device");
   device = builderResult.value();
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+  if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
+    VkDebugUtilsObjectNameInfoEXT nameInfo {
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .pNext = nullptr,
+      .objectType = VK_OBJECT_TYPE_PHYSICAL_DEVICE,
+      .objectHandle = reinterpret_cast<uint64_t>(device.physical_device.physical_device),
+      .pObjectName = device.physical_device.name.c_str()
+    };
+    if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device.device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+    std::string name = device.physical_device.name + " | Logical Device";
+    nameInfo.objectType   = VK_OBJECT_TYPE_DEVICE;
+    nameInfo.objectHandle = reinterpret_cast<uint64_t>(device.device);
+    nameInfo.pObjectName  = name.c_str();
+    if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device.device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+  }
+#endif
   volkLoadDevice(device.device);
   const vkb::Result<VkQueue> queueResult = device.get_queue(vkb::QueueType::graphics);
   if (!queueResult.has_value()) GraphicsInstance::showError(queueResult.vk_result(), "Failed to get Vulkan device queue");
@@ -216,11 +190,4 @@ std::shared_ptr<VkSampler> GraphicsDevice::getSampler(const VkFilter magnificati
   samplers.emplace(samplerID, sampler);
   if (const VkResult result = vkCreateSampler(device, &createInfo, nullptr, sampler.get()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create sampler");
   return sampler;
-}
-
-std::shared_ptr<Mesh> GraphicsDevice::createMesh(const uint64_t id, CommandBuffer commandBuffer) {
-  const auto it = meshes.find(id);
-  if (it != meshes.end()) return it->second;
-  std::filesystem::path path =
-  meshes.insert(it, std::make_pair(id, std::make_shared<Mesh>(this, commandBuffer, path)));
 }

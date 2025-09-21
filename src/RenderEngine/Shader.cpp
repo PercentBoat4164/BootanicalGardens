@@ -88,7 +88,9 @@ Shader::Shader(GraphicsDevice* const device, yyjson_val* obj) : device(device) {
 }
 
 Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
-  /**@todo: Use one global compiler and one global optimizer.*/
+  /**@todo: Use one global compiler and one global optimizer.
+   *   - Switch to Slang.
+   */
   const shaderc::Compiler compiler;
   shaderc::CompileOptions compilerOptions;
   compilerOptions.SetIncluder(std::make_unique<Includer>());
@@ -122,6 +124,7 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
   shaderc::CompilationResult compilationResult = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), compilerOptions);
   if (compilationResult.GetNumErrors() > 0) GraphicsInstance::showError(compilationResult.GetErrorMessage());
   code = {compilationResult.cbegin(), compilationResult.cend()};
+  if (code.empty()) GraphicsInstance::showError("failed to compile shader: '" + sourcePath.string() + "'");
 
   reflectionData = spv_reflect::ShaderModule{code.size() * sizeof(decltype(code)::value_type), code.data(), SPV_REFLECT_MODULE_FLAG_NO_COPY};
   stage      = static_cast<VkShaderStageFlagBits>(reflectionData.GetShaderStage());
@@ -150,6 +153,20 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
   };
   if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create shader module");
   spvBinaryDestroy(binary);
+
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+  if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
+    std::string name = sourcePath.string();
+    const VkDebugUtilsObjectNameInfoEXT nameInfo {
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .pNext = nullptr,
+      .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
+      .objectHandle = reinterpret_cast<uint64_t>(module),
+      .pObjectName = name.c_str()
+    };
+    if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+  }
+#endif
 }
 
 Shader::~Shader() {

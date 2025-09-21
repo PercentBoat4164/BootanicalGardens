@@ -26,7 +26,7 @@ public:
     BufferMapping(GraphicsDevice* device, const std::shared_ptr<const Buffer>& buffer);
     ~BufferMapping();
 
-   GraphicsDevice* const device;
+    GraphicsDevice* const device;
     std::shared_ptr<const Buffer> buffer;
     void* data{};
   };

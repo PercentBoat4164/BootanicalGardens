@@ -23,7 +23,7 @@ class Image : public Resource {
   VkImageView _view;
   uint32_t _mipLevels{1};
   uint32_t _layerCount{1};
-  VkSampleCountFlagBits _sampleCount{VK_SAMPLE_COUNT_1_BIT};
+  VkSampleCountFlags _sampleCount{VK_SAMPLE_COUNT_1_BIT};
 
 public:
   enum Usages : VkImageUsageFlags {
@@ -31,11 +31,11 @@ public:
     Compute = VK_IMAGE_USAGE_STORAGE_BIT,
   };
 
-  Image(GraphicsDevice* device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
-  Image(GraphicsDevice* device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlagBits sampleCount=VK_SAMPLE_COUNT_1_BIT);
+  Image(GraphicsDevice* device, std::string name, VkImage image, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage=0, uint32_t mipLevels=1, VkSampleCountFlags sampleCount=VK_SAMPLE_COUNT_1_BIT, VkImageView view=VK_NULL_HANDLE);
+  Image(GraphicsDevice* device, std::string name, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, uint32_t mipLevels=1, VkSampleCountFlags sampleCount=VK_SAMPLE_COUNT_1_BIT);
   ~Image() override;
 
-  void rebuild(VkExtent3D newExtent);
+  void rebuild(VkExtent3D newExtent={}, VkSampleCountFlags newSampleCount=VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
   [[nodiscard]] VkImage getImage() const;
   [[nodiscard]] VkExtent3D getExtent() const;
@@ -45,7 +45,7 @@ public:
   [[nodiscard]] VkImageAspectFlags getAspect() const;
   [[nodiscard]] uint32_t getMipLevels() const;
   [[nodiscard]] uint32_t getLayerCount() const;
-  [[nodiscard]] VkSampleCountFlagBits getSampleCount() const;
+  [[nodiscard]] VkSampleCountFlags getSampleCount() const;
   [[nodiscard]] VkImageSubresourceRange getWholeRange() const;
 
 private:

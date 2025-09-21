@@ -9,7 +9,6 @@
 #include <vulkan/vulkan.h>
 
 #include <functional>
-#include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -63,33 +62,39 @@ class RenderGraph {
 public:
   GraphicsDevice* const device;
 
-  using AttachmentID = uint32_t;
+  using ImageID = uint32_t;
   using ResolutionGroupID = uint32_t;
 
 private:
-  struct AttachmentProperties {
+  struct ImageProperties {
     ResolutionGroupID resolutionGroup;
     VkFormat format;
-    VkSampleCountFlags sampleCount;
+    bool inheritSampleCount;
+    std::shared_ptr<Image> image;
+    std::string name;  /**@todo: Try to limit the usage of this to just debug builds.*/
   };
 
-  std::unordered_map<ResolutionGroupID, std::tuple<VkExtent3D, std::vector<AttachmentID>>> resolutionGroups;
-  std::unordered_map<AttachmentID, AttachmentProperties> attachmentsProperties;
-  std::unordered_map<AttachmentID, std::shared_ptr<Image>> backingImages;
+  struct ResolutionGroupProperties {
+    VkExtent3D resolution;
+    VkSampleCountFlags sampleCount;
+    plf::colony<ImageID> attachments;
+  };
+
+  std::unordered_map<ResolutionGroupID, ResolutionGroupProperties> resolutionGroups;
+  std::unordered_map<ImageID, ImageProperties> images;
 
 public:
   static uint8_t FRAMES_IN_FLIGHT;
   
-  struct AttachmentDeclaration {
-    /**@todo: Replace the 4 items below with one or more custom ones. This would allow easier specification of the render pass attachments.*/
+  struct ImageAccess {
     VkImageLayout layout{};
     VkImageUsageFlags usage{};
     VkAccessFlags access{};
     VkPipelineStageFlags stage{};
-    VkAttachmentLoadOp loadOp{};
-    VkAttachmentStoreOp storeOp{};
-    VkAttachmentLoadOp stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    VkAttachmentStoreOp stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    VkAttachmentLoadOp loadOp{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+    VkAttachmentStoreOp storeOp{VK_ATTACHMENT_STORE_OP_DONT_CARE};
+    VkAttachmentLoadOp stencilLoadOp{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+    VkAttachmentStoreOp stencilStoreOp{VK_ATTACHMENT_STORE_OP_DONT_CARE};
   };
 
   using iterator = decltype(renderPasses)::iterator;
@@ -111,32 +116,51 @@ public:
 
   [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
   static constexpr ResolutionGroupID getResolutionGroupId(const std::string_view name) { return Tools::hash(name); }
-  void setResolutionGroup(ResolutionGroupID id, VkExtent3D resolution);
-  static constexpr AttachmentID getAttachmentId(const std::string_view name) { return Tools::hash(name); }
-  void setAttachment(AttachmentID id, ResolutionGroupID groupId, VkFormat format, VkSampleCountFlags sampleCount);
+  void setResolutionGroup(const std::string_view& name, VkExtent3D resolution, VkSampleCountFlags sampleCount);
+  static constexpr ImageID getImageId(const std::string_view name) { return Tools::hash(name); }
+
+  /**
+   * Set an attachment's properties. This does <em>not</em> create the actual image. The actual image will be created during baking.
+   * @param name The name of the attachment. Pass an empty string to keep the name that the AttachmentID used to have - useful if you have a pre-existing id.
+   * @param groupName The resolution group that this attachment should belong to.
+   * @param format VkFormat of the image.
+   * @param inheritSampleCount Use the sample count of the resolution group. If this is false, the sample count is forced to VK_SAMPLE_COUNT_1_BIT
+   * @exception std::out_of_range The `groupName` resolution group does not exist. Use `setResolutionGroup` first.
+   */
+  void setImage(const std::string_view& name, const std::string_view& groupName, VkFormat format, bool inheritSampleCount);
+  [[nodiscard]] ImageProperties getImage(ImageID id) const;
+  [[nodiscard]] bool hasImage(ImageID id) const;
+
+  static bool combineImageAccesses(ImageAccess& dst, const ImageAccess& src);
+
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(const const_iterator iterator, Args&&... args) { outOfDate = true; return renderPasses.insert(iterator, std::make_unique<T>(*this, std::forward<Args&&>(args)...)); }
   template<typename T, typename... Args> requires std::constructible_from<T, RenderGraph&, Args...> && std::derived_from<T, RenderPass> && (!std::is_same_v<T, RenderPass>) const_iterator insert(Args&&... args) { outOfDate = true; return insert<T>(cend(), std::forward<Args&&>(args)...); }
-  bool bake(CommandBuffer& commandBuffer);
+  bool bake();
 
   [[nodiscard]] const PerFrameData& getPerFrameData(uint64_t frameIndex=-1) const;
   [[nodiscard]] VkSemaphore waitForNextFrameData() const;
   void update() const;
+  /**
+   * Executes this RenderGraph then blits the GBufferAlbdeo attachment onto the <c>swapchainImage</c>.
+   * @param swapchainImage The image to put the color output onto (usually the swapchain image).
+   * @param semaphore The semaphore to signal when the GPU has finished rendering.
+   */
   void execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore);
 
-  inline static const AttachmentID RenderColor = getAttachmentId("RenderColor");
-  inline static const AttachmentID RenderDepth = getAttachmentId("RenderDepth");
-  inline static const ResolutionGroupID RenderResolution = getResolutionGroupId("Render");
+  static constexpr std::string_view VoidResolutionGroup = "void";
+  static constexpr std::string_view VoidImage           = "void";
+  static constexpr std::string_view RenderResolution    = "Render";
+  static constexpr std::string_view GBufferAlbedo       = "gBufferAlbedo";
+  static constexpr std::string_view GBufferPosition     = "gBufferPosition";
+  static constexpr std::string_view GBufferNormal       = "gBufferNormal";
+  static constexpr std::string_view GBufferDepth        = "gBufferDepth";
+  static constexpr std::string_view RenderColor         = "renderColor";
+  static constexpr std::string_view ShadowResolution    = "Shadow";
+  static constexpr std::string_view ShadowDepth         = "shadowMap";
 
 private:
   /**
-   * Builds the images stored in `backingImages` from `attachmentProperties`
+   * Builds the images stored in <c>backingImages</c> from <c>attachmentProperties</c>
    */
-  void buildImages();
-
-  /**
-   * Transitions images in the `backingImages`
-   * @param commandBuffer The CommandBuffer to record transitions into
-   * @param declarations Declarations of the images in the `backingImages`
-   */
-  void transitionImages(CommandBuffer& commandBuffer, const std::map<AttachmentID, AttachmentDeclaration>& declarations);
+  void buildImages(const std::unordered_map<ImageID, VkImageUsageFlags>& usages);
 };
