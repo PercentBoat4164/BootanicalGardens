@@ -21,7 +21,7 @@ GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, Opa
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::declareAccesses() {
   std::vector<std::shared_ptr<Material>> materials;
   materials.reserve(graph.device->meshes.size());
-  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) materials.push_back(mesh->getMaterial());
+  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes | std::ranges::views::values) materials.push_back(mesh->getMaterial());
   setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
@@ -49,16 +49,16 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
     }
   };
   const VkRenderPassCreateInfo renderPassCreateInfo{
-      .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .pNext           = nullptr,
-      .flags           = 0,
-      .attachmentCount = static_cast<uint32_t>(attachmentDescriptions.size()),
-      .pAttachments    = attachmentDescriptions.data(),
-      .subpassCount    = static_cast<uint32_t>(subpassDescriptions.size()),
-      .pSubpasses      = subpassDescriptions.data(),
-      .dependencyCount = 0,
-      .pDependencies   = nullptr
-  };
+    .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .pNext           = nullptr,
+    .flags           = 0,
+    .attachmentCount = static_cast<uint32_t>(attachmentDescriptions.size()),
+    .pAttachments    = attachmentDescriptions.data(),
+    .subpassCount    = static_cast<uint32_t>(subpassDescriptions.size()),
+    .pSubpasses      = subpassDescriptions.data(),
+    .dependencyCount = 0,
+    .pDependencies   = nullptr
+};
   setRenderPassInfo(renderPassCreateInfo, images);
   if (const VkResult result = vkCreateRenderPass(graph.device->device, &renderPassCreateInfo, nullptr, &renderPass); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create render pass");
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
@@ -67,7 +67,7 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_RENDER_PASS,
-      .objectHandle = reinterpret_cast<uint64_t>(renderPass),
+      .objectHandle = std::bit_cast<uint64_t>(renderPass),
       .pObjectName = "G-Buffer Render Pass"
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(graph.device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
@@ -75,7 +75,7 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
 #endif
 
   framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) {
+  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes | std::ranges::views::values) {
     const std::shared_ptr<Material>& material = mesh->getMaterial();
     pipelines[material]                       = std::make_shared<Pipeline>(graph.device, material);
   }
@@ -130,7 +130,7 @@ void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
   constexpr VkClearValue black{.color={0, 0, 0, 0}};
   constexpr VkClearValue far{.depthStencil = {.depth = 1.0F, .stencil = 0}};
   commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{far, black, black, black});
-  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
+  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes | std::ranges::views::values) {
     if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
       continue;
     const std::shared_ptr<Pipeline>& pipeline = pipelines.at(mesh->getMaterial());

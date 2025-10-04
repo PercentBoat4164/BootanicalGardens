@@ -20,6 +20,7 @@ class Mesh {
   std::vector<uint32_t> indices;
   std::shared_ptr<Buffer> vertexBuffer{nullptr};
   std::shared_ptr<Buffer> indexBuffer{nullptr};
+  std::shared_ptr<Material> material{nullptr};
 
 public:
   Mesh(GraphicsDevice* device, CommandBuffer& commandBuffer, const fastgltf::Asset& asset, const fastgltf::Primitive& primitive);
@@ -30,4 +31,5 @@ public:
   [[nodiscard]] bool isTransparent() const;
   [[nodiscard]] std::shared_ptr<Buffer> getVertexBuffer() const;
   [[nodiscard]] std::shared_ptr<Buffer> getIndexBuffer() const;
+  [[nodiscard]] std::shared_ptr<Material> getMaterial() const;
 };

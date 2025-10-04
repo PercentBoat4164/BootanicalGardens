@@ -16,13 +16,13 @@ Image::Image(GraphicsDevice* const device, std::string name, VkImage image, cons
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_IMAGE,
-      .objectHandle = reinterpret_cast<uint64_t>(_image),
+      .objectHandle = std::bit_cast<uint64_t>(_image),
       .pObjectName = _name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
     const std::string viewName = _name + " View";
     nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
-    nameInfo.objectHandle = reinterpret_cast<uint64_t>(_view);
+    nameInfo.objectHandle = std::bit_cast<uint64_t>(_view);
     nameInfo.pObjectName = viewName.c_str();
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
   }
@@ -58,7 +58,7 @@ Image::Image(GraphicsDevice* const device, std::string name, const VkFormat form
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_IMAGE,
-      .objectHandle = reinterpret_cast<uint64_t>(_image),
+      .objectHandle = std::bit_cast<uint64_t>(_image),
       .pObjectName = _name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
@@ -93,7 +93,7 @@ Image::Image(GraphicsDevice* const device, std::string name, const VkFormat form
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
-      .objectHandle = reinterpret_cast<uint64_t>(_view),
+      .objectHandle = std::bit_cast<uint64_t>(_view),
       .pObjectName = viewName.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");

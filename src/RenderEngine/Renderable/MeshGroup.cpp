@@ -7,6 +7,9 @@
 
 #include <yyjson.h>
 
+void MeshGroup::onTick() {
+}
+
 MeshGroup::MeshGroup(const std::uint64_t id, Entity& entity) : Component(id, entity) {}
 
 std::shared_ptr<Component> MeshGroup::create(std::uint64_t id, Entity& entity, yyjson_val* componentData) {

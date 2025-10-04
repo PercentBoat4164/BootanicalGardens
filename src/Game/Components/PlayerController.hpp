@@ -18,5 +18,5 @@ public:
 
   static std::shared_ptr<Component> create(std::uint64_t id, Entity& entity, yyjson_val* obj);
 
-  void onTick() override;
+    void onTick() override;
 };

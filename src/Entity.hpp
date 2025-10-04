@@ -66,7 +66,7 @@ public:
    * @tparam T Derives from Component
    * @param component The Component to be added
    */
-  Component* addComponent(yyjson_val* componentData);
+  std::shared_ptr<Component> addComponent(yyjson_val* componentData);
 
   /**
    * Add a Component to the map of Components.

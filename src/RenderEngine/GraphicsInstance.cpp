@@ -81,7 +81,7 @@ void GraphicsInstance::create(std::vector<const char*> extensions) {
   builder.set_engine_name("Boo Engine").set_engine_version(0, 0, 1);
 #if !NDEBUG & defined(BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION)
   builder.enable_validation_layers(std::getenv(BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION) != nullptr);
-  builder.set_debug_callback(&GraphicsInstance::debugCallback);
+  builder.set_debug_callback(reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(&GraphicsInstance::debugCallback));
   builder.set_debug_callback_user_data_pointer(&GraphicsInstance::debugData);
 #else
   builder.enable_validation_layers(false);

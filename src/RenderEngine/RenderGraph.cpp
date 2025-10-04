@@ -321,7 +321,7 @@ VkSemaphore RenderGraph::waitForNextFrameData() const {
 }
 
 void RenderGraph::update() const {
-  for (const std::shared_ptr<Mesh>& mesh : device->meshes)
+  for (const std::shared_ptr<Mesh>& mesh : device->meshes | std::ranges::views::values)
     mesh->update(*this);
   for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
     renderPass->update();

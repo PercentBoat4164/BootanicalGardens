@@ -1,3 +1,4 @@
+#pragma once
 #include "src/Component.hpp"
 
 #include "src/Entity.hpp"

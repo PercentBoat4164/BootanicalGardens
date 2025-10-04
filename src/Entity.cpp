@@ -22,11 +22,11 @@ Entity::Entity(std::uint64_t id, glm::vec3 position, glm::dquat rotation, glm::v
 Entity::Entity(std::uint64_t id, const Entity& other)
     : id(id), position(other.position), rotation(other.rotation), scale(other.scale) {}
 
-Component* Entity::addComponent(yyjson_val* componentData) {
+std::shared_ptr<Component> Entity::addComponent(yyjson_val* componentData) {
   auto it = componentConstructors.find(yyjson_get_str(yyjson_obj_get(componentData, "type")));
   if (it == componentConstructors.end()) return nullptr;
   std::shared_ptr<Component> component = it->second(++nextComponentId, *this, componentData);
-  return components.emplace(component->getId(), std::move(component)).first->second.get();
+  return component;
 }
 
 void Entity::removeComponent(const uint64_t id) {

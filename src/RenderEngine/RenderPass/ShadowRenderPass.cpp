@@ -11,6 +11,8 @@
 
 #include <volk/volk.h>
 
+#include <bit>
+
 ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
   material = std::make_shared<Material>(
     std::make_shared<Shader>(graph.device, std::filesystem::canonical("../res/shaders/shadow.vert")),
@@ -65,7 +67,7 @@ void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_RENDER_PASS,
-      .objectHandle = reinterpret_cast<uint64_t>(renderPass),
+      .objectHandle = std::bit_cast<uint64_t>(renderPass),
       .pObjectName = "Shadow Render Pass"
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(graph.device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
@@ -125,7 +127,7 @@ void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
   commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector<VkClearValue>{{.depthStencil = {.depth = 1.0F, .stencil = 0}}});
   commandBuffer.record<CommandBuffer::BindPipeline>(pipelines[material]);
   commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(graph.getFrameIndex())}, 1);
-  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
+  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes | std::ranges::views::values) {
     if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
       continue;
     commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});

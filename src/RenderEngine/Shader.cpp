@@ -161,7 +161,7 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
-      .objectHandle = reinterpret_cast<uint64_t>(module),
+      .objectHandle = std::bit_cast<uint64_t>(module),
       .pObjectName = name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");

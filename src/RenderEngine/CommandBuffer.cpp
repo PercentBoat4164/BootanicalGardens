@@ -196,8 +196,8 @@ void CommandBuffer::BlitImageToImage::preprocess(State& state, PreprocessingFlag
   });
   srcImage = src->getImage();
   dstImage = dst->getImage();
-  srcImageLayout = state.resourceStates.at(srcImage).layout;
-  dstImageLayout = state.resourceStates.at(dstImage).layout;
+  srcImageLayout = state.resourceStates.at(reinterpret_cast<void*>(srcImage)).layout;
+  dstImageLayout = state.resourceStates.at(reinterpret_cast<void*>(dstImage)).layout;
 }
 void CommandBuffer::BlitImageToImage::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -220,7 +220,7 @@ CommandBuffer::ClearColorImage::ClearColorImage(std::shared_ptr<Image> img, cons
 void CommandBuffer::ClearColorImage::preprocess(State& state, PreprocessingFlags flags) {
   if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
   image = img->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::ClearColorImage::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -243,7 +243,7 @@ CommandBuffer::ClearDepthStencilImage::ClearDepthStencilImage(std::shared_ptr<Im
 void CommandBuffer::ClearDepthStencilImage::preprocess(State& state, PreprocessingFlags flags) {
   if (subresourceRanges.empty()) subresourceRanges.push_back({img->getAspect(), 0, img->getMipLevels(), 0, img->getLayerCount()});
   image = img->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::ClearDepthStencilImage::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -305,7 +305,7 @@ void CommandBuffer::CopyBufferToImage::preprocess(State& state, PreprocessingFla
   });
   buffer = src->getBuffer();
   image = dst->getImage();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::CopyBufferToImage::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -338,7 +338,7 @@ void CommandBuffer::CopyImageToBuffer::preprocess(State& state, PreprocessingFla
   });
   image = src->getImage();
   buffer = dst->getBuffer();
-  layout = state.resourceStates.at(image).layout;
+  layout = state.resourceStates.at(reinterpret_cast<void*>(image)).layout;
 }
 void CommandBuffer::CopyImageToBuffer::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -372,8 +372,8 @@ void CommandBuffer::CopyImageToImage::preprocess(State& state, PreprocessingFlag
   });
   srcImage = src->getImage();
   dstImage = dst->getImage();
-  srcLayout = state.resourceStates.at(srcImage).layout;
-  dstLayout = state.resourceStates.at(dstImage).layout;
+  srcLayout = state.resourceStates.at(reinterpret_cast<void*>(srcImage)).layout;
+  dstLayout = state.resourceStates.at(reinterpret_cast<void*>(dstImage)).layout;
 }
 void CommandBuffer::CopyImageToImage::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -478,7 +478,7 @@ CommandBuffer::PipelineBarrier::PipelineBarrier(const VkPipelineStageFlags srcSt
     imageMemoryBarriers(std::move(imageMemoryBarriers)) {}
 void CommandBuffer::PipelineBarrier::preprocess(State& state, const PreprocessingFlags flags) {
     for (auto& imageMemoryBarrier: imageMemoryBarriers) {
-      ResourceState& resourceState = state.resourceStates[imageMemoryBarrier.image];
+      ResourceState& resourceState = state.resourceStates[reinterpret_cast<void*>(imageMemoryBarrier.image)];
       if (flags & ModifyPipelineBarriers) {
         imageMemoryBarrier.oldLayout = resourceState.layout;
         if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM) imageMemoryBarrier.srcAccessMask = resourceState.access;

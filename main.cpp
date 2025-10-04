@@ -1,3 +1,5 @@
+#include <yyjson.h>
+
 #include "src/Game/Game.hpp"
 #include "src/Game/LevelParser.hpp"
 #include "src/InputEngine/Input.hpp"
@@ -20,6 +22,8 @@ int main() {
 
     Window window{&graphicsDevice};
 
+    Entity::registerComponentConstructor("MeshGroup", &MeshGroup::create);
+
     // Build the RenderGraph
     RenderGraph renderGraph{&graphicsDevice};
     renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution(), VK_SAMPLE_COUNT_1_BIT);
@@ -34,16 +38,7 @@ int main() {
     renderGraph.insert<ShadowRenderPass>();
     renderGraph.insert<CollectShadowsRenderPass>();
 
-    const auto fragmentShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.frag"));
-    const auto vertexShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.vert"));
-
-    const auto helmetMesh = std::make_shared<MeshGroup>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
-    const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
-    for (const std::shared_ptr<Mesh>& mesh: meshes) {
-      mesh->getMaterial()->setFragmentShader(fragmentShader);
-      mesh->getMaterial()->setVertexShader(vertexShader);
-    }
-    graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
+    LevelParser::loadLevel("../res/levels/Level1.json");
 
     renderGraph.bake();
 

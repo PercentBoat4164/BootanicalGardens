@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.27.8)
 project("Bootanical Gardens")
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 
 find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)

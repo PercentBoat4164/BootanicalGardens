@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <memory>
+#include "RenderEngine/Renderable/Mesh.hpp"
 
 class Entity;
 

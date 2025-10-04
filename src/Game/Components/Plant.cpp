@@ -7,6 +7,7 @@ void Plant::onTick() {
   // Eats ghosts?
 }
 
+
 std::shared_ptr<Component> Plant::create(std::uint64_t id, Entity& entity, yyjson_val* obj) {
   return std::make_shared<Plant>(id, entity);
 }

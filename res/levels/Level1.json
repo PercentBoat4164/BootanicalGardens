@@ -1,21 +1,12 @@
 {
   "entities": [
     {
-      "transformation": [
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0]
-      ],
+      "position": [1, 0, 0],
+      "rotation": [1, 0, 0, 0],
+      "scale": 1,
       "components": [
         {
           "type": "MeshGroup",
-          "transformation": [
-            [0, 0, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 0]
-          ],
           "meshes": [0],
           "materials": [0],
           "transformations": [
@@ -30,12 +21,9 @@
         }
       ]
     }, {
-      "transformation": [
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0]
-      ],
+      "position": [1, 0, 0],
+      "rotation": [1, 0, 0, 0],
+      "scale": 1,
       "components": [
         {
           "type": "Plant"

@@ -67,7 +67,7 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_RENDER_PASS,
-      .objectHandle = reinterpret_cast<uint64_t>(renderPass),
+      .objectHandle = std::bit_cast<uint64_t>(renderPass),
       .pObjectName = "Collect Shadows Render Pass"
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(graph.device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");

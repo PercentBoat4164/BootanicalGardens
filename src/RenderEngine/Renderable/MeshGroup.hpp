@@ -13,8 +13,11 @@ class MeshGroup : public Component {
   glm::mat4 transformation;
   std::vector<std::uint64_t> meshIndices;
   std::vector<std::uint64_t> materialIndices;
+  std::vector<std::shared_ptr<Mesh>> meshes;
 
 public:
+  void onTick() override;
+
   MeshGroup(std::uint64_t id, Entity& entity);
 
   static std::shared_ptr<Component> create(std::uint64_t id, Entity& entity, yyjson_val* componentData);
