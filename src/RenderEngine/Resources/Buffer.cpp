@@ -3,18 +3,29 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/Tools/Hashing.hpp"
 
 #include <volk/volk.h>
 
-Buffer::BufferMapping::BufferMapping(GraphicsDevice* const device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
-  vmaMapMemory(device->allocator, buffer->allocation, &data);
+Buffer::BufferMapping::BufferMapping(GraphicsDevice* const device, Buffer* buffer) : device(device), buffer(buffer){
+  if (const VkResult result = vmaMapMemory(device->allocator, buffer->allocation, &data); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to map buffer memory");
 }
 
 Buffer::BufferMapping::~BufferMapping() {
   vmaUnmapMemory(device->allocator, buffer->allocation);
 }
 
-Buffer::Buffer(GraphicsDevice* const device, const char* name, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags required, const VkMemoryPropertyFlags preferred, const VmaMemoryUsage memoryUsage, const VmaAllocationCreateFlags flags) :
+Buffer::Buffer(GraphicsDevice* const device,
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+               const char* name,
+#endif
+               const VkDeviceSize bufferSize,
+               const VkBufferUsageFlags usage,
+               const VkMemoryPropertyFlags required,
+               const VkMemoryPropertyFlags preferred,
+               const VmaMemoryUsage memoryUsage, const
+               VmaAllocationCreateFlags flags
+              ) :
     Resource(Resource::Buffer, device),
     size(bufferSize) {
   const VkBufferCreateInfo bufferCreateInfo{
@@ -70,7 +81,8 @@ VkDeviceSize Buffer::getSize() const {
 
 std::shared_ptr<Buffer::BufferMapping> Buffer::map() {
   if (!mapping.expired()) return mapping.lock();
-  auto newMapping = std::make_shared<BufferMapping>(device, std::dynamic_pointer_cast<Buffer>(shared_from_this()));
+  auto newMapping = std::make_shared<BufferMapping>(device, this);
+  if (newMapping->data == nullptr) return nullptr;
   mapping = newMapping;
   return newMapping;
 }

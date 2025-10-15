@@ -1,11 +1,9 @@
 #pragma once
 
-#include <memory>
-
 class GraphicsDevice;
 class Buffer;
 
-class Resource : public std::enable_shared_from_this<Resource> {
+class Resource {
 public:
   enum Type {
     Image,
@@ -14,7 +12,7 @@ public:
 
  GraphicsDevice* const device;
 
-  explicit Resource(Type type, GraphicsDevice* const device);
+  explicit Resource(Type type, GraphicsDevice* device);
   virtual ~Resource();
 
   [[nodiscard]] virtual void* getObject() const = 0;

@@ -1,30 +1,35 @@
 #include "ShadowRenderPass.hpp"
 
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_transform.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Mesh.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 
 #include <volk/volk.h>
 
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+
 ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  material = std::make_shared<Material>(
-    std::make_shared<Shader>(graph.device, std::filesystem::canonical("../res/shaders/shadow.vert")),
-    std::make_shared<Shader>(graph.device, std::filesystem::canonical("../res/shaders/shadow.frag"))
-  );
+  fragmentShaderOverride = graph.device->getJSONShader("Shadow Render Pass | Fragment Shader Override");
 }
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::declareAccesses() {
-  std::array materials{material};
-  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
+  for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
+    for (Material* material : mesh.instances | std::ranges::views::keys) {
+      Material* overriddenMaterial = material->getFragmentVariation(fragmentShaderOverride);
+      pipelines.emplace(overriddenMaterial, nullptr);
+      materialRemap.emplace(material, overriddenMaterial);
+    }
+  }
+  setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 
-void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
+void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
   std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
   uint32_t i{~0U};
   for (VkAttachmentReference& attachmentReference: attachmentReferences) {
@@ -72,10 +77,10 @@ void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
   }
 #endif
 
-  framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  pipelines[material] = std::make_shared<Pipeline>(graph.device, material);
+  for (auto& [material, pipeline]: pipelines) pipeline = graph.device->getPipeline(material, compatibility);
 
-  uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "Shadow Pass | Uniform Buffer");
+  framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
+  uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, "Shadow Pass | Uniform Buffer");
 }
 
 void ShadowRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
@@ -122,17 +127,17 @@ void ShadowRenderPass::update() {
 }
 
 void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
-  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector<VkClearValue>{{.depthStencil = {.depth = 1.0F, .stencil = 0}}});
-  commandBuffer.record<CommandBuffer::BindPipeline>(pipelines[material]);
-  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(graph.getFrameIndex())}, 1);
-  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
-    if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
-      continue;
-    commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});
-    if (mesh->getIndexBuffer() != nullptr) {
-      commandBuffer.record<CommandBuffer::BindIndexBuffers>(mesh->getIndexBuffer());
-      commandBuffer.record<CommandBuffer::DrawIndexed>();
-    } else commandBuffer.record<CommandBuffer::Draw>();
+  commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
+  for (const Mesh& mesh : graph.device->meshes | std::ranges::views::values) {
+    commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{mesh.positionsVertexBuffer.get(), mesh.textureCoordinatesVertexBuffer.get(), mesh.normalsVertexBuffer.get(), mesh.tangentsVertexBuffer.get()});
+    commandBuffer.record<CommandBuffer::BindIndexBuffer>(mesh.indexBuffer.get());
+    for (auto& [material, instanceData]: mesh.instances) {
+      Pipeline* pipeline = pipelines.at(materialRemap.at(material));
+      commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(graph.getFrameIndex())}, 1);
+      commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
+      commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
+    }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }

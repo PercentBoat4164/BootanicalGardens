@@ -5,7 +5,7 @@
 
 
 #include <memory>
-#include <span>
+#include <ranges>
 #include <vector>
 
 class GraphicsDevice;
@@ -22,7 +22,10 @@ public:
   explicit DescriptorSetRequirer(GraphicsDevice* device);
   virtual ~DescriptorSetRequirer();
 
-  void setDescriptorSets(std::span<std::shared_ptr<VkDescriptorSet>> sets, VkDescriptorSetLayout setLayout);
+  void setDescriptorSets(std::ranges::range auto&& sets, VkDescriptorSetLayout setLayout) {
+    descriptorSets = std::ranges::to<std::vector>(sets);
+    layout = setLayout;
+  }
 
   /**
    * This function will be called after <c>setDescriptorSets</c> and when the descriptor sets need to be (re)written. This function's purpose is to enable the batching of the descriptor set writes. Rather than issuing your own <c>vkWriteDescriptorSets</c> calls, store the <c>VkDescriptorWrites</c> objects in <c>writes</c>.

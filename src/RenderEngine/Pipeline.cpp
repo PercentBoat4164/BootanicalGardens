@@ -5,15 +5,15 @@
 #include "glm/ext/matrix_transform.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Texture.hpp"
-#include "src/RenderEngine/Renderable/Vertex.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Texture.hpp"
+#include "src/RenderEngine/MeshGroup/Vertex.hpp"
 #include "src/RenderEngine/Shader.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <volk/volk.h>
 
-Pipeline::Pipeline(GraphicsDevice* const device, const std::shared_ptr<Material>& material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
+Pipeline::Pipeline(GraphicsDevice* const device, Material* material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
 
 /**@todo: Only rebake if out-of-date.*/
 void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_t subpassIndex, std::span<VkDescriptorSetLayout> layouts, std::vector<void*>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
@@ -30,11 +30,11 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_
   if (const VkResult result = vkCreatePipelineLayout(device->device, &createInfo, nullptr, &layout); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create pipeline layout");
 
   /**@todo: Improve the memory allocation scheme across this entire function. Allocations could be greatly reduced both in quantity and size by precomputing the required size, then allocating one memory pool and filling that.*/
-  const std::vector shaders = {material->getVertexShader(), material->getFragmentShader()};
+  const std::vector shaders = {material->vertexShader, material->fragmentShader};
   std::vector<VkPipelineShaderStageCreateInfo>& stages = *static_cast<std::vector<VkPipelineShaderStageCreateInfo>*>(miscMemoryPool.emplace_back(new std::vector<VkPipelineShaderStageCreateInfo>(shaders.size())));
   for (uint32_t i{}; i < shaders.size(); ++i) {
-    const std::shared_ptr<const Shader>& shader = shaders[i];
-    stages[i]                                   = VkPipelineShaderStageCreateInfo{
+    const Shader* shader = shaders[i];
+    stages[i] = VkPipelineShaderStageCreateInfo{
         .sType               = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext               = nullptr,
         .flags               = 0,
@@ -45,15 +45,27 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_
     };
   }
 
-  /**@todo: Reflect the vertex format.*/
-  const VkVertexInputBindingDescription& bindingDescription = *static_cast<VkVertexInputBindingDescription*>(miscMemoryPool.emplace_back(new VkVertexInputBindingDescription{Vertex::getBindingDescription()}));
-  const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = *static_cast<std::vector<VkVertexInputAttributeDescription>*>(miscMemoryPool.emplace_back(new std::vector{std::move(Vertex::getAttributeDescriptions())}));
+  // const std::vector<VkVertexInputBindingDescription>& bindingDescription = *static_cast<std::vector<VkVertexInputBindingDescription>*>(miscMemoryPool.emplace_back(new std::vector{
+  //   PositionVertex::getBindingDescription(),
+  //   ShadingVertex::getBindingDescription(),
+  //   ModelInstance::getBindingDescription(),
+  //   MaterialInstance::getBindingDescription()
+  // }));
+  // std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = *static_cast<std::vector<VkVertexInputAttributeDescription>*>(miscMemoryPool.emplace_back(new std::vector<VkVertexInputAttributeDescription>));
+  // attributeDescriptions.append_range(PositionVertex::getAttributeDescriptions());
+  // attributeDescriptions.append_range(ShadingVertex::getAttributeDescriptions());
+  // attributeDescriptions.append_range(ModelInstance::getAttributeDescriptions());
+  // attributeDescriptions.append_range(MaterialInstance::getAttributeDescriptions());
+
+  const std::vector<VkVertexInputBindingDescription>& bindingDescription = *static_cast<std::vector<VkVertexInputBindingDescription>*>(miscMemoryPool.emplace_back(new std::vector{material->computeVertexBindingDescriptions()}));
+  const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = *static_cast<std::vector<VkVertexInputAttributeDescription>*>(miscMemoryPool.emplace_back(new std::vector{material->computeVertexAttributeDescriptions()}));
+
   const VkPipelineVertexInputStateCreateInfo& vertexInputState = *static_cast<VkPipelineVertexInputStateCreateInfo*>(miscMemoryPool.emplace_back(new VkPipelineVertexInputStateCreateInfo{
       .sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .pNext                           = nullptr,
       .flags                           = 0,
-      .vertexBindingDescriptionCount   = 1,
-      .pVertexBindingDescriptions      = &bindingDescription,
+      .vertexBindingDescriptionCount   = static_cast<uint32_t>(bindingDescription.size()),
+      .pVertexBindingDescriptions      = bindingDescription.data(),
       .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
       .pVertexAttributeDescriptions    = attributeDescriptions.data()
   }));
@@ -98,7 +110,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, uint32_
       .depthClampEnable        = VK_FALSE,
       .rasterizerDiscardEnable = VK_FALSE,
       .polygonMode             = VK_POLYGON_MODE_FILL,
-      .cullMode                = static_cast<VkCullModeFlags>(material->isDoubleSided() ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT),
+      .cullMode                = static_cast<VkCullModeFlags>(material->doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT),
       .frontFace               = VK_FRONT_FACE_CLOCKWISE,
       .depthBiasEnable         = VK_FALSE,
       .depthBiasConstantFactor = 0.0,
@@ -209,8 +221,8 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
         if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
           data.emplace<std::vector<VkDescriptorImageInfo>>();
         std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
-          .sampler     = material->getAlbedoTexture()->getSampler(),
-          .imageView   = material->getAlbedoTexture()->getImageView(),
+          .sampler     = material->albedoTexture->getSampler(),
+          .imageView   = material->albedoTexture->getImageView(),
           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         });
         break;
@@ -220,8 +232,8 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
         if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
           data.emplace<std::vector<VkDescriptorImageInfo>>();
         std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
-          .sampler     = material->getNormalTexture()->getSampler(),
-          .imageView   = material->getNormalTexture()->getImageView(),
+          .sampler     = material->normalTexture->getSampler(),
+          .imageView   = material->normalTexture->getImageView(),
           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         });
         break;
@@ -309,8 +321,6 @@ void Pipeline::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vect
   }
 }
 
-void Pipeline::update() {}
-
 Pipeline::~Pipeline() {
   vkDestroyPipelineLayout(device->device, layout, nullptr);
   layout = VK_NULL_HANDLE;
@@ -320,4 +330,4 @@ Pipeline::~Pipeline() {
 
 VkPipeline Pipeline::getPipeline() const { return pipeline; }
 VkPipelineLayout Pipeline::getLayout() const { return layout; }
-std::shared_ptr<Material> Pipeline::getMaterial() const { return material; }
+Material* Pipeline::getMaterial() const { return material; }

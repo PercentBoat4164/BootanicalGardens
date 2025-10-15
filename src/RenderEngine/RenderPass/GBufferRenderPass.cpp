@@ -4,8 +4,8 @@
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Mesh.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/Buffer.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
@@ -16,17 +16,23 @@
 
 #include <volk/volk.h>
 
-GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {}
+GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
+  fragmentShaderOverride = graph.device->getJSONShader("Geometry Buffer Render Pass | Fragment Shader Override");
+}
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::declareAccesses() {
-  std::vector<std::shared_ptr<Material>> materials;
-  materials.reserve(graph.device->meshes.size());
-  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) materials.push_back(mesh->getMaterial());
-  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
+  for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
+    for (Material* material : mesh.instances | std::ranges::views::keys) {
+      Material* overriddenMaterial = material->getFragmentVariation(fragmentShaderOverride);
+      pipelines.emplace(overriddenMaterial, nullptr);
+      materialRemap.emplace(material, overriddenMaterial);
+    }
+  }
+  setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 
-void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
+void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
   std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
   uint32_t i{~0U};
   for (VkAttachmentReference& attachmentReference: attachmentReferences) {
@@ -74,13 +80,10 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
   }
 #endif
 
-  framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  for (const std::shared_ptr<Mesh>& mesh: graph.device->meshes) {
-    const std::shared_ptr<Material>& material = mesh->getMaterial();
-    pipelines[material]                       = std::make_shared<Pipeline>(graph.device, material);
-  }
+  for (auto& [material, pipeline]: pipelines) pipeline = graph.device->getPipeline(material, compatibility);
 
-  uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "G-Buffer Render Pass | Uniform Buffer");
+  framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
+  uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, "G-Buffer Render Pass | Uniform Buffer");
 }
 
 void GBufferRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
@@ -127,21 +130,18 @@ void GBufferRenderPass::update() {
 }
 
 void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
-  constexpr VkClearValue black{.color={0, 0, 0, 0}};
-  constexpr VkClearValue far{.depthStencil = {.depth = 1.0F, .stencil = 0}};
-  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this(), VkRect2D{}, std::vector{far, black, black, black});
-  for (const std::shared_ptr<Mesh>& mesh : graph.device->meshes) {
-    if (!(mesh->isOpaque() && meshFilter & OpaqueBit) && !(mesh->isTransparent() && meshFilter & TransparentBit))
-      continue;
-    const std::shared_ptr<Pipeline>& pipeline = pipelines.at(mesh->getMaterial());
-    const uint64_t frameIndex = graph.getFrameIndex();
-    commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-    commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*graph.getPerFrameData(frameIndex).descriptorSet, *getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)});
-    commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>{{mesh->getVertexBuffer(), 0}});
-    if (mesh->getIndexBuffer() != nullptr) {
-      commandBuffer.record<CommandBuffer::BindIndexBuffers>(mesh->getIndexBuffer());
-      commandBuffer.record<CommandBuffer::DrawIndexed>();
-    } else commandBuffer.record<CommandBuffer::Draw>();
+  const uint64_t frameIndex = graph.getFrameIndex();
+  commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
+  for (const Mesh& mesh : graph.device->meshes | std::ranges::views::values) {
+    commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{mesh.positionsVertexBuffer.get(), mesh.textureCoordinatesVertexBuffer.get(), mesh.normalsVertexBuffer.get(), mesh.tangentsVertexBuffer.get()});
+    commandBuffer.record<CommandBuffer::BindIndexBuffer>(mesh.indexBuffer.get());
+    for (auto& [material, instanceData]: mesh.instances) {
+      Pipeline* pipeline = pipelines.at(materialRemap.at(material));
+      commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(graph.getFrameIndex()), *pipeline->getDescriptorSet(frameIndex)}, 1);
+      commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
+      commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
+    }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }

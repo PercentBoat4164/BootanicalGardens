@@ -3,6 +3,7 @@
 #include "src/RenderEngine/Resources/Buffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/Tools/Hashing.hpp"
 
 #include <vma/vk_mem_alloc.h>
 #include <volk/volk.h>

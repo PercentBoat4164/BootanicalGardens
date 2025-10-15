@@ -1,16 +1,19 @@
 #pragma once
 
-#include "RenderPass/RenderPass.hpp"
-#include "Resources/Buffer.hpp"
+#include "src/RenderEngine/RenderPass/RenderPass.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
+#include "src/RenderEngine/Resources/Image.hpp"
 
 #include <vulkan/vulkan_core.h>
 
 #include <cpptrace/basic.hpp>
+
 #include <list>
 #include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <ranges>
 
 class RenderPass;
 class Image;
@@ -28,8 +31,8 @@ public:
     MergePipelineBarriers = 0x8,
     PipelineBarriers = AddPipelineBarriers | RemovePipelineBarriers | ModifyPipelineBarriers | MergePipelineBarriers,
     MergePipelineBinds = 0x10,
-    CommandBufferStateTransitions = 0x10,
-    Everything = PipelineBarriers | CommandBufferStateTransitions
+    StateTransitions = MergePipelineBinds,
+    Everything = PipelineBarriers | StateTransitions
   };
 
   struct ResourceState {
@@ -38,11 +41,11 @@ public:
   };
 
   struct State {
-    std::unordered_map<void*, ResourceState> resourceStates;
-    std::weak_ptr<RenderPass> renderPass;
-    std::weak_ptr<Pipeline> pipeline;
-    std::weak_ptr<Buffer> indexBuffer;
-    std::vector<std::weak_ptr<Buffer>> vertexBuffers;
+    std::unordered_map<const Resource*, ResourceState> resourceStates;
+    const RenderPass* renderPass;
+    const Pipeline* pipeline;
+    const Buffer* indexBuffer;
+    std::vector<const Buffer*> vertexBuffers;
   };
 
   struct Command {
@@ -53,7 +56,7 @@ public:
       };
       using Type = uint8_t;
       Type type{Read};
-      Resource* resource{nullptr};
+      const Resource* resource{nullptr};
       VkPipelineStageFlags stage{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
       VkAccessFlags mask{VK_ACCESS_NONE};
       std::vector<VkImageLayout> allowedLayouts{};
@@ -81,7 +84,8 @@ public:
   };
 
 private:
-  std::list<std::shared_ptr<Command>> commands;
+  std::list<std::unique_ptr<Command>> commands;
+  plf::colony<Resource*> resources;
 
 public:
   using iterator = decltype(commands)::iterator;
@@ -100,20 +104,38 @@ public:
   [[nodiscard]] bool empty() const { return commands.empty(); }
 
   struct BeginRenderPass final : Command {
-    explicit BeginRenderPass(std::shared_ptr<RenderPass> renderPass, VkRect2D renderArea={}, std::vector<VkClearValue> clearValues={});
+    template<std::ranges::range T = std::span<VkClearValue>>
+    /**@todo: Make renderPass const when declareAccesses has been made constable*/
+    explicit BeginRenderPass(RenderPass* renderPass, T&& clearValues=T{}, const VkRect2D renderArea={}) :
+        Command([&]->std::vector<ResourceAccess>{
+          std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->declareAccesses();
+          std::vector<ResourceAccess> accesses;
+          accesses.reserve(attachments.size());
+          for (const auto& [id, access]: attachments) {
+            accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, renderPass->getGraph().getImage(id).image, access.stage, access.access, std::vector{access.layout});
+          }
+          return accesses;
+        }(), StateChange),
+        renderPass(renderPass),
+        renderArea(renderArea.offset.x == 0 && renderArea.offset.y == 0 && renderArea.extent.width == 0 && renderArea.extent.height == 0 ? this->renderPass->getFramebuffer()->getRect() : renderArea),
+        clearValues(std::ranges::to<std::vector>(clearValues)),
+        renderPassBeginInfo() {}
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<RenderPass> renderPass;
+    RenderPass* renderPass;
     VkRect2D renderArea;
     std::vector<VkClearValue> clearValues;
     VkRenderPassBeginInfo renderPassBeginInfo;
   };
 
   struct BindDescriptorSets final : Command {
-    explicit BindDescriptorSets(const std::vector<VkDescriptorSet>& descriptorSets, uint32_t firstSet=0);
+    explicit BindDescriptorSets(std::ranges::range auto&& descriptorSets, const uint32_t firstSet=0) :
+        Command({}, StateChange),
+        descriptorSets{std::ranges::to<std::vector>(descriptorSets)},
+        firstSet(firstSet) {}
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -124,141 +146,236 @@ public:
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   };
 
-  struct BindIndexBuffers final : Command {
-    explicit BindIndexBuffers(std::shared_ptr<Buffer> indexBuffer);
+  struct BindIndexBuffer final : Command {
+    explicit BindIndexBuffer(const Buffer* indexBuffer);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Buffer> buffer;
+    const Buffer* buffer;
   };
 
   struct BindPipeline final : Command {
-    explicit BindPipeline(std::shared_ptr<Pipeline> pipeline);
+    explicit BindPipeline(const Pipeline* pipeline);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Pipeline> pipeline;
+    const Pipeline* pipeline;
     VkExtent2D extent;
   };
 
   struct BindVertexBuffers final : Command {
-    explicit BindVertexBuffers(const std::vector<std::tuple<std::shared_ptr<Buffer>, const VkDeviceSize>>& vertexBuffers);
+    explicit BindVertexBuffers(std::ranges::range auto&& vertexBuffers, std::ranges::range auto&& offsets, const uint32_t firstBinding=0) :
+        Command({}, StateChange),
+        buffers(std::ranges::to<std::vector>(vertexBuffers)),
+        offsets(std::ranges::to<std::vector>(offsets)),
+        firstBinding(firstBinding) {}
+    explicit BindVertexBuffers(std::ranges::range auto&& vertexBuffers, const uint32_t firstBinding=0) :
+        Command({}, StateChange),
+        buffers(std::ranges::to<std::vector>(vertexBuffers)),
+        offsets(buffers.size(), 0),
+        firstBinding(firstBinding) {}
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::vector<std::shared_ptr<Buffer>> buffers;
-    std::vector<VkBuffer> rawBuffers;
+    std::vector<Buffer*> buffers;
     std::vector<VkDeviceSize> offsets;
+    uint32_t firstBinding;
   };
 
   struct BlitImageToImage final : Command {
-    BlitImageToImage(std::shared_ptr<Image> src, std::shared_ptr<Image> dst, std::vector<VkImageBlit> regions={}, VkFilter filter=VK_FILTER_NEAREST);
+    template<std::ranges::range T = std::span<VkImageBlit>>
+    BlitImageToImage(const Image* const source, const Image* const destination, T&& regions=T{}, const VkFilter filter=VK_FILTER_NEAREST) :
+        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                 ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}
+        }, Copy),
+        src(source),
+        dst(destination),
+        blits(std::ranges::to<std::vector>(regions)),
+        filter(filter) {
+      if (blits.empty()) blits.push_back({
+        .srcSubresource = VkImageSubresourceLayers{source->getAspect(), 0, 0, source->getLayerCount()},
+        .srcOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(source->getExtent().width), static_cast<int32_t>(source->getExtent().height), static_cast<int32_t>(source->getExtent().depth)}},
+        .dstSubresource = VkImageSubresourceLayers{destination->getAspect(), 0, 0, destination->getLayerCount()},
+        .dstOffsets = {{0, 0, 0}, VkOffset3D{static_cast<int32_t>(destination->getExtent().width), static_cast<int32_t>(destination->getExtent().height), static_cast<int32_t>(destination->getExtent().depth)}},
+      });
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Image> src;
-    std::shared_ptr<Image> dst;
-
-    VkImage srcImage{VK_NULL_HANDLE};
-    VkImage dstImage{VK_NULL_HANDLE};
+    const Image* src;
+    const Image* dst;
     VkImageLayout srcImageLayout{};
     VkImageLayout dstImageLayout{};
-    std::vector<VkImageBlit> regions{};
+    std::vector<VkImageBlit> blits{};
     VkFilter filter{};
   };
 
   struct ClearColorImage final : Command {
-    explicit ClearColorImage(std::shared_ptr<Image> img, VkClearColorValue value={}, std::vector<VkImageSubresourceRange> subresourceRanges={});
+    template<std::ranges::range T = std::span<VkImageSubresourceRange>>
+    explicit ClearColorImage(const Image* const image, const VkClearColorValue value={}, T&& subresourceRanges=T{}) :
+        Command({ResourceAccess{ResourceAccess::Write, image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
+        image(image),
+        value(value),
+        ranges(std::ranges::to<std::vector>(subresourceRanges)) {
+      if (ranges.empty()) ranges.push_back({image->getAspect(), 0, image->getMipLevels(), 0, image->getLayerCount()});
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Image> img;
+    const Image* image;
     VkClearColorValue value;
-    std::vector<VkImageSubresourceRange> subresourceRanges;
-    VkImage image{VK_NULL_HANDLE};
+    std::vector<VkImageSubresourceRange> ranges;
     VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
   };
 
   struct ClearDepthStencilImage final : Command {
-    explicit ClearDepthStencilImage(std::shared_ptr<Image> img, VkClearDepthStencilValue value={1.0, 0}, std::vector<VkImageSubresourceRange> subresourceRanges={});
+    template<std::ranges::range T = std::span<VkImageSubresourceRange>>
+    explicit ClearDepthStencilImage(const Image* const image, const VkClearDepthStencilValue value={1}, T&& subresourceRanges=T{}) :
+        Command({ResourceAccess{ResourceAccess::Write, image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
+        image(image),
+        value(value),
+        ranges(std::ranges::to<std::vector>(subresourceRanges)) {
+      if (ranges.empty()) ranges.push_back({image->getAspect(), 0, image->getMipLevels(), 0, image->getLayerCount()});
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Image> img;
+    const Image* image;
     VkClearDepthStencilValue value;
-    std::vector<VkImageSubresourceRange> subresourceRanges;
-    VkImage image{VK_NULL_HANDLE};
+    std::vector<VkImageSubresourceRange> ranges;
     VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
   };
 
   struct CopyBufferToBuffer final : Command {
-    CopyBufferToBuffer(std::shared_ptr<Buffer> src, std::shared_ptr<Buffer> dst, std::vector<VkBufferCopy> regions={});
+    template<std::ranges::range T = std::span<VkBufferCopy>>
+    CopyBufferToBuffer(const Buffer* const source, const Buffer* const destination, T&& regions=T{}) :
+        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
+             ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+             Copy),
+        src(source),
+        dst(destination),
+        copies(std::ranges::to<std::vector>(regions)) {
+      if (copies.empty()) copies.push_back({
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = std::min(source->getSize(), destination->getSize())
+      });
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Buffer> src;
-    std::shared_ptr<Buffer> dst;
-    std::vector<VkBufferCopy> regions;
-    VkBuffer srcBuffer{VK_NULL_HANDLE};
-    VkBuffer dstBuffer{VK_NULL_HANDLE};
+    const Buffer* src;
+    const Buffer* dst;
+    std::vector<VkBufferCopy> copies;
   };
 
   struct CopyBufferToImage final : Command {
-    CopyBufferToImage(std::shared_ptr<Buffer> src, std::shared_ptr<Image> dst, std::vector<VkBufferImageCopy> regions={});
+    template<std::ranges::range T = std::span<VkBufferImageCopy>>
+    CopyBufferToImage(const Buffer* const source, const Image* const destination, T&& regions=T{}) :
+        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
+                 ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+                 Copy),
+        src(source),
+        dst(destination),
+        copies{std::ranges::to<std::vector<VkBufferImageCopy>>(regions)} {
+      if (copies.empty()) {
+        const VkExtent3D texelBlockExtent = vkuFormatTexelBlockExtent(destination->getFormat());
+        copies.push_back({
+          .bufferOffset = 0,
+          .bufferRowLength = texelBlockExtent.width * destination->getExtent().width,
+          .bufferImageHeight = texelBlockExtent.height * destination->getExtent().height,
+          .imageSubresource = VkImageSubresourceLayers{destination->getAspect(), 0, 0, destination->getLayerCount()},
+          .imageOffset = VkOffset3D{0, 0, 0},
+          .imageExtent = destination->getExtent()
+        });
+      }
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Buffer> src;
-    std::shared_ptr<Image> dst;
-    std::vector<VkBufferImageCopy> regions;
-    VkBuffer buffer{VK_NULL_HANDLE};
-    VkImage image{VK_NULL_HANDLE};
+    const Buffer* src;
+    const Image* dst;
+    std::vector<VkBufferImageCopy> copies;
     VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
   };
 
   struct CopyImageToBuffer final : Command {
-    CopyImageToBuffer(std::shared_ptr<Image> src, std::shared_ptr<Buffer> dst, std::vector<VkBufferImageCopy> regions={});
+    template<std::ranges::range T = std::span<VkBufferImageCopy>>
+    CopyImageToBuffer(const Image* const source, const Buffer* const destination, T&& regions=T{}) :
+        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+             ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+             Copy),
+        src(source),
+        dst(destination),
+        copies(std::ranges::to<std::vector>(regions)) {
+      if (copies.empty()) {
+        const VkExtent3D texelBlockExtent = vkuFormatTexelBlockExtent(source->getFormat());
+        copies.push_back({
+          .bufferOffset = 0,
+          .bufferRowLength = texelBlockExtent.width * source->getExtent().width,
+          .bufferImageHeight = texelBlockExtent.height * source->getExtent().height,
+          .imageSubresource = VkImageSubresourceLayers{source->getAspect(), 0, 0, source->getLayerCount()},
+          .imageOffset = VkOffset3D{0, 0, 0},
+          .imageExtent = source->getExtent()
+        });
+      }
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Image> src;
-    std::shared_ptr<Buffer> dst;
-    std::vector<VkBufferImageCopy> regions;
-    VkImage image{VK_NULL_HANDLE};
-    VkBuffer buffer{VK_NULL_HANDLE};
+    const Image* src;
+    const Buffer* dst;
+    std::vector<VkBufferImageCopy> copies;
     VkImageLayout layout{VK_IMAGE_LAYOUT_MAX_ENUM};
   };
 
   struct CopyImageToImage final : Command {
-    CopyImageToImage(std::shared_ptr<Image> src, std::shared_ptr<Image> dst, std::vector<VkImageCopy> regions={});
+    template<std::ranges::range T = std::span<VkImageCopy>>
+    CopyImageToImage(const Image* const src, const Image* const dst, T&& regions=T{}) :
+        Command(src == dst ? std::vector{ResourceAccess{ResourceAccess::Read, src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                                         ResourceAccess{ResourceAccess::Write, dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}
+                           : std::vector{ResourceAccess{ResourceAccess::Read, src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                                         ResourceAccess{ResourceAccess::Write, dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+                Copy),
+        src(src),
+        dst(dst),
+        copies(std::ranges::to<std::vector>(regions)) {
+      if (copies.empty()) {
+        copies.push_back({
+          .srcSubresource = VkImageSubresourceLayers{src->getAspect(), 0, 0, src->getLayerCount()},
+          .srcOffset      = VkOffset3D{0, 0, 0},
+          .dstSubresource = VkImageSubresourceLayers{dst->getAspect(), 0, 0, dst->getLayerCount()},
+          .dstOffset      = VkOffset3D{0, 0, 0},
+          .extent         = VkExtent3D{std::min(src->getExtent().width, dst->getExtent().width), std::min(src->getExtent().height, dst->getExtent().height), std::min(src->getExtent().depth, dst->getExtent().depth)}
+        });
+      }
+    }
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Image> src;
-    std::shared_ptr<Image> dst;
-    std::vector<VkImageCopy> regions;
-    VkImage srcImage{VK_NULL_HANDLE};
-    VkImage dstImage{VK_NULL_HANDLE};
+    const Image* src;
+    const Image* dst;
+    std::vector<VkImageCopy> copies;
     VkImageLayout srcLayout{VK_IMAGE_LAYOUT_MAX_ENUM};
     VkImageLayout dstLayout{VK_IMAGE_LAYOUT_MAX_ENUM};
   };
@@ -274,25 +391,25 @@ public:
   };
 
   struct DrawIndexed final : Command {
-    explicit DrawIndexed();
+    explicit DrawIndexed(uint32_t instanceCount=1);
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
+    uint32_t instanceCount{0};
     uint32_t vertexCount{0};
     uint32_t indexCount{0};
   };
 
   struct DrawIndexedIndirect final : Command {
-    explicit DrawIndexedIndirect(const std::shared_ptr<Buffer>& buffer, uint32_t count, VkDeviceSize offset=0, uint32_t stride=sizeof(VkDrawIndexedIndirectCommand));
+    explicit DrawIndexedIndirect(const Buffer* buffer, uint32_t count=std::numeric_limits<uint32_t>::max(), VkDeviceSize offset=0, uint32_t stride=sizeof(VkDrawIndexedIndirectCommand));
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
     std::string toString(bool includeArguments) override;
 
-    std::shared_ptr<Buffer> buffer;
-    VkBuffer buf{VK_NULL_HANDLE};
+    const Buffer* buffer;
     VkDeviceSize offset{0};
     uint32_t count{0};
     uint32_t stride{0};
@@ -307,7 +424,46 @@ public:
   };
 
   struct PipelineBarrier final : Command {
-    PipelineBarrier(VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags, std::vector<VkMemoryBarrier> memoryBarriers, std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers, std::vector<VkImageMemoryBarrier> imageMemoryBarriers);
+    struct MemoryBarrier {
+      VkStructureType sType;
+      const void*     pNext;
+      VkAccessFlags   srcAccessMask;
+      VkAccessFlags   dstAccessMask;
+      explicit operator VkMemoryBarrier() const { return {sType, pNext, srcAccessMask, dstAccessMask}; }
+    };
+    struct BufferMemoryBarrier {
+      VkStructureType sType;
+      const void*     pNext;
+      VkAccessFlags   srcAccessMask;
+      VkAccessFlags   dstAccessMask;
+      uint32_t        srcQueueFamilyIndex;
+      uint32_t        dstQueueFamilyIndex;
+      const Buffer*   buffer;
+      VkDeviceSize    offset;
+      VkDeviceSize    size;
+      explicit operator VkBufferMemoryBarrier() const { return {sType, pNext, srcAccessMask, dstAccessMask, srcQueueFamilyIndex, dstQueueFamilyIndex, buffer->getBuffer(), offset, size}; }
+    };
+    struct ImageMemoryBarrier {
+      VkStructureType         sType;
+      const void*             pNext;
+      VkAccessFlags           srcAccessMask;
+      VkAccessFlags           dstAccessMask;
+      VkImageLayout           oldLayout;
+      VkImageLayout           newLayout;
+      uint32_t                srcQueueFamilyIndex;
+      uint32_t                dstQueueFamilyIndex;
+      const Image*            image;
+      VkImageSubresourceRange subresourceRange;
+      explicit operator VkImageMemoryBarrier() const { return {sType, pNext, srcAccessMask, dstAccessMask, oldLayout, newLayout, srcQueueFamilyIndex, dstQueueFamilyIndex, image->getImage(), subresourceRange}; }
+    };
+    PipelineBarrier(const VkPipelineStageFlags srcStageMask, const VkPipelineStageFlags dstStageMask, const VkDependencyFlags dependencyFlags, std::ranges::range auto&& memoryBarriers, std::ranges::range auto&& bufferMemoryBarriers, std::ranges::range auto&& imageMemoryBarriers) :
+      Command({}, Synchronization),
+      srcStageMask(srcStageMask),
+      dstStageMask(dstStageMask),
+      dependencyFlags(dependencyFlags),
+      memoryBarriers(std::ranges::to<std::vector>(memoryBarriers)),
+      bufferMemoryBarriers(std::ranges::to<std::vector>(bufferMemoryBarriers)),
+      imageMemoryBarriers(std::ranges::to<std::vector>(imageMemoryBarriers)) {}
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -316,17 +472,16 @@ public:
     VkPipelineStageFlags srcStageMask;
     VkPipelineStageFlags dstStageMask;
     VkDependencyFlags dependencyFlags;
-    std::vector<VkMemoryBarrier> memoryBarriers;
-    std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers;
-    std::vector<VkImageMemoryBarrier> imageMemoryBarriers;
+    std::vector<MemoryBarrier> memoryBarriers;
+    std::vector<BufferMemoryBarrier> bufferMemoryBarriers;
+    std::vector<ImageMemoryBarrier> imageMemoryBarriers;
   };
 
   template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(const const_iterator& iterator, Args&&... args) { return commands.insert(iterator, std::make_unique<T>(std::forward<Args&&>(args)...)); }
-  template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(Args&&... args) { return record<T>(commands.cend(), std::forward<Args&&>(args)...); }
-  const_iterator record(const const_iterator& iterator, const CommandBuffer& commandBuffer);
-  const_iterator record(const CommandBuffer& commandBuffer);
+  template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(Args&&... args) { return commands.insert(commands.cend(), std::make_unique<T>(std::forward<Args&&>(args)...)); }
+  void addCleanupResource(Resource* resource);
   /**
-   * This command will preprocess this CommandBuffer assuming a set of input states. This process involves not only modifying the recorded commands to be correct with each other, but can optimize them as well.
+   * This command will preprocess this CommandBuffer assuming a set of input states. This process involves not only modifying the recorded commands to be correct with each other, but optimizing them as well.
    * @param state The states of all resources as they will be at the time this command buffer is submitted to the GPU
    * @param flags The optimizations to perform
    * @param apply Whether changes should be applied to this command buffer or not
@@ -344,4 +499,6 @@ public:
   void clear();
 
   void getDefaultState(State&state);
+
+  ~CommandBuffer();
 };

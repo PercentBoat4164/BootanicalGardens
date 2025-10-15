@@ -2,13 +2,13 @@
 
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Mesh.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 
 #include <volk/volk.h>
 
 /**@todo: Thread this function.*/
-void RenderPass::setRenderPassInfo(const VkRenderPassCreateInfo& createInfo, const std::vector<std::shared_ptr<Image>>& images) {
+void RenderPass::setRenderPassInfo(const VkRenderPassCreateInfo& createInfo, const std::vector<const Image*>&images) {
   // Compute the render pass's compatibility. This is given as the hash of the attributes of the render pass that determine compatibility.
   uint32_t index{};
   compatibility = 0;
@@ -88,53 +88,7 @@ RenderPass::~RenderPass() {
   }
 }
 
-void RenderPass::setup(const std::span<std::shared_ptr<Material>> materials) {
-  imageAccesses.clear();
-  // Prepare data for this render pass
-  if (const std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {
-    depthStencilAttachmentOffset = imageAccesses.size();
-    auto [id, access] = optionalDepthStencilAttachmentAccess.value();
-    imageAccesses.emplace_back(id, access);
-  }
-  colorAttachmentOffset = imageAccesses.size();
-  for (const std::shared_ptr<Material>& material: materials) {
-    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& colorAttachmentAccesses = material->computeColorAttachmentAccesses();
-    for (auto& [id, access]: colorAttachmentAccesses) {
-      auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
-      if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
-      /**@todo: If the order of rendering is known (e.g. if the meshes are sorted), then this error can go away and we can just use the first and last layouts that the image is in.*/
-      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
-    }
-  }
-  if (colorAttachmentOffset == imageAccesses.size()) colorAttachmentOffset = ~0U;
-  else colorAttachmentCount = imageAccesses.size() - colorAttachmentOffset;
-  inputAttachmentOffset = imageAccesses.size();
-  for (const std::shared_ptr<Material>& material: materials) {
-    /**@todo: Add automatic support for resolve attachments.*/
-    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
-    for (auto& [id, access]: inputAttachmentAccesses) {
-      auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
-      if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
-      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
-    }
-  }
-  if (inputAttachmentOffset == imageAccesses.size()) inputAttachmentOffset = ~0U;
-  else inputAttachmentCount = imageAccesses.size() - inputAttachmentOffset;
-  boundImageOffset = imageAccesses.size();
-  for (const std::shared_ptr<Material>& material: materials) {
-    const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& boundImageAccesses = material->computeBoundImageAccesses();
-    for (auto& [id, access]: boundImageAccesses) {
-      auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
-      if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
-      else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
-    }
-  }
-  if (boundImageOffset == imageAccesses.size()) boundImageOffset = ~0U;
-  else boundImageCount = imageAccesses.size() - boundImageOffset;
-  imageAccesses.shrink_to_fit();
-}
-
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }
-std::shared_ptr<Framebuffer> RenderPass::getFramebuffer() const { return framebuffer; }
-const std::unordered_map<std::shared_ptr<Material>, std::shared_ptr<Pipeline>>& RenderPass::getPipelines() { return pipelines; }
+Framebuffer* RenderPass::getFramebuffer() const { return framebuffer.get(); }
+std::unordered_map<Material*, Pipeline*> RenderPass::getPipelines() { return pipelines; }
 const RenderGraph& RenderPass::getGraph() const { return graph; }

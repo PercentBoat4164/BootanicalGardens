@@ -1,5 +1,6 @@
 #include "GraphicsInstance.hpp"
 
+#include "src/RenderEngine/CommandBuffer.hpp"
 #include "Window.hpp"
 
 #include <cpptrace/cpptrace.hpp>
@@ -15,6 +16,9 @@
   //   printf("\n");                            \
   // } while(false)
 #endif
+#include "src/Entity.hpp"
+
+#include <iostream>
 #include <vma/vk_mem_alloc.h>
 
 #if BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS & !VK_EXT_debug_utils
@@ -50,7 +54,7 @@ VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBi
     const auto* debugData = static_cast<DebugData*>(pUserData);
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
     if (debugData->command != nullptr) {
-      stacktrace = debugData->command->trace.resolve().to_string(true);
+      stacktrace = static_cast<CommandBuffer::Command*>(debugData->command)->trace.resolve().to_string(true);
       stacktrace.reserve(std::ranges::count(stacktrace, '\n') * 2 + stacktrace.length());
       pos = stacktrace.find('\n');
       while (pos != std::string::npos) {
@@ -92,11 +96,11 @@ void GraphicsInstance::create(std::vector<const char*> extensions) {
   volkLoadInstanceOnly(instance.instance);
 }
 
-bool GraphicsInstance::extensionEnabled(uint32_t nameHash) {
+bool GraphicsInstance::extensionEnabled(const uint64_t nameHash) {
   return enabledExtensions.contains(nameHash);
 }
 
-void GraphicsInstance::setDebugDataCommand(CommandBuffer::Command* command) { debugData.command = command; }
+void GraphicsInstance::setDebugDataCommand(void* command) { debugData.command = command; }
 
 void GraphicsInstance::destroy() {
   destroy_instance(instance);

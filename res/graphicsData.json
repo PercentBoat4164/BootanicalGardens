@@ -1,29 +1,119 @@
 {
+  "materials": [
+    {
+      "name": "FlightHelmet | GlassPlastic",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 0,
+      "normalTexture": 1
+    }, {
+      "name": "FlightHelmet | Hose",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 3,
+      "normalTexture": 4
+    }, {
+      "name": "FlightHelmet | Leather",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 6,
+      "normalTexture": 7
+    }, {
+      "name": "FlightHelmet | Lenses",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": true,
+      "alphaMode": 2,
+      "alphaCutoff": null,
+      "albedoTexture": 9,
+      "normalTexture": 10
+    }, {
+      "name": "FlightHelmet | Metal",
+      "vertexShader": 0,
+      "fragmentShader": 1,
+      "doubleSided": false,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 12,
+      "normalTexture": 13
+    }
+  ],
+  "meshes": [
+    {
+      "path": "goggles.glb"
+    }, {
+      "path": "hose.glb"
+    }, {
+      "path": "leather.glb"
+    }, {
+      "path": "lenses.glb"
+    }, {
+      "path": "metal.glb"
+    }, {
+      "path": "rubberwood.glb"
+    }
+  ],
   "shaders": [
     {
-      "source": "res/basic.vert",
-      "code": [23473425],
-      "stage": 536234,
-      "entry points": [
-        {
-          "name": "main"
-        }
-      ]
+      "path": "gbuffer.vert"
+    }, {
+      "path": "deferred.frag"
     }
   ],
-  "pipelines": [
+  "overrideShaders": {
+    "Geometry Buffer Render Pass | Fragment Shader Override":
+      {
+        "path": "gbuffer.frag"
+      },
+    "Shadow Render Pass | Fragment Shader Override":
+      {
+        "path": "shadow.frag"
+      },
+    "Collect Shadows Render Pass | Vertex Shader Override":
+      {
+        "path": "deferred.vert"
+      }
+  },
+  "textures": [
     {
-      "bind point": 43025,
-      "shaders": [0]
-    }
-  ],
-  "render passes": [
-    {
-      "subpasses": [
-        {
-
-        }
-      ]
+      "path": "FlightHelmet/GlassPlastic/albedo.exr"
+    }, {
+      "path": "FlightHelmet/GlassPlastic/normal.exr"
+    }, {
+      "path": "FlightHelmet/GlassPlastic/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Hose/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Hose/normal.exr"
+    }, {
+      "path": "FlightHelmet/Hose/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Leather/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Leather/normal.exr"
+    }, {
+      "path": "FlightHelmet/Leather/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/normal.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Metal/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Metal/normal.exr"
+    }, {
+      "path": "FlightHelmet/Metal/occlusionRoughnessMetallic.exr"
     }
   ]
 }

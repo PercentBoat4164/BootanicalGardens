@@ -1,31 +1,37 @@
 #include "CollectShadowsRenderPass.hpp"
 
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_transform.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 
-#include <filesystem>
 #include <volk/volk.h>
 
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+
+#include <filesystem>
+
 CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  material = std::make_shared<Material>(
-    std::make_shared<Shader>(graph.device, std::filesystem::canonical("../res/shaders/deferred.vert")),
-    std::make_shared<Shader>(graph.device, std::filesystem::canonical("../res/shaders/deferred.frag"))
-  );
+  vertexShaderOverride = graph.device->getJSONShader("Collect Shadows Render Pass | Vertex Shader Override");
 }
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::declareAccesses() {
-  std::array materials{material};
-  setup(materials);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
+  std::unordered_set<Material*> materialSet;
+  for (Material& material: graph.device->materials | std::ranges::views::values) {
+    Material* overriddenMaterial = material.getVertexVariation(vertexShaderOverride);
+    pipelines.emplace(overriddenMaterial, nullptr);
+    materialRemap.emplace(&material, overriddenMaterial);
+  }
+  setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
   return imageAccesses;
 }
 
-void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<std::shared_ptr<Image>>& images) {
+void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
   std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
   uint32_t i{~0U};
   for (VkAttachmentReference& attachmentReference: attachmentReferences) {
@@ -68,16 +74,16 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_RENDER_PASS,
       .objectHandle = reinterpret_cast<uint64_t>(renderPass),
-      .pObjectName = "Collect Shadows Render Pass"
+      .pObjectName = name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(graph.device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
   }
 #endif
 
-  framebuffer = std::make_shared<Framebuffer>(graph.device, images, renderPass);
-  pipelines[material] = std::make_shared<Pipeline>(graph.device, material);
+  for (auto& [material, pipeline]: pipelines) pipeline = graph.device->getPipeline(material, compatibility);
 
-  uniformBuffer = std::make_shared<UniformBuffer<PassData>>(graph.device, "Collect Shadows Pass | Uniform Buffer");
+  framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
+  uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, (std::string(PassName) + " | Uniform Buffer").c_str());
 }
 
 void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
@@ -150,11 +156,13 @@ void CollectShadowsRenderPass::update() {
 }
 
 void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
-  commandBuffer.record<CommandBuffer::BeginRenderPass>(shared_from_this());
-  std::shared_ptr<Pipeline> pipeline = pipelines.at(material);
+  commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   const uint64_t frameIndex = graph.getFrameIndex();
-  commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
-  commandBuffer.record<CommandBuffer::Draw>(3);  // No vertex buffer needs to be bound for this call because the vertex shader generates the required vertex attributes automatically.
+  for (const Pipeline* pipeline : pipelines | std::ranges::views::values) {
+    commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
+    commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
+    commandBuffer.record<CommandBuffer::Draw>(3);  // No vertex buffer needs to be bound for this call because the vertex shader generates the vertex positions automatically.
+    /**@todo: Make this happen in multiple subpasses to enhance the parallelism achievable on the GPU?*/
+  }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }

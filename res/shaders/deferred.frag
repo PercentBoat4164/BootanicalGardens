@@ -1,7 +1,10 @@
 #version 460
 #include "BooLib.glsl"
 
-layout (location = 0) in vec2 screenSpaceCoordinates;
+layout (set=PER_FRAME_SET, binding=0) uniform FrameData {
+    uint frameNumber;
+    float time;
+} frameData;
 
 layout (input_attachment_index=0, set=PER_PASS_SET, binding=0) uniform subpassInput gBufferAlbedo;
 layout (input_attachment_index=1, set=PER_PASS_SET, binding=1) uniform subpassInput gBufferPosition;

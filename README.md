@@ -21,7 +21,7 @@ src
 |-- Component.cpp
 |-- Entity.cpp  // Manages a group of Components
 |-- RenderEngine
-|   |-- Renderable.cpp  // A model, material, textures, and other rendering parameters | Inherits from Component.cpp
+|   |-- MeshGroup.cpp  // A model, material, textures, and other rendering parameters | Inherits from Component.cpp
 |
 |-- Game
 |   |-- Game.cpp  // Manages all entities

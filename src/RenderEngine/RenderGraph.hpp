@@ -1,8 +1,7 @@
 #pragma once
 
 #include "DescriptorSetRequirer.hpp"
-#include "src/RenderEngine/Renderable/Instance.hpp"
-#include "src/Tools/StringHash.h"
+#include "src/Tools/Hashing.hpp"
 
 #include <plf_colony.h>
 
@@ -22,7 +21,7 @@ class GraphicsDevice;
 class Pipeline;
 class RenderPass;
 class Image;
-class Renderable;
+class MeshGroup;
 template <typename T> class UniformBuffer;
 
 class RenderGraph {
@@ -51,9 +50,8 @@ class RenderGraph {
   };
   
   std::vector<PerFrameData> frames;
-  plf::colony<Instance> instances;
 
-  uint64_t frameNumber{};
+  std::uint64_t frameNumber{};
   std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE};
 
   std::vector<std::shared_ptr<RenderPass>> renderPasses;
@@ -62,15 +60,15 @@ class RenderGraph {
 public:
   GraphicsDevice* const device;
 
-  using ImageID = uint32_t;
-  using ResolutionGroupID = uint32_t;
+  using ImageID = std::uint64_t;
+  using ResolutionGroupID = std::uint64_t;
 
 private:
   struct ImageProperties {
     ResolutionGroupID resolutionGroup;
     VkFormat format;
     bool inheritSampleCount;
-    std::shared_ptr<Image> image;
+    Image* image;
     std::string name;  /**@todo: Try to limit the usage of this to just debug builds.*/
   };
 

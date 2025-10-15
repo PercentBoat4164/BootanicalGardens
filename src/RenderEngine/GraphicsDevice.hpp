@@ -1,19 +1,21 @@
 #pragma once
 
+#include "yyjson.h"
 #include "src/RenderEngine/DescriptorSetAllocator.hpp"
-#include "src/RenderEngine/CommandBuffer.hpp"
 
 #include <VkBootstrap.h>
 #include <vma/vk_mem_alloc.h>
 
-#include <map>
-#include <memory>
-#include <unordered_set>
 
-class Texture;
-class Mesh;
-class Material;
+#include <filesystem>
+#include <unordered_map>
+
 class Shader;
+class Texture;
+class Material;
+class Mesh;
+class Pipeline;
+class CommandBuffer;
 
 class GraphicsDevice {
 public:
@@ -22,12 +24,42 @@ public:
   uint32_t globalQueueFamilyIndex;
   VmaAllocator allocator{VK_NULL_HANDLE};
   VkCommandPool commandPool{VK_NULL_HANDLE};
-  std::map<std::size_t, std::weak_ptr<VkSampler>> samplers;
   DescriptorSetAllocator descriptorSetAllocator{*this};
-  std::unordered_set<std::shared_ptr<Mesh>> meshes;
 
-  explicit GraphicsDevice();
+  std::unordered_map<std::uint64_t, VkSampler> samplers;
+  std::unordered_map<std::string, Shader*> overrideShaders;
+  std::unordered_map<std::uint64_t, Shader*> shaders;
+  std::unordered_map<std::uint64_t, Texture*> textures;
+  std::unordered_map<std::uint64_t, Pipeline> pipelines;
+  std::unordered_map<std::uint64_t, Material> overrideMaterials;
+  std::unordered_map<std::uint64_t, Material> materials;
+  std::unordered_map<std::uint64_t, Mesh> meshes;
+
+  yyjson_doc* graphicsJSON;
+  std::filesystem::path resourcesDirectory;
+  yyjson_val* JSONTextureArray;
+  std::uint64_t JSONTextureArrayCount;
+  yyjson_val* JSONShaderArray;
+  std::uint64_t JSONShaderArrayCount;
+  yyjson_val* JSONOverrideShaders;
+  yyjson_val* JSONMaterialArray;
+  std::uint64_t JSONMaterialArrayCount;
+  yyjson_val* JSONMeshArray;
+  std::uint64_t JSONMeshArrayCount;
+
+  explicit GraphicsDevice(std::filesystem::path path);
   ~GraphicsDevice();
+
+  VkSampler* getSampler(VkFilter magnificationFilter=VK_FILTER_NEAREST, VkFilter minificationFilter=VK_FILTER_NEAREST, VkSamplerMipmapMode mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST, VkSamplerAddressMode addressMode=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, float lodBias=0, VkBorderColor borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+  Shader* getJSONShader(const std::string& name);
+  Shader* getJSONShader(std::uint64_t id);
+  Texture* getJSONTexture(std::uint64_t id);
+  Pipeline* getPipeline(Material* material, std::uint64_t renderPassCompatibility);
+  Material* getMaterial(std::uint64_t id, const Material* material);
+  Material* getMaterial(std::uint64_t id);
+  Mesh* getJSONMesh(std::uint64_t id);
+
+  void update();
 
   struct ImmediateExecutionContext {
     VkCommandBuffer commandBuffer;
@@ -37,5 +69,4 @@ public:
   [[nodiscard]] ImmediateExecutionContext executeCommandBufferAsync(const CommandBuffer& commandBuffer) const;
   void waitForAsyncCommandBuffer(ImmediateExecutionContext context) const;
   void executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const;
-  std::shared_ptr<VkSampler> getSampler(VkFilter magnificationFilter = VK_FILTER_NEAREST, VkFilter minificationFilter = VK_FILTER_NEAREST, VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, float lodBias = 0, VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 };

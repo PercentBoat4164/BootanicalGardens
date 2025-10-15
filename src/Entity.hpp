@@ -3,6 +3,7 @@
 #include "Component.hpp"
 #include "Tools/ClassName.h"
 
+#include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -15,7 +16,8 @@
 struct yyjson_val;
 
 class Entity {
-  static std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Entity&, yyjson_val*)> componentConstructors;
+  using ComponentConstructor = std::function<std::shared_ptr<Component>(std::uint64_t, Entity&, yyjson_val*)>;
+  static std::unordered_map<std::string, ComponentConstructor> componentConstructors;
 
   std::unordered_map<uint64_t, std::shared_ptr<Component>> components;
   uint64_t nextComponentId{UINT64_MAX};
@@ -23,7 +25,7 @@ class Entity {
 
 public:
   glm::vec3 position;
-  glm::dquat rotation;
+  glm::quat rotation;
   glm::vec3 scale;
 
   /**
@@ -34,7 +36,7 @@ public:
    * @param function the functon to be called
    * @return <c>false</c> if a pre-existing Component Constructor would have been overridden, <c>true</c> otherwise.
    */
-  static bool registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*));
+  static bool registerComponentConstructor(const std::string& name, const ComponentConstructor& function);
 
   /**
    * Construct an empty Entity with the given position, rotation, and scale.
@@ -42,7 +44,7 @@ public:
    * @param rotation the initial orientation
    * @param scale the initial scale
    */
-  explicit Entity(std::uint64_t id, glm::vec3 position = glm::vec3(), glm::dquat rotation = glm::dquat(), glm::vec3 scale = glm::vec3());
+  explicit Entity(std::uint64_t id, glm::vec3 position = glm::vec3(), const glm::quat& rotation = glm::quat(), glm::vec3 scale = glm::vec3());
 
   /**
    * Constructs an empty Entity with the same position, rotation, and scale as the given Entity.

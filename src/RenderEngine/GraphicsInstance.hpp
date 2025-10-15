@@ -1,18 +1,16 @@
 #pragma once
-#include "CommandBuffer.hpp"
 #include "magic_enum/magic_enum.hpp"
 
 #include <SDL3/SDL_messagebox.h>
 #include <VkBootstrap.h>
 
-#include <iostream>
 #include <unordered_set>
 
 class GraphicsDevice;
 
 class GraphicsInstance {
   static thread_local struct DebugData {
-    CommandBuffer::Command* command;
+    void* command;
   } debugData;
 
 public:
@@ -28,8 +26,8 @@ public:
    * @param nameHash The hash of the extension's name.
    * @return <c>true</c> if the extension is enabled and <c>false</c> if not.
    */
-  static bool extensionEnabled(uint32_t nameHash);
-  static void setDebugDataCommand(CommandBuffer::Command* command);
+  static bool extensionEnabled(uint64_t nameHash);
+  static void setDebugDataCommand(void* command);
   static void destroy();
 
   static void showError(const std::string& message);

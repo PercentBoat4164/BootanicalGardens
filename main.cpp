@@ -7,16 +7,16 @@
 #include "src/RenderEngine/RenderPass/CollectShadowsRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Renderable.hpp"
-#include "src/RenderEngine/Shader.hpp"
+#include "src/RenderEngine/MeshGroup/MeshGroup.hpp"
 #include "src/RenderEngine/Window.hpp"
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
   GraphicsInstance::create({VK_EXT_DEBUG_UTILS_EXTENSION_NAME});
   {
-    GraphicsDevice graphicsDevice;
+    GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
+
+    Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
 
     Window window{&graphicsDevice};
 
@@ -34,20 +34,12 @@ int main() {
     renderGraph.insert<ShadowRenderPass>();
     renderGraph.insert<CollectShadowsRenderPass>();
 
-    const auto fragmentShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.frag"));
-    const auto vertexShader = std::make_shared<Shader>(&graphicsDevice, std::filesystem::canonical("../res/shaders/gbuffer.vert"));
-
-    const auto renderable = std::make_shared<Renderable>(&graphicsDevice, std::filesystem::canonical("../res/FlightHelmet.glb"));
-    const std::vector<std::shared_ptr<Mesh>>& meshes = renderable->getMeshes();
-    for (const std::shared_ptr<Mesh>& mesh: meshes) {
-      mesh->getMaterial()->setFragmentShader(fragmentShader);
-      mesh->getMaterial()->setVertexShader(vertexShader);
-    }
-    graphicsDevice.meshes.insert(meshes.begin(), meshes.end());
+    LevelParser::loadLevel("../res/levels/Level1.json");
 
     renderGraph.bake();
 
     do {
+      graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();
       // Make sure that the GPU is appropriately waiting for the display (V-Sync)

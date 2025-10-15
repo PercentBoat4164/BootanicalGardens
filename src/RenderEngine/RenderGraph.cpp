@@ -1,19 +1,19 @@
 #include "RenderGraph.hpp"
 
-#include "Renderable/Texture.hpp"
+#include "MeshGroup/Texture.hpp"
 #include "src/Game/Game.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/Pipeline.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
-#include "src/RenderEngine/Renderable/Material.hpp"
-#include "src/RenderEngine/Renderable/Mesh.hpp"
-#include "src/RenderEngine/Renderable/Renderable.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/Window.hpp"
 #include "src/Tools/Hashing.hpp"
 
+#include <iostream>
 #include <volk/volk.h>
 
 #include <ranges>
@@ -86,7 +86,7 @@ void RenderGraph::setResolutionGroup(const std::string_view& name, const VkExten
   ResolutionGroupProperties& group = resolutionGroups[getResolutionGroupId(name)];
   group.resolution = resolution;
   group.sampleCount = sampleCount;
-  for (ImageID attachmentId : group.attachments) if (std::shared_ptr<Image> image = images[attachmentId].image; image != nullptr) image->rebuild(resolution, sampleCount);
+  for (ImageID attachmentId : group.attachments) if (Image* image = images[attachmentId].image; image != nullptr) image->rebuild(resolution, sampleCount);
   outOfDate = true;
 }
 
@@ -159,18 +159,17 @@ bool RenderGraph::bake() {
       const std::vector<ImageID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
       std::vector<VkAttachmentDescription> descriptions;
       descriptions.reserve(renderPassAttachmentIDs.size());
-      std::vector<std::shared_ptr<Image>> attachments;
+      std::vector<const Image*> attachments;
       attachments.reserve(renderPassAttachmentIDs.size());
       for (const ImageID& id: renderPassAttachmentIDs) {
         /**@todo: Add support for aliasing attachments.*/
         /**@todo: Add support for reordering render passes.*/
-        std::shared_ptr<Image> image = getImage(id).image;
+        const Image* image = getImage(id).image;
         std::vector<std::pair<RenderPass*, ImageAccess>>& attachmentDeclarations = id2decl.at(id);
         // Find this renderpass in the declarations of this attachment.
         const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
         /**@todo: Optimize load and store ops.*/
         /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
-        /**@todo: Log an error if this the loadOp is CLEAR and the attachment is an input attachment.*/
         const ImageAccess& thisDeclaration = thisIt->second;
         descriptions.push_back({
             .flags = 0U,
@@ -186,31 +185,27 @@ bool RenderGraph::bake() {
         attachments.push_back(image);
       }
       renderPass->bake(descriptions, attachments);
-      if (renderPass->compatibility == -1U) GraphicsInstance::showError("`RenderPass::bake(...)` failed to update the RenderPass compatibility.");
+      if (renderPass->compatibility == -1U) GraphicsInstance::showError("`RenderPass::bake()` failed to update the RenderPass compatibility.");
     }
 
-    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-      for (const std::shared_ptr<Material>& material: renderPass->getPipelines() | std::views::keys) {
-        if (std::shared_ptr<Texture> albedo = material->getAlbedoTexture(); albedo != nullptr) {
-          std::string name = material->getAlbedoTextureName();
-          images[getImageId(name)] = {
-            .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-            .format = albedo->getFormat(),
-            .inheritSampleCount = false,
-            .image = albedo,
-            .name = name
-          };
-        }
-        if (std::shared_ptr<Texture> normal = material->getNormalTexture(); normal != nullptr) {
-          std::string name = material->getNormalTextureName();
-          images[getImageId(name)] = {
-            .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-            .format = normal->getFormat(),
-            .inheritSampleCount = false,
-            .image = normal,
-            .name = name
-          };
-        }
+    for (Material& material : device->materials | std::ranges::views::values) {
+      if (Texture* albedo = material.albedoTexture; albedo != nullptr) {
+        images[Tools::hash(albedo)] = {
+          .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
+          .format = albedo->getFormat(),
+          .inheritSampleCount = false,
+          .image = albedo,
+          .name = material.name + " | Albedo Texture"
+        };
+      }
+      if (Texture* const normal = material.normalTexture; normal != nullptr) {
+        images[Tools::hash(normal)] = {
+          .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
+          .format = normal->getFormat(),
+          .inheritSampleCount = false,
+          .image = normal,
+          .name = material.name + " | Normal Texture"
+        };
       }
     }
   }
@@ -219,15 +214,15 @@ bool RenderGraph::bake() {
    * Process Descriptor Sets *
    ***************************/
   // Compute the descriptor set requirements
-  std::map<std::shared_ptr<DescriptorSetRequirer>, std::vector<VkDescriptorSetLayoutBinding>> requirements;
+  std::map<DescriptorSetRequirer*, std::vector<VkDescriptorSetLayoutBinding>> requirements;
   for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) {
-    for (const std::shared_ptr<Pipeline>& pipeline: renderPass->getPipelines() | std::ranges::views::values) {
-      pipeline->getMaterial()->computeDescriptorSetRequirements(requirements, renderPass, pipeline);
+    for (Pipeline* pipeline: renderPass->getPipelines() | std::ranges::views::values) {
+      pipeline->getMaterial()->computeDescriptorSetRequirements(requirements, renderPass.get(), pipeline);
     }
   }
   std::size_t i = std::numeric_limits<std::size_t>::max();
-  std::map<std::shared_ptr<DescriptorSetRequirer>, std::size_t> requirementIndices;
-  for (const std::shared_ptr<DescriptorSetRequirer>& requirer: requirements | std::ranges::views::keys) requirementIndices[requirer] = ++i;
+  std::map<DescriptorSetRequirer*, std::size_t> requirementIndices;
+  for (DescriptorSetRequirer* requirer: requirements | std::ranges::views::keys) requirementIndices[requirer] = ++i;
   auto perSetDescriptorBindings = requirements | std::ranges::views::values;
 
   // Create VkDescriptorSetLayout objects
@@ -254,14 +249,15 @@ bool RenderGraph::bake() {
     std::vector<VkPipeline*> pipelines;
     std::vector<VkDescriptorSetLayout> setLayouts;
     setLayouts.reserve(3);
-    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
-      for (const std::shared_ptr<Pipeline>& pipeline : renderPass->getPipelines() | std::views::values) {
+    for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
+      for (Pipeline* pipeline : renderPass->getPipelines() | std::views::values) {
         setLayouts.clear();
         if (frameDataLayout) setLayouts.emplace_back(frameDataLayout);
-        if (requirementIndices.contains(renderPass)) setLayouts.emplace_back(layouts.at(requirementIndices.at(renderPass)));
+        if (requirementIndices.contains(renderPass.get())) setLayouts.emplace_back(layouts.at(requirementIndices.at(renderPass.get())));
         if (requirementIndices.contains(pipeline)) setLayouts.emplace_back(layouts.at(requirementIndices.at(pipeline)));
         pipeline->bake(renderPass, 0, setLayouts, miscMemoryPool, pipelineCreateInfos, pipelines);
       }
+    }
     std::vector<VkPipeline> tempPipelines(pipelines.size());
     if (!pipelines.empty())
       if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, pipelineCreateInfos.size(), pipelineCreateInfos.data(), nullptr, tempPipelines.data()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create graphics pipelines");
@@ -272,9 +268,9 @@ bool RenderGraph::bake() {
     pipelines.clear();
   }
 
-  /****************************
-   * Bake the Command Buffers *
-   ****************************/
+  /*****************************
+   * Build the Descriptor Sets *
+   *****************************/
   std::vector<std::shared_ptr<VkDescriptorSet>> descriptorSets;
   {  // Allocate descriptor sets
     std::vector<VkDescriptorSetLayout> framesInFlightLayouts;
@@ -287,22 +283,23 @@ bool RenderGraph::bake() {
   }
 
   {  // Assign descriptor sets
-    std::shared_ptr<VkDescriptorSetLayout> layout;
-    if (frameDataLayout) layout = std::shared_ptr<VkDescriptorSetLayout>(new VkDescriptorSetLayout(frameDataLayout), [this](VkDescriptorSetLayout* layout) {
-      vkDestroyDescriptorSetLayout(device->device, *layout, nullptr);
-      delete layout;
-    });
     std::vector<void*> miscMemoryPool;
     std::vector<VkWriteDescriptorSet> writes;
     for (auto& [descriptorSetRequirer, index]: requirementIndices) {
       auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
       if (descriptorSetRequirer) {
-        descriptorSetRequirer->setDescriptorSets({start, start + FRAMES_IN_FLIGHT}, layouts[index]);
+        descriptorSetRequirer->setDescriptorSets(std::span{start, start + FRAMES_IN_FLIGHT}, layouts[index]);
         descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes, *this);
       }
-      else for (uint32_t j{}; j < frames.size(); ++j) {
-        frames.at(j).descriptorSet = *(start + j);
-        frames.at(j).descriptorSetLayout = layout;
+      else if (frameDataLayout) {
+        auto layout = std::shared_ptr<VkDescriptorSetLayout>(new VkDescriptorSetLayout(frameDataLayout), [this](const VkDescriptorSetLayout* layout) {
+          vkDestroyDescriptorSetLayout(device->device, *layout, nullptr);
+          delete layout;
+        });
+        for (uint32_t j{}; j < frames.size(); ++j) {
+          frames.at(j).descriptorSet = *(start + j);
+          frames.at(j).descriptorSetLayout = layout;
+        }
       }
     }
     vkUpdateDescriptorSets(device->device, writes.size(), writes.data(), 0, nullptr);
@@ -321,8 +318,6 @@ VkSemaphore RenderGraph::waitForNextFrameData() const {
 }
 
 void RenderGraph::update() const {
-  for (const std::shared_ptr<Mesh>& mesh : device->meshes)
-    mesh->update(*this);
   for (const std::shared_ptr<RenderPass>& renderPass : renderPasses)
     renderPass->update();
   uniformBuffer->update({static_cast<uint32_t>(frameNumber), static_cast<float>(Game::getTime())});
@@ -331,8 +326,8 @@ void RenderGraph::update() const {
 void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore) {
   CommandBuffer commandBuffer;
   for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) renderPass->execute(commandBuffer);
-  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(getImageId(RenderColor)).image, swapchainImage);
-  std::vector<VkImageMemoryBarrier> imageBarriers = {
+  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(getImageId(RenderColor)).image, swapchainImage.get());
+  std::vector<CommandBuffer::PipelineBarrier::ImageMemoryBarrier> imageBarriers = {
     {
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext               = nullptr,
@@ -342,11 +337,11 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
       .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image               = swapchainImage->getImage(),
+      .image               = swapchainImage.get(),
       .subresourceRange    = swapchainImage->getWholeRange()
     }
   };
-  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, std::vector<VkMemoryBarrier>{}, std::vector<VkBufferMemoryBarrier>{}, imageBarriers);
+  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, std::span<CommandBuffer::PipelineBarrier::MemoryBarrier>{}, std::span<CommandBuffer::PipelineBarrier::BufferMemoryBarrier>{}, imageBarriers);
   commandBuffer.preprocess();
 
   const PerFrameData& frameData = getPerFrameData();
@@ -377,8 +372,8 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
 
 void RenderGraph::buildImages(const std::unordered_map<ImageID, VkImageUsageFlags>& usages) {
   for (auto& [id, properties]: images) {
-    auto& resolutionGroup = resolutionGroups[properties.resolutionGroup];
-    properties.image = std::make_shared<Image>(device, properties.name, properties.format, resolutionGroup.resolution, usages.at(id), 1, resolutionGroup.sampleCount);
+    const auto& resolutionGroup = resolutionGroups[properties.resolutionGroup];
+    properties.image = new Image(device, properties.name, properties.format, resolutionGroup.resolution, usages.at(id), 1, properties.inheritSampleCount ? resolutionGroup.sampleCount : VK_SAMPLE_COUNT_1_BIT);
   }
 }
 
