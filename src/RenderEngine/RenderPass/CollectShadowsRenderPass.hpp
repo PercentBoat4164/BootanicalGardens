@@ -15,6 +15,7 @@ class CollectShadowsRenderPass : public RenderPass {
   std::unique_ptr<UniformBuffer<PassData>> uniformBuffer;
   Shader* vertexShaderOverride = nullptr;
   static constexpr std::string_view PassName = "Collect Shadows Render Pass";
+  std::unique_ptr<Buffer> copyBuffer;
 
 public:
   explicit CollectShadowsRenderPass(RenderGraph& graph);

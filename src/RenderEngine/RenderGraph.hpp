@@ -115,6 +115,8 @@ public:
   [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
   static constexpr ResolutionGroupID getResolutionGroupId(const std::string_view name) { return Tools::hash(name); }
   void setResolutionGroup(const std::string_view& name, VkExtent3D resolution, VkSampleCountFlags sampleCount);
+  [[nodiscard]] ResolutionGroupProperties getResolutionGroup(ResolutionGroupID id) const;
+  [[nodiscard]] bool hasResolutionGroup(ResolutionGroupID id) const;
   static constexpr ImageID getImageId(const std::string_view name) { return Tools::hash(name); }
 
   /**
@@ -151,6 +153,7 @@ public:
   static constexpr std::string_view GBufferAlbedo       = "gBufferAlbedo";
   static constexpr std::string_view GBufferPosition     = "gBufferPosition";
   static constexpr std::string_view GBufferNormal       = "gBufferNormal";
+  static constexpr std::string_view GBufferMaterialID   = "gBufferMaterialID";
   static constexpr std::string_view GBufferDepth        = "gBufferDepth";
   static constexpr std::string_view RenderColor         = "renderColor";
   static constexpr std::string_view ShadowResolution    = "Shadow";

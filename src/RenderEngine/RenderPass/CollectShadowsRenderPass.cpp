@@ -28,6 +28,12 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectSh
     materialRemap.emplace(&material, overriddenMaterial);
   }
   setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
+  imageAccesses.emplace_back(RenderGraph::getImageId(RenderGraph::GBufferMaterialID), RenderGraph::ImageAccess{
+    .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    .access = VK_ACCESS_TRANSFER_READ_BIT,
+    .stage = VK_PIPELINE_STAGE_TRANSFER_BIT
+  });
   return imageAccesses;
 }
 
@@ -84,6 +90,9 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
 
   framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
   uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, (std::string(PassName) + " | Uniform Buffer").c_str());
+  const auto image = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID));
+  const VkExtent3D resolution = graph.getResolutionGroup(image.resolutionGroup).resolution;
+  copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatElementSize(image.format) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
 void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
@@ -144,7 +153,16 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
 }
 
 std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::getDepthStencilAttachmentAccess() {
-  return{};
+  return {{RenderGraph::getImageId(RenderGraph::GBufferDepth), {
+    .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+    .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+    .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+  }}};
 }
 
 void CollectShadowsRenderPass::update() {
@@ -156,6 +174,8 @@ void CollectShadowsRenderPass::update() {
 }
 
 void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
+  commandBuffer.record<CommandBuffer::CopyImageToBuffer>(graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID)).image, copyBuffer.get());
+  commandBuffer.record<CommandBuffer::CopyBufferToImage>(copyBuffer.get(), graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferDepth)).image);
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   const uint64_t frameIndex = graph.getFrameIndex();
   for (const Pipeline* pipeline : pipelines | std::ranges::views::values) {

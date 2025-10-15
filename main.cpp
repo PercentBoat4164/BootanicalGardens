@@ -27,6 +27,7 @@ int main() {
     renderGraph.setImage(RenderGraph::GBufferAlbedo, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, true);
     renderGraph.setImage(RenderGraph::GBufferPosition, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SFLOAT, true);
     renderGraph.setImage(RenderGraph::GBufferNormal, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SFLOAT, true);
+    renderGraph.setImage(RenderGraph::GBufferMaterialID, RenderGraph::RenderResolution, VK_FORMAT_R32_UINT, true);
     renderGraph.setImage(RenderGraph::GBufferDepth, RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, true);
     renderGraph.setResolutionGroup(RenderGraph::ShadowResolution, VkExtent3D{1024, 1024, 1}, VK_SAMPLE_COUNT_1_BIT);
     renderGraph.setImage(RenderGraph::ShadowDepth, RenderGraph::ShadowResolution, VK_FORMAT_D32_SFLOAT, true);

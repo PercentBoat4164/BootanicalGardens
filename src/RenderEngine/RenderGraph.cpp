@@ -90,6 +90,14 @@ void RenderGraph::setResolutionGroup(const std::string_view& name, const VkExten
   outOfDate = true;
 }
 
+RenderGraph::ResolutionGroupProperties RenderGraph::getResolutionGroup(const ResolutionGroupID id) const {
+  return resolutionGroups.at(id);
+}
+
+bool RenderGraph::hasResolutionGroup(const ResolutionGroupID id) const {
+  return resolutionGroups.contains(id);
+}
+
 void RenderGraph::setImage(const std::string_view& name, const std::string_view& groupName, const VkFormat format, const bool inheritSampleCount) {
   const ImageID id = getImageId(name);
   const ResolutionGroupID groupId = getResolutionGroupId(groupName);
