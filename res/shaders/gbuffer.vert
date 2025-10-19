@@ -16,7 +16,7 @@ layout (location = 0) out vec3 outWorldSpacePosition;
 layout (location = 1) out vec2 outTextureCoordinates;
 layout (location = 2) out vec3 outNormal;
 layout (location = 3) out vec3 outTangent;
-layout (location = 4) out uint outMaterialID;
+layout (location = 4) flat out uint outMaterialID;
 
 void main() {
     outWorldSpacePosition = (inModelMatrix * vec4(inPosition, 1)).xyz;

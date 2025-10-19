@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Vertex.hpp"
-#include "yyjson.h"
 #include "src/RenderEngine/RenderGraph.hpp"
 #include "src/RenderEngine/Resources/Buffer.hpp"
+
+#include <glm/matrix.hpp>
+#include <yyjson.h>
 
 class Buffer;
 class CommandBuffer;
@@ -17,8 +18,8 @@ public:
     struct PerInstanceData {
       glm::mat4 originalModelMatrix;
     };
-    plf::colony<ModelInstance> modelInstances;
-    plf::colony<MaterialInstance> materialInstances;
+    plf::colony<glm::mat4> modelInstances;
+    plf::colony<uint32_t> materialInstances;
     plf::colony<PerInstanceData> perInstanceData;
     std::unique_ptr<Buffer> modelInstanceBuffer{nullptr};
     std::unique_ptr<Buffer> materialInstanceBuffer{nullptr};
@@ -43,6 +44,7 @@ public:
   bool stale = true;
 
   Mesh(GraphicsDevice* device, yyjson_val* json);
+  ~Mesh();
 
   InstanceReference addInstance(uint64_t materialID, glm::mat4 mat);
   void removeInstance(InstanceReference&& instanceReference);

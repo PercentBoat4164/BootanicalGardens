@@ -67,9 +67,7 @@ Window::Window(GraphicsDevice* const device) : device{device} {
 
 Window::~Window() {
   for (VkSemaphore semaphore: semaphores) vkDestroySemaphore(device->device, semaphore, nullptr);
-  semaphores.clear();
   destroy_swapchain(swapchain);
-  swapchainImages.clear();
   swapchain = {};
   vkDestroySurfaceKHR(GraphicsInstance::instance, surface, nullptr);
   surface = VK_NULL_HANDLE;

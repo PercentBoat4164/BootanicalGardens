@@ -16,9 +16,7 @@ Buffer::BufferMapping::~BufferMapping() {
 }
 
 Buffer::Buffer(GraphicsDevice* const device,
-#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
                const char* name,
-#endif
                const VkDeviceSize bufferSize,
                const VkBufferUsageFlags usage,
                const VkMemoryPropertyFlags required,

@@ -13,9 +13,10 @@
 #include "src/RenderEngine/Window.hpp"
 #include "src/Tools/Hashing.hpp"
 
-#include <iostream>
 #include <volk/volk.h>
 
+#include <deque>
+#include <functional>
 #include <ranges>
 #include <vector>
 
@@ -86,7 +87,7 @@ void RenderGraph::setResolutionGroup(const std::string_view& name, const VkExten
   ResolutionGroupProperties& group = resolutionGroups[getResolutionGroupId(name)];
   group.resolution = resolution;
   group.sampleCount = sampleCount;
-  for (ImageID attachmentId : group.attachments) if (Image* image = images[attachmentId].image; image != nullptr) image->rebuild(resolution, sampleCount);
+  for (ImageID attachmentId : group.attachments) if (std::weak_ptr<Image> image = images[attachmentId].image; !image.expired()) image.lock()->rebuild(resolution, sampleCount);
   outOfDate = true;
 }
 
@@ -149,7 +150,8 @@ bool RenderGraph::bake() {
       {getImageId(RenderColor), VK_IMAGE_USAGE_TRANSFER_SRC_BIT}
     };
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-      std::vector<std::pair<ImageID, ImageAccess>> accesses = renderPass->declareAccesses();
+      renderPass->setup();
+      std::vector<std::pair<ImageID, ImageAccess>> accesses = renderPass->getImageAccesses();
       std::vector<ImageID> ids;
       for (auto& [id, access] : accesses) {
         usages[id] |= access.usage;
@@ -172,7 +174,7 @@ bool RenderGraph::bake() {
       for (const ImageID& id: renderPassAttachmentIDs) {
         /**@todo: Add support for aliasing attachments.*/
         /**@todo: Add support for reordering render passes.*/
-        const Image* image = getImage(id).image;
+        const Image* image = getImage(id).image.get();
         std::vector<std::pair<RenderPass*, ImageAccess>>& attachmentDeclarations = id2decl.at(id);
         // Find this renderpass in the declarations of this attachment.
         const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
@@ -197,21 +199,23 @@ bool RenderGraph::bake() {
     }
 
     for (Material& material : device->materials | std::ranges::views::values) {
-      if (Texture* albedo = material.albedoTexture; albedo != nullptr) {
-        images[Tools::hash(albedo)] = {
+      if (std::weak_ptr<Texture> albedo = material.albedoTexture; !albedo.expired()) {
+        std::shared_ptr<Texture> tex = albedo.lock();
+        images[Tools::hash(tex.get())] = {
           .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-          .format = albedo->getFormat(),
+          .format = tex->getFormat(),
           .inheritSampleCount = false,
-          .image = albedo,
+          .image = tex,
           .name = material.name + " | Albedo Texture"
         };
       }
-      if (Texture* const normal = material.normalTexture; normal != nullptr) {
-        images[Tools::hash(normal)] = {
+      if (std::weak_ptr<Texture> const normal = material.normalTexture; !normal.expired()) {
+        std::shared_ptr<Texture> tex = normal.lock();
+        images[Tools::hash(tex.get())] = {
           .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-          .format = normal->getFormat(),
+          .format = tex->getFormat(),
           .inheritSampleCount = false,
-          .image = normal,
+          .image = tex,
           .name = material.name + " | Normal Texture"
         };
       }
@@ -250,9 +254,9 @@ bool RenderGraph::bake() {
   /*****************************************
    * Process Materials and Their Pipelines *
    * ***************************************/
+  std::deque<std::tuple<void*, std::function<void(void*)>>> miscMemoryPool;
   VkDescriptorSetLayout frameDataLayout = requirementIndices.contains(nullptr) ? layouts.at(requirementIndices.at(nullptr)) : VK_NULL_HANDLE;
   {  // Bake pipelines
-    std::vector<void*> miscMemoryPool;
     std::vector<VkGraphicsPipelineCreateInfo> pipelineCreateInfos;
     std::vector<VkPipeline*> pipelines;
     std::vector<VkDescriptorSetLayout> setLayouts;
@@ -270,10 +274,8 @@ bool RenderGraph::bake() {
     if (!pipelines.empty())
       if (const VkResult result = vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, pipelineCreateInfos.size(), pipelineCreateInfos.data(), nullptr, tempPipelines.data()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create graphics pipelines");
     for (uint32_t j{}; j < tempPipelines.size(); ++j) *pipelines.at(j) = tempPipelines.at(j);
-    for (void* memory: miscMemoryPool) free(memory);
+    for (const auto& [mem, deleter]: miscMemoryPool) deleter(mem);
     miscMemoryPool.clear();
-    pipelineCreateInfos.clear();
-    pipelines.clear();
   }
 
   /*****************************
@@ -291,7 +293,6 @@ bool RenderGraph::bake() {
   }
 
   {  // Assign descriptor sets
-    std::vector<void*> miscMemoryPool;
     std::vector<VkWriteDescriptorSet> writes;
     for (auto& [descriptorSetRequirer, index]: requirementIndices) {
       auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
@@ -311,7 +312,8 @@ bool RenderGraph::bake() {
       }
     }
     vkUpdateDescriptorSets(device->device, writes.size(), writes.data(), 0, nullptr);
-    for (void* memory: miscMemoryPool) free(memory);
+    for (const auto& [mem, deleter]: miscMemoryPool) deleter(mem);
+    miscMemoryPool.clear();
   }
 
   outOfDate = false;
@@ -334,7 +336,7 @@ void RenderGraph::update() const {
 void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore) {
   CommandBuffer commandBuffer;
   for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) renderPass->execute(commandBuffer);
-  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(getImageId(RenderColor)).image, swapchainImage.get());
+  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(getImageId(RenderColor)).image.get(), swapchainImage.get());
   std::vector<CommandBuffer::PipelineBarrier::ImageMemoryBarrier> imageBarriers = {
     {
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -381,7 +383,7 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
 void RenderGraph::buildImages(const std::unordered_map<ImageID, VkImageUsageFlags>& usages) {
   for (auto& [id, properties]: images) {
     const auto& resolutionGroup = resolutionGroups[properties.resolutionGroup];
-    properties.image = new Image(device, properties.name, properties.format, resolutionGroup.resolution, usages.at(id), 1, properties.inheritSampleCount ? resolutionGroup.sampleCount : VK_SAMPLE_COUNT_1_BIT);
+    properties.image = std::make_shared<Image>(device, properties.name, properties.format, resolutionGroup.resolution, usages.at(id), 1, properties.inheritSampleCount ? resolutionGroup.sampleCount : VK_SAMPLE_COUNT_1_BIT);
   }
 }
 

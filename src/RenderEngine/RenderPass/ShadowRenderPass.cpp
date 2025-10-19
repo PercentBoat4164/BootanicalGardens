@@ -17,7 +17,9 @@ ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, Opaqu
   fragmentShaderOverride = graph.device->getJSONShader("Shadow Render Pass | Fragment Shader Override");
 }
 
-std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::declareAccesses() {
+void ShadowRenderPass::setup() {
+  pipelines.clear();
+  materialRemap.clear();
   for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
     for (Material* material : mesh.instances | std::ranges::views::keys) {
       Material* overriddenMaterial = material->getFragmentVariation(fragmentShaderOverride);
@@ -25,8 +27,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRen
       materialRemap.emplace(material, overriddenMaterial);
     }
   }
-  setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
-  return imageAccesses;
+  RenderPass::setup(pipelines | std::ranges::views::keys);
 }
 
 void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
@@ -83,12 +84,12 @@ void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
   uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, "Shadow Pass | Uniform Buffer");
 }
 
-void ShadowRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
-  const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
+void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
+  const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
      .buffer = uniformBuffer->getBuffer(),
      .offset = 0,
      .range = uniformBuffer->getSize()
-  }));
+  }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); })));
   const uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,

@@ -83,5 +83,4 @@ std::vector<std::shared_ptr<VkDescriptorSet>> DescriptorSetAllocator::allocate(c
 
 void DescriptorSetAllocator::destroy() {
   for (const PoolData& pool: pools) vkDestroyDescriptorPool(device.device, pool.pool, nullptr);
-  pools.clear();
 }

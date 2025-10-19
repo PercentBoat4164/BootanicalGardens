@@ -68,7 +68,7 @@ private:
     ResolutionGroupID resolutionGroup;
     VkFormat format;
     bool inheritSampleCount;
-    Image* image;
+    std::shared_ptr<Image> image;
     std::string name;  /**@todo: Try to limit the usage of this to just debug builds.*/
   };
 

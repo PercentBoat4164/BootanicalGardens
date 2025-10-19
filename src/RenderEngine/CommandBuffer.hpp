@@ -108,11 +108,11 @@ public:
     /**@todo: Make renderPass const when declareAccesses has been made constable*/
     explicit BeginRenderPass(RenderPass* renderPass, T&& clearValues=T{}, const VkRect2D renderArea={}) :
         Command([&]->std::vector<ResourceAccess>{
-          std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->declareAccesses();
+          std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->getImageAccesses();
           std::vector<ResourceAccess> accesses;
           accesses.reserve(attachments.size());
           for (const auto& [id, access]: attachments) {
-            accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, renderPass->getGraph().getImage(id).image, access.stage, access.access, std::vector{access.layout});
+            accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, renderPass->getGraph().getImage(id).image.get(), access.stage, access.access, std::vector{access.layout});
           }
           return accesses;
         }(), StateChange),
@@ -416,7 +416,7 @@ public:
   };
 
   struct EndRenderPass final : Command {
-    explicit EndRenderPass();
+    EndRenderPass();
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -475,6 +475,32 @@ public:
     std::vector<MemoryBarrier> memoryBarriers;
     std::vector<BufferMemoryBarrier> bufferMemoryBarriers;
     std::vector<ImageMemoryBarrier> imageMemoryBarriers;
+  };
+
+  struct PushConstants final : Command {
+    template<typename T> explicit PushConstants(T value, const VkShaderStageFlagBits stages, const std::uint32_t offset=0) :
+        Command({}, StateChange),
+        offset(offset),
+        stages(stages) {
+      data.resize(sizeof(T));
+      std::memcpy(data.data(), &value, sizeof(T));
+    }
+    explicit PushConstants(std::ranges::range auto&& values, const VkShaderStageFlagBits stages, const std::uint32_t offset=0) :
+        Command({}, StateChange),
+        offset(offset),
+        stages(stages) {
+      auto temp = std::ranges::to<std::vector>(values);
+      std::memcpy(data.data(), temp->data(), temp->size());
+    }
+  private:
+    void preprocess(State& state, PreprocessingFlags flags) override;
+    void bake(VkCommandBuffer commandBuffer) override;
+    std::string toString(bool includeArguments) override;
+
+    std::vector<char> data;
+    std::uint32_t offset;
+    VkShaderStageFlagBits stages{};
+    VkPipelineLayout layout{VK_NULL_HANDLE};
   };
 
   template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(const const_iterator& iterator, Args&&... args) { return commands.insert(iterator, std::make_unique<T>(std::forward<Args&&>(args)...)); }

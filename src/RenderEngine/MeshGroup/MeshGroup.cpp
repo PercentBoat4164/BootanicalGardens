@@ -17,10 +17,10 @@ MeshGroup::MeshGroup(const std::uint64_t id, Entity& entity, GraphicsDevice* con
 }
 
 MeshGroup::~MeshGroup() {
-  for (auto& [mesh, instances] : meshes) {
-    /**@todo: Add a removeInstances function to the Mesh.*/
-    for (Mesh::InstanceReference& instance: instances) mesh->removeInstance(std::move(instance));
-  }
+  // for (auto& [mesh, instances] : meshes) {
+  //   /**@todo: Add a removeInstances function to the Mesh.*/
+  //   for (Mesh::InstanceReference& instance: instances) mesh->removeInstance(std::move(instance));
+  // }
 }
 
 void MeshGroup::onTick() {
@@ -32,9 +32,9 @@ void MeshGroup::onTick() {
     for (auto& [mesh, references]: meshes) {
       bool& stale = mesh->stale;
       for (const Mesh::InstanceReference& reference: references) {
-        glm::mat4 modelMatrix = reference.modelInstanceID->modelMatrix;
-        reference.modelInstanceID->modelMatrix = entityTransform * reference.perInstanceDataID->originalModelMatrix;
-        stale |= mesh->instances[reference.material].stale |= modelMatrix != reference.modelInstanceID->modelMatrix;
+        glm::mat4 modelMatrix = *reference.modelInstanceID;
+        *reference.modelInstanceID = entityTransform * reference.perInstanceDataID->originalModelMatrix;
+        stale |= mesh->instances[reference.material].stale |= modelMatrix != *reference.modelInstanceID;
       }
     }
   // }

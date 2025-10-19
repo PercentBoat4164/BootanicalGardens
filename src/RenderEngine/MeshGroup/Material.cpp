@@ -9,7 +9,7 @@
 
 #include <ranges>
 
-Material::Material(GraphicsDevice* device, yyjson_val* json) : device(device) {
+Material::Material(GraphicsDevice* device, yyjson_val* json, const std::uint32_t id) : device(device), id(id) {
   name = yyjson_get_str(yyjson_obj_get(json, "name"));
   yyjson_val* val = yyjson_obj_get(json, "vertexShader");
   if (yyjson_is_uint(val)) vertexShader = device->getJSONShader(yyjson_get_uint(val));
@@ -145,8 +145,8 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
         if (binding->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && binding->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE && binding->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE) continue;
         RenderGraph::ImageID id = RenderGraph::getImageId(binding->name);
         switch (id) {
-          case RenderGraph::getImageId("albedo"): id = Tools::hash(albedoTexture); break;
-          case RenderGraph::getImageId("normal"): id = Tools::hash(normalTexture); break;
+          case RenderGraph::getImageId("albedo"): id = Tools::hash(albedoTexture.lock().get()); break;
+          case RenderGraph::getImageId("normal"): id = Tools::hash(normalTexture.lock().get()); break;
           default: break;
         }
         results.emplace_back(
@@ -277,16 +277,46 @@ std::vector<VkVertexInputAttributeDescription> Material::computeVertexAttributeD
   return std::ranges::to<std::vector>(attributeDescriptions | std::ranges::views::values);
 }
 
+std::vector<VkPushConstantRange> Material::computePushConstantRanges() const {
+  const std::vector shaders = {vertexShader, fragmentShader};
+
+  // Obtain reflected push constant data
+  std::vector<SpvReflectBlockVariable*> pushConstantBlocks;  // sets for all shaders
+  std::vector<VkShaderStageFlags> shaderStages;
+  for (uint32_t i{}; i < shaders.size(); ++i) {
+    const Shader& shader = *shaders[i];
+    const spv_reflect::ShaderModule* reflectedData = shader.getReflectedData();
+    uint32_t count;
+    reflectedData->EnumeratePushConstantBlocks(&count, nullptr);
+    const uint32_t offset = pushConstantBlocks.size();
+    pushConstantBlocks.resize(offset + count);
+    reflectedData->EnumeratePushConstantBlocks(&count, pushConstantBlocks.data() + offset);
+    shaderStages.resize(offset + count, shader.getStage());
+  }
+
+  std::vector<VkPushConstantRange> pushConstantRanges(pushConstantBlocks.size());
+  for (uint32_t i{}; i < pushConstantBlocks.size(); ++i) {
+    pushConstantRanges[i] = {
+      .stageFlags = shaderStages[i],
+      .offset = pushConstantBlocks[i]->absolute_offset,
+      .size = pushConstantBlocks[i]->padded_size
+    };
+  }
+  return pushConstantRanges;
+}
+
 Material* Material::getVertexVariation(Shader* shader) const {
-  const std::uint64_t id = Tools::hash(shader, fragmentShader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture), std::bit_cast<std::uint64_t>(normalTexture));
+  const std::uint64_t id = Tools::hash(shader, fragmentShader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
   material->vertexShader = shader;
   return material;
 }
 
 Material* Material::getFragmentVariation(Shader* shader) const {
-  const std::uint64_t id = Tools::hash(vertexShader, shader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture), std::bit_cast<std::uint64_t>(normalTexture));
+  const std::uint64_t id = Tools::hash(vertexShader, shader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
   material->fragmentShader = shader;
   return material;
 }
+
+std::uint32_t Material::getId() const { return id; }

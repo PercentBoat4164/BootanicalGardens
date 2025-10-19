@@ -10,11 +10,11 @@
 #define VMA_IMPLEMENTATION
 #if !NDEBUG
   /**@todo: Write a better debug log function once logging methods have been decided upon.*/
-  // #define VMA_DEBUG_LOG_FORMAT(format, ...)  \
-  // do {                                       \
-  //   printf((format), __VA_ARGS__);           \
-  //   printf("\n");                            \
-  // } while(false)
+  #define VMA_DEBUG_LOG_FORMAT(format, ...)  \
+  do {                                       \
+    printf((format), __VA_ARGS__);           \
+    printf("\n");                            \
+  } while(false)
 #endif
 #include "src/Entity.hpp"
 

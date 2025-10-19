@@ -119,6 +119,8 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
   device->executeCommandBufferImmediate(commandBuffer);
 }
 
+Mesh::~Mesh() {}
+
 Mesh::InstanceReference Mesh::addInstance(uint64_t materialID, glm::mat4 mat) {
   Material* material = indexBuffer->device->getMaterial(materialID);
   InstanceCollection& instanceCollection = instances[material];
@@ -133,7 +135,9 @@ Mesh::InstanceReference Mesh::addInstance(uint64_t materialID, glm::mat4 mat) {
 }
 
 void Mesh::removeInstance(InstanceReference&& instanceReference) {
-  InstanceCollection& instanceCollection = instances[instanceReference.material];
+  const auto it = instances.find(instanceReference.material);
+  if (it == instances.end()) return;
+  InstanceCollection& instanceCollection = it->second;
   instanceCollection.modelInstances.erase(instanceReference.modelInstanceID);
   instanceCollection.materialInstances.erase(instanceReference.materialInstanceID);
   instanceCollection.perInstanceData.erase(instanceReference.perInstanceDataID);
@@ -160,16 +164,16 @@ void Mesh::update(CommandBuffer& commandBuffer) {
         auto* stagingBuffer = new StagingBuffer(device, "Mesh-Material Instance Staging Buffer", instanceCollection.materialInstanceBuffer->getSize());
         const std::shared_ptr<Buffer::BufferMapping> map = stagingBuffer->map();
         std::size_t i = std::numeric_limits<std::size_t>::max();
-        for (const MaterialInstance& materialInstance: instanceCollection.materialInstances)
-          static_cast<MaterialInstance*>(map->data)[++i] = materialInstance;
+        for (const uint32_t materialInstance: instanceCollection.materialInstances)
+          static_cast<uint32_t*>(map->data)[++i] = materialInstance;
         commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(stagingBuffer, instanceCollection.materialInstanceBuffer.get());
         commandBuffer.addCleanupResource(stagingBuffer);
       } {  // Update the model buffer
         auto* stagingBuffer = new StagingBuffer(device, "Mesh-Model Instance Staging Buffer", instanceCollection.modelInstanceBuffer->getSize());
         const std::shared_ptr<Buffer::BufferMapping> map = stagingBuffer->map();
         std::size_t i = std::numeric_limits<std::size_t>::max();
-        for (const ModelInstance& modelInstance: instanceCollection.modelInstances)
-          static_cast<ModelInstance*>(map->data)[++i] = modelInstance;
+        for (const glm::mat4& modelInstance: instanceCollection.modelInstances)
+          static_cast<glm::mat4*>(map->data)[++i] = modelInstance;
         commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(stagingBuffer, instanceCollection.modelInstanceBuffer.get());
         commandBuffer.addCleanupResource(stagingBuffer);
       }

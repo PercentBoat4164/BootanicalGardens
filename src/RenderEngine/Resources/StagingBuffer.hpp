@@ -36,7 +36,6 @@ public:
    * @param data A <c>std::ranges::range</c> of elements to be uploaded to the buffer.
    */
   explicit StagingBuffer(GraphicsDevice* device, const char* name, std::ranges::range auto&& data) : StagingBuffer(device, name, sizeof(std::ranges::range_value_t<decltype(data)>) * data.size()) {
-    std::vector<std::ranges::range_value_t<decltype(data)>> vec = std::ranges::to<std::vector>(data);
-    vmaCopyMemoryToAllocation(device->allocator, data.data(), allocation, 0, sizeof(std::ranges::range_value_t<decltype(data)>) * data.size());
+    vmaCopyMemoryToAllocation(device->allocator, std::ranges::to<std::vector>(data).data(), allocation, 0, sizeof(std::ranges::range_value_t<decltype(data)>) * data.size());
   }
 };

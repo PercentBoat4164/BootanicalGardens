@@ -114,12 +114,13 @@ public:
     imageAccesses.shrink_to_fit();
     return clearValues;
   }
-  virtual std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> declareAccesses()                              = 0;
+  virtual void setup()                                                                                                          = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) = 0;
   virtual std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess()            = 0;
   virtual void update()                                                                                                         = 0;
   virtual void execute(CommandBuffer& commandBuffer)                                                                            = 0;
 
+  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] Framebuffer* getFramebuffer() const;
   [[nodiscard]] std::unordered_map<Material*, Pipeline*> getPipelines();

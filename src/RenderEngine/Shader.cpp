@@ -47,8 +47,8 @@ public:
   }
 
   void ReleaseInclude(shaderc_include_result* data) override {
-    delete data->source_name;
-    delete data->content;
+    delete[] data->source_name;
+    delete[] data->content;
     delete data;
   }
 };

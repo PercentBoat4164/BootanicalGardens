@@ -20,21 +20,19 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
   vertexShaderOverride = graph.device->getJSONShader("Collect Shadows Render Pass | Vertex Shader Override");
 }
 
-std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::declareAccesses() {
-  std::unordered_set<Material*> materialSet;
+void CollectShadowsRenderPass::setup() {
   for (Material& material: graph.device->materials | std::ranges::views::values) {
     Material* overriddenMaterial = material.getVertexVariation(vertexShaderOverride);
     pipelines.emplace(overriddenMaterial, nullptr);
     materialRemap.emplace(&material, overriddenMaterial);
   }
-  setup(pipelines | std::ranges::views::keys);  /*@todo: Perform setup once during RenderGraph baking time. This function should just return the imageAccesses.*/
+  RenderPass::setup(pipelines | std::ranges::views::keys);
   imageAccesses.emplace_back(RenderGraph::getImageId(RenderGraph::GBufferMaterialID), RenderGraph::ImageAccess{
     .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
     .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     .access = VK_ACCESS_TRANSFER_READ_BIT,
     .stage = VK_PIPELINE_STAGE_TRANSFER_BIT
   });
-  return imageAccesses;
 }
 
 void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
@@ -95,7 +93,7 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
   copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatElementSize(image.format) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
-void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
+void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
   // The g-buffer albedo
   uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
@@ -105,11 +103,11 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-      .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+      .pImageInfo = static_cast<VkDescriptorImageInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferAlbedo)).image->getImageView(),
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      })),
+      }, [](void* mem){ delete static_cast<VkDescriptorImageInfo*>(mem); }))),
       .pBufferInfo = nullptr,
       .pTexelBufferView = nullptr
   });
@@ -123,11 +121,11 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-      .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+      .pImageInfo = static_cast<VkDescriptorImageInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferPosition)).image->getImageView(),
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      })),
+      }, [](void* mem){ delete static_cast<VkDescriptorImageInfo*>(mem); }))),
       .pBufferInfo = nullptr,
       .pTexelBufferView = nullptr
   });
@@ -141,11 +139,11 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::vector<void*>& miscMemor
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-      .pImageInfo = static_cast<VkDescriptorImageInfo*>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
+      .pImageInfo = static_cast<VkDescriptorImageInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorImageInfo{
         .sampler     = *graph.device->getSampler(),
         .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferNormal)).image->getImageView(),
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      })),
+      }, [](void* mem){ delete static_cast<VkDescriptorImageInfo*>(mem); }))),
       .pBufferInfo = nullptr,
       .pTexelBufferView = nullptr
   });
@@ -174,12 +172,13 @@ void CollectShadowsRenderPass::update() {
 }
 
 void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
-  commandBuffer.record<CommandBuffer::CopyImageToBuffer>(graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID)).image, copyBuffer.get());
-  commandBuffer.record<CommandBuffer::CopyBufferToImage>(copyBuffer.get(), graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferDepth)).image);
+  commandBuffer.record<CommandBuffer::CopyImageToBuffer>(graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID)).image.get(), copyBuffer.get());
+  commandBuffer.record<CommandBuffer::CopyBufferToImage>(copyBuffer.get(), graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferDepth)).image.get());
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   const uint64_t frameIndex = graph.getFrameIndex();
   for (const Pipeline* pipeline : pipelines | std::ranges::views::values) {
     commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
+    commandBuffer.record<CommandBuffer::PushConstants>(pipeline->getMaterial()->getId(), VK_SHADER_STAGE_VERTEX_BIT);
     commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
     commandBuffer.record<CommandBuffer::Draw>(3);  // No vertex buffer needs to be bound for this call because the vertex shader generates the vertex positions automatically.
     /**@todo: Make this happen in multiple subpasses to enhance the parallelism achievable on the GPU?*/

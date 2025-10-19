@@ -34,8 +34,8 @@ void CommandBuffer::BeginRenderPass::preprocess(State& state, PreprocessingFlags
   };
 
   state.renderPass = renderPass;
-  for (const auto& [id, access]: renderPass->declareAccesses()) {
-    ResourceState& resourceState = state.resourceStates[renderPass->getGraph().getImage(id).image];
+  for (const auto& [id, access]: renderPass->getImageAccesses()) {
+    ResourceState& resourceState = state.resourceStates[renderPass->getGraph().getImage(id).image.get()];
     resourceState.layout = access.layout;
     resourceState.access = access.access;
   }
@@ -69,13 +69,6 @@ std::string CommandBuffer::BeginRenderPass::toString(const bool includeArguments
 }
 
 void CommandBuffer::BindDescriptorSets::preprocess(State& state, PreprocessingFlags flags) {
-  /**@todo: This should not rely on the currently bound pipeline because the descriptor sets may be bound before the pipeline is. Add an algorithm that sets this layout correctly no matter the bind order.
-   *   - Iterate through the CommandBuffer starting from this command searching for either a BindPipeline or a BindDescriptorSets command.
-   *   - If BindPipeline is found first:
-   *     - Choose the pipeline layout of that pipeline.
-   *   - If BindDescriptorSets is found first:
-   *     - Signal that this command is redundant and should be removed (potentially log a warning stating that this is suboptimal, and should not have been recorded in the first place).
-   **/
   pipelineLayout = state.pipeline->getLayout();
 }
 void CommandBuffer::BindDescriptorSets::bake(VkCommandBuffer commandBuffer) {
@@ -275,7 +268,6 @@ void CommandBuffer::Draw::preprocess(State& state, PreprocessingFlags flags) {
   if (state.pipeline == nullptr) GraphicsInstance::showError("must call BindPipeline before Draw");
   if (vertexCount != 0) return;
   if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindVertexBuffers before Draw, unless vertexCount (" + std::to_string(vertexCount) + ") != 0");
-  vertexCount = state.vertexBuffers.at(0)->getSize() / sizeof(PositionVertex);
 }
 void CommandBuffer::Draw::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -297,7 +289,6 @@ void CommandBuffer::DrawIndexed::preprocess(State& state, PreprocessingFlags fla
   if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindIndexBuffer before DrawIndexed");
   indexCount = state.indexBuffer->getSize() / sizeof(uint32_t);
   if (state.vertexBuffers.empty() || state.vertexBuffers.at(0) == nullptr) GraphicsInstance::showError("must call BindVertexBuffers before DrawIndexed");
-  vertexCount = state.vertexBuffers.at(0)->getSize() / sizeof(PositionVertex);
 }
 void CommandBuffer::DrawIndexed::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -381,6 +372,24 @@ void CommandBuffer::PipelineBarrier::bake(VkCommandBuffer commandBuffer) {
 }
 std::string CommandBuffer::PipelineBarrier::toString(bool includeArguments) {
   return "vkCmdPipelineBarrier";
+}
+
+void CommandBuffer::PushConstants::preprocess(State& state, PreprocessingFlags flags) {
+  layout = state.pipeline->getLayout();
+}
+
+void CommandBuffer::PushConstants::bake(VkCommandBuffer commandBuffer) {
+#if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
+  GraphicsInstance::setDebugDataCommand(this);
+#endif
+  vkCmdPushConstants(commandBuffer, layout, stages, offset, data.size(), data.data());
+#if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
+  GraphicsInstance::setDebugDataCommand(nullptr);
+#endif
+}
+
+std::string CommandBuffer::PushConstants::toString(bool includeArguments) {
+  return "vkCmdPushConstants";
 }
 
 void CommandBuffer::addCleanupResource(Resource* resource) {

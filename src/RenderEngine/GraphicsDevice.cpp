@@ -110,10 +110,17 @@ GraphicsDevice::GraphicsDevice(std::filesystem::path path) {
 
 GraphicsDevice::~GraphicsDevice() {
   vkDeviceWaitIdle(device);
+  for (VkSampler sampler: samplers | std::ranges::views::values) vkDestroySampler(device, sampler, nullptr);
+  overrideShaders.clear();
+  shaders.clear();
+  textures.clear();
+  pipelines.clear();
+  overrideMaterials.clear();
+  materials.clear();
+  meshes.clear();
   vkDestroyCommandPool(device, commandPool, nullptr);
   descriptorSetAllocator.destroy();
   commandPool = VK_NULL_HANDLE;
-  meshes.clear();
   if (allocator != VK_NULL_HANDLE) vmaDestroyAllocator(allocator);
   allocator = VK_NULL_HANDLE;
   globalQueue = VK_NULL_HANDLE;
@@ -151,21 +158,21 @@ VkSampler* GraphicsDevice::getSampler(const VkFilter magnificationFilter, const 
 }
 
 Shader* GraphicsDevice::getJSONShader(const std::string& name) {
-  if (const auto it = overrideShaders.find(name); it != overrideShaders.end()) return it->second;
-  return overrideShaders.emplace(name, new Shader(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_obj_get(JSONOverrideShaders, name.c_str()), "path")))).first->second;
+  if (const auto it = overrideShaders.find(name); it != overrideShaders.end()) return it->second.get();
+  return overrideShaders.emplace(name, std::make_unique<Shader>(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_obj_get(JSONOverrideShaders, name.c_str()), "path")))).first->second.get();
 }
 
 Shader* GraphicsDevice::getJSONShader(const std::uint64_t id) {
   if (id >= JSONShaderArrayCount) return nullptr;
-  if (const auto it = shaders.find(id); it != shaders.end()) return it->second;
-  return shaders.emplace(id, new Shader(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_arr_get(JSONShaderArray, id), "path")))).first->second;
+  if (const auto it = shaders.find(id); it != shaders.end()) return it->second.get();
+  return shaders.emplace(id, std::make_unique<Shader>(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_arr_get(JSONShaderArray, id), "path")))).first->second.get();
 }
 
-Texture* GraphicsDevice::getJSONTexture(const std::uint64_t id) {
-  if (id >= JSONTextureArrayCount) return nullptr;
+std::weak_ptr<Texture> GraphicsDevice::getJSONTexture(const std::uint64_t id) {
+  if (id >= JSONTextureArrayCount) return std::weak_ptr<Texture>();
   if (const auto it = textures.find(id); it != textures.end()) return it->second;
   CommandBuffer commandBuffer;
-  Texture* texture = textures.emplace(id, Texture::jsonGet(this, yyjson_arr_get(JSONTextureArray, id), commandBuffer)).first->second;
+  std::shared_ptr<Texture> texture = textures.emplace(id, Texture::jsonGet(this, yyjson_arr_get(JSONTextureArray, id), commandBuffer)).first->second;
   commandBuffer.preprocess();
   executeCommandBufferImmediate(commandBuffer);
   return texture;
@@ -174,24 +181,24 @@ Texture* GraphicsDevice::getJSONTexture(const std::uint64_t id) {
 Pipeline* GraphicsDevice::getPipeline(Material* material, std::uint64_t renderPassCompatibility) {
   const std::uint64_t key = Tools::hash(material, renderPassCompatibility);
   if (const auto it = pipelines.find(key); it != pipelines.end()) return &it->second;
-  return &pipelines.emplace(key, Pipeline(this, material)).first->second;
+  return &pipelines.emplace(std::piecewise_construct, std::tuple{key}, std::tuple{this, material}).first->second;
 }
 
 Material* GraphicsDevice::getMaterial(const std::uint64_t id, const Material* material) {
   if (const auto it = overrideMaterials.find(id); it != overrideMaterials.end()) return &it->second;
-  return &overrideMaterials.emplace(id, Material(*material)).first->second;
+  return &overrideMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{*material}).first->second;
 }
 
 Material* GraphicsDevice::getMaterial(const std::uint64_t id) {
   if (id >= JSONMaterialArrayCount) return nullptr;
   if (const auto it = materials.find(id); it != materials.end()) return &it->second;
-  return &materials.emplace(id, Material(this, yyjson_arr_get(JSONMaterialArray, id))).first->second;
+  return &materials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id), id}).first->second;
 }
 
 Mesh* GraphicsDevice::getJSONMesh(const std::uint64_t id) {
   if (id >= JSONMeshArrayCount) return nullptr;
   if (const auto it = meshes.find(id); it != meshes.end()) return &it->second;
-  return &meshes.emplace(id, Mesh(this, yyjson_arr_get(JSONMeshArray, id))).first->second;
+  return &meshes.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMeshArray, id)}).first->second;
 }
 
 void GraphicsDevice::update() {

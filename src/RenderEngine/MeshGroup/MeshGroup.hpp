@@ -14,6 +14,5 @@ struct MeshGroup : Component {
   MeshGroup(std::uint64_t id, Entity& entity, GraphicsDevice* device, yyjson_val* val);
   ~MeshGroup() override;
 
-  /**@note: Other function not allowed*/
   void onTick() override;  // Move to an 'AnimationSystem'
 };
