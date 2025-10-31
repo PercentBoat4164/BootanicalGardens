@@ -1,10 +1,18 @@
 #pragma once
 
 #include "src/RenderEngine/RenderGraph.hpp"
-#include "src/RenderEngine/Shader.hpp"
+#include "src/RenderEngine/Pipeline/FragmentProcess.hpp"
+#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
 
 #include <fastgltf/core.hpp>
 
+#include <map>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+struct yyjson_val;
 
 class Shader;
 class Pipeline;
@@ -25,23 +33,20 @@ public:
 
   GraphicsDevice* device;
 
-  Shader* vertexShader = nullptr;
-  Shader* fragmentShader = nullptr;
+  VertexProcess* vertexProcess;
+  FragmentProcess* fragmentProcess;
 
   // A map of shader bindings for the material set to hashes of the names
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, Binding>> perSetBindings;
   std::string name;
 
-  bool doubleSided = false;
   fastgltf::AlphaMode alphaMode = fastgltf::AlphaMode::Opaque;
   float alphaCutoff = 0;
 
   std::weak_ptr<Texture> albedoTexture;
   std::weak_ptr<Texture> normalTexture;
 
-  const std::uint32_t id;
-
-  Material(GraphicsDevice* device, yyjson_val* json, std::uint32_t id);
+  Material(GraphicsDevice* device, yyjson_val* json);
 
   [[nodiscard]] const std::unordered_map<uint32_t, Binding>* getBindings(uint8_t set) const;
 
@@ -56,7 +61,6 @@ public:
   [[nodiscard]] std::vector<VkVertexInputAttributeDescription> computeVertexAttributeDescriptions() const;
   [[nodiscard]] std::vector<VkPushConstantRange> computePushConstantRanges() const;
 
-  Material* getVertexVariation(Shader* shader) const;
-  Material* getFragmentVariation(Shader* shader) const;
-  std::uint32_t getId() const;
+  Material* getVertexVariation(VertexProcess* vertexProcess) const;
+  Material* getFragmentVariation(FragmentProcess* fragmentProcess) const;
 };

@@ -12,7 +12,7 @@ class ShadowRenderPass : public RenderPass {
   };
   std::unique_ptr<UniformBuffer<PassData>> uniformBuffer;
 
-  Shader* fragmentShaderOverride;
+  FragmentProcess* fragmentProcessOverride;
 
 public:
   explicit ShadowRenderPass(RenderGraph& graph);

@@ -2,7 +2,7 @@
 
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
@@ -17,7 +17,7 @@
 #include <volk/volk.h>
 
 GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  fragmentShaderOverride = graph.device->getJSONShader("Geometry Buffer Render Pass | Fragment Shader Override");
+  fragmentProcessOverride = graph.device->getJSONFragmentProcess("Geometry Buffer Render Pass | Fragment Shader Override");
 }
 
 void GBufferRenderPass::setup() {
@@ -25,7 +25,7 @@ void GBufferRenderPass::setup() {
   materialRemap.clear();
   for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
     for (Material* material : mesh.instances | std::ranges::views::keys) {
-      Material* overriddenMaterial = material->getFragmentVariation(fragmentShaderOverride);
+      Material* overriddenMaterial = material->getFragmentVariation(fragmentProcessOverride);
       pipelines.emplace(overriddenMaterial, nullptr);
       materialRemap.emplace(material, overriddenMaterial);
     }

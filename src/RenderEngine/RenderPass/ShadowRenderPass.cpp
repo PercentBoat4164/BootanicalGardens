@@ -3,7 +3,7 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
@@ -14,7 +14,7 @@
 #include <glm/ext/matrix_transform.hpp>
 
 ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  fragmentShaderOverride = graph.device->getJSONShader("Shadow Render Pass | Fragment Shader Override");
+  fragmentProcessOverride = graph.device->getJSONFragmentProcess("Shadow Render Pass | Fragment Shader Override");
 }
 
 void ShadowRenderPass::setup() {
@@ -22,7 +22,7 @@ void ShadowRenderPass::setup() {
   materialRemap.clear();
   for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
     for (Material* material : mesh.instances | std::ranges::views::keys) {
-      Material* overriddenMaterial = material->getFragmentVariation(fragmentShaderOverride);
+      Material* overriddenMaterial = material->getFragmentVariation(fragmentProcessOverride);
       pipelines.emplace(overriddenMaterial, nullptr);
       materialRemap.emplace(material, overriddenMaterial);
     }

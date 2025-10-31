@@ -9,8 +9,8 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 set(CPM_SOURCE_CACHE external)
 include(cmake/CPM.cmake)
-CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.312")
-CPMAddPackage("gh:libsdl-org/SDL#release-3.2.24")
+CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.329")
+CPMAddPackage("gh:libsdl-org/SDL#release-3.2.4")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.7")
 set(FASTGLTF_DOWNLOAD_SIMDJSON ON)
 set(FASTGLTF_ENABLE_TESTS OFF)
@@ -19,16 +19,16 @@ set(FASTGLTF_ENABLE_DOCS OFF)
 CPMAddPackage("gh:spnda/fastgltf@0.9.0")
 set(DRACO_INSTALL OFF)
 CPMAddPackage("gh:google/draco#1.5.7")
-CPMAddPackage("gh:mattreecebentley/plf_colony#ce7a8ab6e8a2923407f614291635a1ec0e3648f8")  # v7.5.26
+CPMAddPackage("gh:mattreecebentley/plf_colony#06e2148a90fd8b9e81696ae9c056c8bd6b29c856")  # v7.5.41
 CPMAddPackage(
         NAME glm
-        GIT_TAG 1.0.1
+        GIT_TAG 1.0.2
         GITHUB_REPOSITORY g-truc/glm
         OPTIONS CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON  # Workaround for glm bug #1279
 )
-CPMAddPackage("gh:ibireme/yyjson#0.10.0")
-CPMAddPackage("gh:jeremy-rifkin/cpptrace#v0.7.5")
-CPMAddPackage("gh:SpartanJ/efsw#1.4.0")
+CPMAddPackage("gh:ibireme/yyjson#0.12.0")
+CPMAddPackage("gh:jeremy-rifkin/cpptrace#v1.0.4")
+CPMAddPackage("gh:SpartanJ/efsw#1.5.0")
 
 add_executable(BootanicalGardens
         src/Component.cpp
@@ -44,7 +44,10 @@ add_executable(BootanicalGardens
         src/RenderEngine/Framebuffer.cpp
         src/RenderEngine/GraphicsDevice.cpp
         src/RenderEngine/GraphicsInstance.cpp
-        src/RenderEngine/Pipeline.cpp
+        src/RenderEngine/Pipeline/FragmentProcess.cpp
+        src/RenderEngine/Pipeline/Pipeline.cpp
+        src/RenderEngine/Pipeline/Shader.cpp
+        src/RenderEngine/Pipeline/VertexProcess.cpp
         src/RenderEngine/RenderGraph.cpp
         src/RenderEngine/RenderPass/CollectShadowsRenderPass.cpp
         src/RenderEngine/RenderPass/GBufferRenderPass.cpp
@@ -60,7 +63,6 @@ add_executable(BootanicalGardens
         src/RenderEngine/Resources/Resource.cpp
         src/RenderEngine/Resources/StagingBuffer.cpp
         src/RenderEngine/Resources/UniformBuffer.cpp
-        src/RenderEngine/Shader.cpp
         src/RenderEngine/Window.cpp
 
         src/Tools/ClassName.h

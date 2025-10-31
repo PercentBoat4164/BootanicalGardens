@@ -1,6 +1,6 @@
 #include "Pipeline.hpp"
 
-#include "Resources/UniformBuffer.hpp"
+#include "../Resources/UniformBuffer.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
@@ -8,7 +8,7 @@
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Texture.hpp"
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
-#include "src/RenderEngine/Shader.hpp"
+#include "Shader.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <volk/volk.h>
@@ -33,7 +33,7 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, const u
   if (const VkResult result = vkCreatePipelineLayout(device->device, &createInfo, nullptr, &layout); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create pipeline layout");
 
   /**@todo: Improve the memory allocation scheme across this entire function. The number of allocations could be greatly reduced by precomputing the required size, then allocating one memory pool and filling that.*/
-  const std::vector shaders = {material->vertexShader, material->fragmentShader};
+  const std::vector shaders = {material->vertexProcess->shader, material->fragmentProcess->shader};
   VkPipelineShaderStageCreateInfo(&stages)[] = *static_cast<VkPipelineShaderStageCreateInfo(*)[]>(std::get<0>(miscMemoryPool.emplace_back(new VkPipelineShaderStageCreateInfo[shaders.size()], [](void* mem){ delete[] static_cast<VkPipelineShaderStageCreateInfo*>(mem); })));
   for (uint32_t i{}; i < shaders.size(); ++i) {
     const Shader* shader = shaders[i];
@@ -67,8 +67,8 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, const u
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .pNext                  = nullptr,
       .flags                  = 0,
-      .topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,  /**@todo: Support multiple topologies. Low priority. Topology is recorded on a per-mesh basis.*/
-      .primitiveRestartEnable = VK_FALSE
+      .topology               = material->vertexProcess->topology,
+      .primitiveRestartEnable = material->vertexProcess->primitiveRestartEnable,
   }, [](void* mem){ delete static_cast<VkPipelineInputAssemblyStateCreateInfo*>(mem);})));
   const VkViewport& viewport = *static_cast<VkViewport*>(std::get<0>(miscMemoryPool.emplace_back(new VkViewport{
       .x        = 0,
@@ -101,73 +101,60 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, const u
       .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .pNext                   = nullptr,
       .flags                   = 0,
-      .depthClampEnable        = VK_FALSE,
-      .rasterizerDiscardEnable = VK_FALSE,
-      .polygonMode             = VK_POLYGON_MODE_FILL,
-      .cullMode                = static_cast<VkCullModeFlags>(material->doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT),
-      .frontFace               = VK_FRONT_FACE_CLOCKWISE,
-      .depthBiasEnable         = VK_FALSE,
-      .depthBiasConstantFactor = 0.0,
-      .depthBiasClamp          = 0.0,
-      .depthBiasSlopeFactor    = 0.0,
-      .lineWidth               = 1.0
+      .depthClampEnable        = material->fragmentProcess->depthState.depthClampEnable,
+      .rasterizerDiscardEnable = material->fragmentProcess->rasterizerDiscardEnable,
+      .polygonMode             = material->fragmentProcess->polygonMode,
+      .cullMode                = material->vertexProcess->cullMode,
+      .frontFace               = material->vertexProcess->frontFace,
+      .depthBiasEnable         = material->fragmentProcess->depthState.bias.depthBiasEnable,
+      .depthBiasConstantFactor = material->fragmentProcess->depthState.bias.depthBiasConstantFactor,
+      .depthBiasClamp          = material->fragmentProcess->depthState.bias.depthBiasClamp,
+      .depthBiasSlopeFactor    = material->fragmentProcess->depthState.bias.depthBiasSlopeFactor,
+      .lineWidth               = material->fragmentProcess->lineWidth
   }, [](void* mem){ delete static_cast<VkPipelineRasterizationStateCreateInfo*>(mem);})));
   const VkPipelineMultisampleStateCreateInfo& multisampleState = *static_cast<VkPipelineMultisampleStateCreateInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkPipelineMultisampleStateCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .pNext                 = nullptr,
       .flags                 = 0,
-      .rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT,
-      .sampleShadingEnable   = VK_FALSE,
-      .minSampleShading      = 1.0,
-      .pSampleMask           = nullptr,
-      .alphaToCoverageEnable = VK_FALSE,
-      .alphaToOneEnable      = VK_FALSE
+      .rasterizationSamples  = material->fragmentProcess->multisampleState.sampleCount,
+      .sampleShadingEnable   = material->fragmentProcess->multisampleState.sampleShading,
+      .minSampleShading      = material->fragmentProcess->multisampleState.minSampleShading,
+      .pSampleMask           = material->fragmentProcess->multisampleState.pSampleMask,
+      .alphaToCoverageEnable = material->fragmentProcess->multisampleState.alphaToCoverageEnable,
+      .alphaToOneEnable      = material->fragmentProcess->multisampleState.alphaToOneEnable
   }, [](void* mem){delete static_cast<VkPipelineMultisampleStateCreateInfo*>(mem);})));
   const VkPipelineDepthStencilStateCreateInfo& depthStencilState = *static_cast<VkPipelineDepthStencilStateCreateInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkPipelineDepthStencilStateCreateInfo{
       .sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
       .pNext                 = nullptr,
       .flags                 = 0,
-      .depthTestEnable       = VK_TRUE,
-      .depthWriteEnable      = VK_TRUE,
-      .depthCompareOp        = VK_COMPARE_OP_LESS,
-      .depthBoundsTestEnable = VK_FALSE,
-      .stencilTestEnable     = VK_FALSE,
-      .front                 = {
-          .failOp      = VK_STENCIL_OP_KEEP,
-          .passOp      = VK_STENCIL_OP_KEEP,
-          .depthFailOp = VK_STENCIL_OP_KEEP,
-          .compareOp   = VK_COMPARE_OP_LESS,
-          .compareMask = 0,
-          .writeMask   = 0,
-          .reference   = 0
-      },
-      .back           = {.failOp = VK_STENCIL_OP_KEEP, .passOp = VK_STENCIL_OP_KEEP, .depthFailOp = VK_STENCIL_OP_KEEP, .compareOp = VK_COMPARE_OP_LESS, .compareMask = 0, .writeMask = 0, .reference = 0},
-      .minDepthBounds = 0.0,
-      .maxDepthBounds = 1.0
+      .depthTestEnable       = material->fragmentProcess->depthState.test.depthTestEnable,
+      .depthWriteEnable      = material->fragmentProcess->depthState.depthWriteEnable,
+      .depthCompareOp        = material->fragmentProcess->depthState.test.depthCompareOp,
+      .depthBoundsTestEnable = material->fragmentProcess->depthState.test.depthBoundsTestEnable,
+      .stencilTestEnable     = material->fragmentProcess->stencilState.stencilTestEnable,
+      .front                 = material->fragmentProcess->stencilState.front,
+      .back                  = material->fragmentProcess->stencilState.back,
+      .minDepthBounds        = material->fragmentProcess->depthState.test.minDepthBounds,
+      .maxDepthBounds        = material->fragmentProcess->depthState.test.maxDepthBounds
   }, [](void* mem){ delete static_cast<VkPipelineDepthStencilStateCreateInfo*>(mem);})));
   const std::uint32_t blendAttachmentStateCount = renderPass->subpassData.at(subpassIndex).colorImages.size();
   VkPipelineColorBlendAttachmentState(&blendAttachmentStates)[] = *static_cast<VkPipelineColorBlendAttachmentState(*)[]>(std::get<0>(miscMemoryPool.emplace_back(new VkPipelineColorBlendStateCreateInfo[blendAttachmentStateCount], [](void* mem){ delete[] static_cast<VkPipelineColorBlendStateCreateInfo*>(mem); })));
-  constexpr VkPipelineColorBlendAttachmentState blendAttachmentState {
-      .blendEnable         = VK_FALSE,
-      .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-      .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-      .colorBlendOp        = VK_BLEND_OP_ADD,
-      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-      .alphaBlendOp        = VK_BLEND_OP_ADD,
-      .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-  };
   for (std::uint32_t i = 0; i < blendAttachmentStateCount; i++)
-    std::memcpy(&blendAttachmentStates[i], &blendAttachmentState, sizeof(VkPipelineColorBlendAttachmentState));
+    blendAttachmentStates[i] = material->fragmentProcess->blendState.blendStates[0];
   const VkPipelineColorBlendStateCreateInfo& colorBlendState = *static_cast<VkPipelineColorBlendStateCreateInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkPipelineColorBlendStateCreateInfo{
       .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
       .pNext           = nullptr,
       .flags           = 0,
-      .logicOpEnable   = VK_FALSE,
-      .logicOp         = VK_LOGIC_OP_COPY,
+      .logicOpEnable   = material->fragmentProcess->blendState.logicOpEnable,
+      .logicOp         = material->fragmentProcess->blendState.logicOp,
       .attachmentCount = blendAttachmentStateCount,
       .pAttachments    = blendAttachmentStates,
-      .blendConstants  = {0, 0, 0, 0}
+      .blendConstants  = {
+        material->fragmentProcess->blendState.blendConstants[0],
+        material->fragmentProcess->blendState.blendConstants[1],
+        material->fragmentProcess->blendState.blendConstants[2],
+        material->fragmentProcess->blendState.blendConstants[3]
+      },
   }, [](void* mem){ delete static_cast<VkPipelineColorBlendStateCreateInfo*>(mem);})));
   const VkDynamicState(&dynamicStates)[] = *static_cast<VkDynamicState(*)[]>(std::get<0>(miscMemoryPool.emplace_back(new VkDynamicState[]{
       VK_DYNAMIC_STATE_VIEWPORT,

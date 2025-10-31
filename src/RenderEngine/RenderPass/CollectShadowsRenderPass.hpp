@@ -1,7 +1,7 @@
 #pragma once
 
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
-#include "src/RenderEngine/Shader.hpp"
+#include "src/RenderEngine/Pipeline/Shader.hpp"
 
 #include "glm/matrix.hpp"
 
@@ -13,7 +13,7 @@ class CollectShadowsRenderPass : public RenderPass {
     glm::mat4 view_ProjectionMatrixInverse;
   };
   std::unique_ptr<UniformBuffer<PassData>> uniformBuffer;
-  Shader* vertexShaderOverride = nullptr;
+  VertexProcess* vertexProcessOverride;
   static constexpr std::string_view PassName = "Collect Shadows Render Pass";
   std::unique_ptr<Buffer> copyBuffer;
 

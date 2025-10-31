@@ -2,7 +2,7 @@
 
 #include "src/Tools/Hashing.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "Pipeline.hpp"
 
 #include <SPIRV-Reflect/spirv_reflect.c>  // Should only be included in one file.
 #include <SPIRV-Reflect/spirv_reflect.h>

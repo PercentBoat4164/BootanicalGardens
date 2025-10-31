@@ -1,13 +1,12 @@
 #pragma once
 
-#include "GraphicsDevice.hpp"
+#include "../GraphicsDevice.hpp"
 
 #include <SPIRV-Reflect/spirv_reflect.h>
 #include <filesystem>
 
-class yyjson_val;
-class yyjson_mut_val;
-class yyjson_mut_doc;
+struct yyjson_mut_doc;
+struct yyjson_mut_val;
 
 class Pipeline;
 class GraphicsDevice;

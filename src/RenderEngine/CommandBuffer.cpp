@@ -6,7 +6,7 @@
 #include "Resources/Resource.hpp"
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
 
 #include <volk/volk.h>

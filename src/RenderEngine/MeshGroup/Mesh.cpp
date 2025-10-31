@@ -119,15 +119,13 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
   device->executeCommandBufferImmediate(commandBuffer);
 }
 
-Mesh::~Mesh() {}
-
-Mesh::InstanceReference Mesh::addInstance(uint64_t materialID, glm::mat4 mat) {
+Mesh::InstanceReference Mesh::addInstance(const uint64_t materialID, glm::mat4 mat) {
   Material* material = indexBuffer->device->getMaterial(materialID);
   InstanceCollection& instanceCollection = instances[material];
   InstanceReference instanceReference;
   instanceReference.material = material;
   instanceReference.modelInstanceID = instanceCollection.modelInstances.emplace(mat);
-  instanceReference.materialInstanceID = instanceCollection.materialInstances.emplace(materialID);
+  instanceReference.materialInstanceID = instanceCollection.materialInstances.emplace(material->fragmentProcess->id);
   instanceReference.perInstanceDataID = instanceCollection.perInstanceData.emplace(mat);
   instanceCollection.stale = true;
   stale = true;
@@ -164,8 +162,8 @@ void Mesh::update(CommandBuffer& commandBuffer) {
         auto* stagingBuffer = new StagingBuffer(device, "Mesh-Material Instance Staging Buffer", instanceCollection.materialInstanceBuffer->getSize());
         const std::shared_ptr<Buffer::BufferMapping> map = stagingBuffer->map();
         std::size_t i = std::numeric_limits<std::size_t>::max();
-        for (const uint32_t materialInstance: instanceCollection.materialInstances)
-          static_cast<uint32_t*>(map->data)[++i] = materialInstance;
+        for (const float materialInstance: instanceCollection.materialInstances)
+          static_cast<float*>(map->data)[++i] = materialInstance;
         commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(stagingBuffer, instanceCollection.materialInstanceBuffer.get());
         commandBuffer.addCleanupResource(stagingBuffer);
       } {  // Update the model buffer

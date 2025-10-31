@@ -12,7 +12,7 @@ template<typename T> class UniformBuffer;
 class GBufferRenderPass final : public RenderPass {
   struct PassData { glm::mat4 view_ViewProjectionMatrix; };
   std::unique_ptr<UniformBuffer<PassData>> uniformBuffer{};
-  Shader* fragmentShaderOverride;
+  FragmentProcess* fragmentProcessOverride;
 
 public:
   explicit GBufferRenderPass(RenderGraph& graph);

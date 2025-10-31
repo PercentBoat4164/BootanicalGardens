@@ -3,7 +3,7 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
@@ -17,12 +17,12 @@
 #include <filesystem>
 
 CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  vertexShaderOverride = graph.device->getJSONShader("Collect Shadows Render Pass | Vertex Shader Override");
+  vertexProcessOverride = graph.device->getJSONVertexProcess("Collect Shadows Render Pass | Vertex Shader Override");
 }
 
 void CollectShadowsRenderPass::setup() {
   for (Material& material: graph.device->materials | std::ranges::views::values) {
-    Material* overriddenMaterial = material.getVertexVariation(vertexShaderOverride);
+    Material* overriddenMaterial = material.getVertexVariation(vertexProcessOverride);
     pipelines.emplace(overriddenMaterial, nullptr);
     materialRemap.emplace(&material, overriddenMaterial);
   }
@@ -178,7 +178,7 @@ void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
   const uint64_t frameIndex = graph.getFrameIndex();
   for (const Pipeline* pipeline : pipelines | std::ranges::views::values) {
     commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-    commandBuffer.record<CommandBuffer::PushConstants>(pipeline->getMaterial()->getId(), VK_SHADER_STAGE_VERTEX_BIT);
+    commandBuffer.record<CommandBuffer::PushConstants>(pipeline->getMaterial()->fragmentProcess->id, VK_SHADER_STAGE_VERTEX_BIT);
     commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
     commandBuffer.record<CommandBuffer::Draw>(3);  // No vertex buffer needs to be bound for this call because the vertex shader generates the vertex positions automatically.
     /**@todo: Make this happen in multiple subpasses to enhance the parallelism achievable on the GPU?*/

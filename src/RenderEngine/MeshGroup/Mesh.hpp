@@ -19,7 +19,7 @@ public:
       glm::mat4 originalModelMatrix;
     };
     plf::colony<glm::mat4> modelInstances;
-    plf::colony<uint32_t> materialInstances;
+    plf::colony<float> materialInstances;
     plf::colony<PerInstanceData> perInstanceData;
     std::unique_ptr<Buffer> modelInstanceBuffer{nullptr};
     std::unique_ptr<Buffer> materialInstanceBuffer{nullptr};
@@ -44,7 +44,6 @@ public:
   bool stale = true;
 
   Mesh(GraphicsDevice* device, yyjson_val* json);
-  ~Mesh();
 
   InstanceReference addInstance(uint64_t materialID, glm::mat4 mat);
   void removeInstance(InstanceReference&& instanceReference);

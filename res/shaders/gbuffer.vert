@@ -6,7 +6,7 @@ layout (location = 1) in vec2 inTextureCoordinates;
 layout (location = 2) in vec3 inNormal;
 layout (location = 3) in vec3 inTangent;
 layout (location = 4) in mat4 inModelMatrix;  // Consumes locations 4, 5, 6, and 7
-layout (location = 8) in uint inMaterialID;
+layout (location = 8) in float inMaterialID;
 
 layout (set=PER_PASS_SET, binding=0) uniform PassData {
     mat4 viewProjectionMatrix;
@@ -16,7 +16,7 @@ layout (location = 0) out vec3 outWorldSpacePosition;
 layout (location = 1) out vec2 outTextureCoordinates;
 layout (location = 2) out vec3 outNormal;
 layout (location = 3) out vec3 outTangent;
-layout (location = 4) flat out uint outMaterialID;
+layout (location = 4) flat out float outMaterialID;
 
 void main() {
     outWorldSpacePosition = (inModelMatrix * vec4(inPosition, 1)).xyz;

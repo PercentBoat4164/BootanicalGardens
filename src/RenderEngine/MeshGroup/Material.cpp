@@ -2,26 +2,26 @@
 
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/MeshGroup/Texture.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "../Pipeline/Pipeline.hpp"
 
 #include "yyjson.h"
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
+#include "src/RenderEngine/Pipeline/Shader.hpp"
 
 #include <ranges>
 
-Material::Material(GraphicsDevice* device, yyjson_val* json, const std::uint32_t id) : device(device), id(id) {
+Material::Material(GraphicsDevice* device, yyjson_val* json) : device(device) {
   name = yyjson_get_str(yyjson_obj_get(json, "name"));
-  yyjson_val* val = yyjson_obj_get(json, "vertexShader");
-  if (yyjson_is_uint(val)) vertexShader = device->getJSONShader(yyjson_get_uint(val));
-  val = yyjson_obj_get(json, "fragmentShader");
-  if (yyjson_is_uint(val)) fragmentShader = device->getJSONShader(yyjson_get_uint(val));
-  doubleSided = yyjson_get_bool(yyjson_obj_get(json, "doubleSided"));
+  yyjson_val* val = yyjson_obj_get(json, "vertexProcess");
+  vertexProcess = device->getJSONVertexProcess(yyjson_get_uint(val));
+  val = yyjson_obj_get(json, "fragmentProcess");
+  fragmentProcess = device->getJSONFragmentProcess(yyjson_get_uint(val));
   alphaMode = static_cast<fastgltf::AlphaMode>(yyjson_get_uint(yyjson_obj_get(json, "alphaMode")));
   alphaCutoff = static_cast<float>(yyjson_get_real(yyjson_obj_get(json, "alphaCutoff")));
   val = yyjson_obj_get(json, "albedoTexture");
-  if (yyjson_is_uint(val)) albedoTexture = device->getJSONTexture(yyjson_get_uint(val));
+  albedoTexture = device->getJSONTexture(yyjson_get_uint(val));
   val = yyjson_obj_get(json, "normalTexture");
-  if (yyjson_is_uint(val)) normalTexture = device->getJSONTexture(yyjson_get_uint(val));
+  normalTexture = device->getJSONTexture(yyjson_get_uint(val));
 }
 
 const std::unordered_map<uint32_t, Material::Binding>* Material::getBindings(const uint8_t set) const {
@@ -56,7 +56,7 @@ VkPipelineStageFlags getPipelineStages(const VkShaderStageFlags shaderStages) {
 }
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeColorAttachmentAccesses() const {
-  const spv_reflect::ShaderModule* reflectedData = fragmentShader->getReflectedData();
+  const spv_reflect::ShaderModule* reflectedData = fragmentProcess->shader->getReflectedData();
   uint32_t count;
   reflectedData->EnumerateOutputVariables(&count, nullptr);
   std::vector<SpvReflectInterfaceVariable*> vars(count);
@@ -86,7 +86,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
 }
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeInputAttachmentAccesses() const {
-  const std::vector shaders = {vertexShader, fragmentShader};
+  const std::vector shaders = {vertexProcess->shader, fragmentProcess->shader};
 
   std::map<uint32_t, std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> inputAttachments;
   for (uint32_t i{}; i < shaders.size(); ++i) {
@@ -127,7 +127,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
 }
 
 std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material::computeBoundImageAccesses() const {
-  const std::vector shaders = {vertexShader, fragmentShader};
+  const std::vector shaders = {vertexProcess->shader, fragmentProcess->shader};
 
   std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> results;
   for (uint32_t i{}; i < shaders.size(); ++i) {
@@ -165,7 +165,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
 }
 
 void Material::computeDescriptorSetRequirements(std::map<DescriptorSetRequirer*, std::vector<VkDescriptorSetLayoutBinding>>& requirements, RenderPass* renderPass, Pipeline* pipeline) {
-  const std::vector shaders = {vertexShader, fragmentShader};
+  const std::vector shaders = {vertexProcess->shader, fragmentProcess->shader};
 
   // Obtain reflected descriptor set data
   std::vector<SpvReflectDescriptorSet*> sets;  // sets for all shaders
@@ -232,7 +232,7 @@ void Material::computeDescriptorSetRequirements(std::map<DescriptorSetRequirer*,
 }
 
 std::vector<VkVertexInputBindingDescription> Material::computeVertexBindingDescriptions() const {
-  const spv_reflect::ShaderModule* reflectionData = vertexShader->getReflectedData();
+  const spv_reflect::ShaderModule* reflectionData = vertexProcess->shader->getReflectedData();
 
   uint32_t count;
   reflectionData->EnumerateInputVariables(&count, nullptr);
@@ -254,7 +254,7 @@ std::vector<VkVertexInputBindingDescription> Material::computeVertexBindingDescr
 }
 
 std::vector<VkVertexInputAttributeDescription> Material::computeVertexAttributeDescriptions() const {
-  const spv_reflect::ShaderModule* reflectionData = vertexShader->getReflectedData();
+  const spv_reflect::ShaderModule* reflectionData = vertexProcess->shader->getReflectedData();
 
   uint32_t count;
   reflectionData->EnumerateInputVariables(&count, nullptr);
@@ -278,7 +278,7 @@ std::vector<VkVertexInputAttributeDescription> Material::computeVertexAttributeD
 }
 
 std::vector<VkPushConstantRange> Material::computePushConstantRanges() const {
-  const std::vector shaders = {vertexShader, fragmentShader};
+  const std::vector shaders = {vertexProcess->shader, fragmentProcess->shader};
 
   // Obtain reflected push constant data
   std::vector<SpvReflectBlockVariable*> pushConstantBlocks;  // sets for all shaders
@@ -305,18 +305,16 @@ std::vector<VkPushConstantRange> Material::computePushConstantRanges() const {
   return pushConstantRanges;
 }
 
-Material* Material::getVertexVariation(Shader* shader) const {
-  const std::uint64_t id = Tools::hash(shader, fragmentShader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
+Material* Material::getVertexVariation(VertexProcess* vertexProcess) const {
+  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
-  material->vertexShader = shader;
+  material->vertexProcess = vertexProcess;
   return material;
 }
 
-Material* Material::getFragmentVariation(Shader* shader) const {
-  const std::uint64_t id = Tools::hash(vertexShader, shader, static_cast<std::uint64_t>(doubleSided), static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
+Material* Material::getFragmentVariation(FragmentProcess* fragmentProcess) const {
+  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
-  material->fragmentShader = shader;
+  material->fragmentProcess = fragmentProcess;
   return material;
 }
-
-std::uint32_t Material::getId() const { return id; }

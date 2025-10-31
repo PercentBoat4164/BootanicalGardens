@@ -4,7 +4,7 @@
 #include "src/Game/Game.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
-#include "src/RenderEngine/Pipeline.hpp"
+#include "Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
