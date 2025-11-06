@@ -22,7 +22,7 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
   {  // Destroy the fastgltf::Parser and the fastgltf::Expected<> after they are no longer necessary
     fastgltf::Parser parser(fastgltf::Extensions::KHR_mesh_quantization | fastgltf::Extensions::EXT_meshopt_compression | fastgltf::Extensions::KHR_draco_mesh_compression);
     fastgltf::Expected<fastgltf::Asset> gltfAsset = parser.loadGltf(file, path.parent_path(), fastgltf::Options::GenerateMeshIndices | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::DontRequireValidAssetMember);
-    if (gltfAsset.error() != fastgltf::Error::None) GraphicsInstance::showError(std::string("failed to parse GLTF file '") + path.string() + "': " + magic_enum::enum_name(gltfAsset.error()));
+    if (gltfAsset.error() != fastgltf::Error::None) GraphicsInstance::showError(std::string("failed to parse GLTF file '") + path.string() + "': " + std::string(magic_enum::enum_name(gltfAsset.error())));
     asset = std::move(gltfAsset.get());
   }
   CommandBuffer commandBuffer;
@@ -72,7 +72,7 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
     buffer.Init(byteBuf, size);
     draco::Decoder decoder;
     draco::StatusOr<std::unique_ptr<draco::Mesh>> statusOrMesh = decoder.DecodeMeshFromBuffer(&buffer);
-    if (!statusOrMesh.ok()) GraphicsInstance::showError("failed to decode Draco compressed mesh: '" + statusOrMesh.status().error_msg_string() + "', Status: '" + magic_enum::enum_name<draco::Status::Code>(statusOrMesh.status().code()) + "'");
+    if (!statusOrMesh.ok()) GraphicsInstance::showError("failed to decode Draco compressed mesh: '" + statusOrMesh.status().error_msg_string() + "', Status: '" + std::string(magic_enum::enum_name<draco::Status::Code>(statusOrMesh.status().code())) + "'");
     for (auto i = draco::FaceIndex(0); i < statusOrMesh.value()->num_faces(); ++i)
       std::memcpy(static_cast<uint32_t*>(indexBufferTempMap->data) + i.value() * 3, reinterpret_cast<const uint32_t*>(statusOrMesh.value()->face(i).data()), sizeof(uint32_t) * 3);
     const draco::PointAttribute* position = statusOrMesh.value()->GetNamedAttribute(draco::GeometryAttribute::POSITION);

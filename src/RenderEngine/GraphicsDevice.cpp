@@ -17,7 +17,10 @@ GraphicsDevice::GraphicsDevice(const std::filesystem::path& path) {
   vkb::DeviceBuilder deviceBuilder{deviceSelector.select().value()};
   /**@todo: Do not hardcode the queues. Build an actually good algorithm to find the most suitable queues.
    *    Assign badness to each queue family choice based on how many other capabilities that queue family has and how rare those capabilities are on the device.*/
-  deviceBuilder.custom_queue_setup(std::span<const vkb::CustomQueueDescription>{vkb::CustomQueueDescription(0, std::span<const float>{1}), vkb::CustomQueueDescription(1, std::span<const float>{0})});
+  constexpr float one = 1;
+  constexpr float zero = 0;
+  std::vector t{vkb::CustomQueueDescription(0, 1, &one), vkb::CustomQueueDescription(1, 1, &zero)};
+  deviceBuilder.custom_queue_setup(t);
   const auto builderResult = deviceBuilder.build();
   if (!builderResult.has_value()) GraphicsInstance::showError(builderResult.vk_result(), "Failed to create the Vulkan device");
   device = builderResult.value();
