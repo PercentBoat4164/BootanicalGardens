@@ -3,16 +3,27 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/Tools/Hashing.hpp"
 
-Buffer::BufferMapping::BufferMapping(GraphicsDevice* const device, const std::shared_ptr<const Buffer>& buffer) : device(device), buffer(buffer){
-  vmaMapMemory(device->allocator, buffer->allocation, &data);
+#include <volk/volk.h>
+
+Buffer::BufferMapping::BufferMapping(GraphicsDevice* const device, Buffer* buffer) : device(device), buffer(buffer){
+  if (const VkResult result = vmaMapMemory(device->allocator, buffer->allocation, &data); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to map buffer memory");
 }
 
 Buffer::BufferMapping::~BufferMapping() {
   vmaUnmapMemory(device->allocator, buffer->allocation);
 }
 
-Buffer::Buffer(GraphicsDevice* const device, const char* name, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags required, const VkMemoryPropertyFlags preferred, const VmaMemoryUsage memoryUsage, const VmaAllocationCreateFlags flags) :
+Buffer::Buffer(GraphicsDevice* const device,
+               const char* name,
+               const VkDeviceSize bufferSize,
+               const VkBufferUsageFlags usage,
+               const VkMemoryPropertyFlags required,
+               const VkMemoryPropertyFlags preferred,
+               const VmaMemoryUsage memoryUsage, const
+               VmaAllocationCreateFlags flags
+              ) :
     Resource(Resource::Buffer, device),
     size(bufferSize) {
   const VkBufferCreateInfo bufferCreateInfo{
@@ -38,6 +49,18 @@ Buffer::Buffer(GraphicsDevice* const device, const char* name, const VkDeviceSiz
 
   if (const VkResult result = vmaCreateBuffer(device->allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, name);
   vmaSetAllocationName(device->allocator, allocation, name);
+#if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
+  if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
+    const VkDebugUtilsObjectNameInfoEXT nameInfo {
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .pNext = nullptr,
+      .objectType = VK_OBJECT_TYPE_BUFFER,
+      .objectHandle = reinterpret_cast<uint64_t>(buffer),
+      .pObjectName = name
+    };
+    if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
+  }
+#endif
 }
 
 Buffer::~Buffer() {
@@ -56,7 +79,8 @@ VkDeviceSize Buffer::getSize() const {
 
 std::shared_ptr<Buffer::BufferMapping> Buffer::map() {
   if (!mapping.expired()) return mapping.lock();
-  auto newMapping = std::make_shared<BufferMapping>(device, std::dynamic_pointer_cast<Buffer>(shared_from_this()));
+  auto newMapping = std::make_shared<BufferMapping>(device, this);
+  if (newMapping->data == nullptr) return nullptr;
   mapping = newMapping;
   return newMapping;
 }

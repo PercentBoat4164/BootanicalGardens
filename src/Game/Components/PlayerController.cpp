@@ -54,7 +54,6 @@ void PlayerController::onTick() {
   if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
     entity.position.x += movementSpeed;
   }
-  std::cout << "Player position: " << entity.position.x << ", " << entity.position.y << std::endl;
 }
 
 std::shared_ptr<Component> PlayerController::create(std::uint64_t id, Entity& entity, yyjson_val* obj) {

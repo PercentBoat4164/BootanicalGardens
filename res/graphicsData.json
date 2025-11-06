@@ -1,29 +1,282 @@
 {
+  "meshes": [
+    {
+      "path": "goggles.glb"
+    }, {
+      "path": "hose.glb"
+    }, {
+      "path": "leather.glb"
+    }, {
+      "path": "lenses.glb"
+    }, {
+      "path": "metal.glb"
+    }, {
+      "path": "rubberwood.glb"
+    }
+  ],
+  "materials": [
+    {
+      "name": "FlightHelmet | GlassPlastic",
+      "vertexProcess": 0,
+      "fragmentProcess": 1,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 0,
+      "normalTexture": 1
+    }, {
+      "name": "FlightHelmet | Hose",
+      "vertexProcess": 0,
+      "fragmentProcess": 1,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 3,
+      "normalTexture": 4
+    }, {
+      "name": "FlightHelmet | Leather",
+      "vertexProcess": 0,
+      "fragmentProcess": 1,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 6,
+      "normalTexture": 7
+    }, {
+      "name": "FlightHelmet | Lenses",
+      "vertexProcess": 0,
+      "fragmentProcess": 1,
+      "alphaMode": 2,
+      "alphaCutoff": null,
+      "albedoTexture": 9,
+      "normalTexture": 10
+    }, {
+      "name": "FlightHelmet | Metal",
+      "vertexProcess": 0,
+      "fragmentProcess": 1,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "albedoTexture": 12,
+      "normalTexture": 13
+    }
+  ],
+  "textures": [
+    {
+      "path": "FlightHelmet/GlassPlastic/albedo.exr"
+    }, {
+      "path": "FlightHelmet/GlassPlastic/normal.exr"
+    }, {
+      "path": "FlightHelmet/GlassPlastic/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Hose/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Hose/normal.exr"
+    }, {
+      "path": "FlightHelmet/Hose/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Leather/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Leather/normal.exr"
+    }, {
+      "path": "FlightHelmet/Leather/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/normal.exr"
+    }, {
+      "path": "FlightHelmet/Lenses/occlusionRoughnessMetallic.exr"
+    }, {
+      "path": "FlightHelmet/Metal/albedo.exr"
+    }, {
+      "path": "FlightHelmet/Metal/normal.exr"
+    }, {
+      "path": "FlightHelmet/Metal/occlusionRoughnessMetallic.exr"
+    }
+  ],
+  "overrideProcesses": {
+    "Geometry Buffer Render Pass | Fragment Shader Override": 0,
+    "Shadow Render Pass | Fragment Shader Override": 2,
+    "Collect Shadows Render Pass | Vertex Shader Override": 1
+  },
+  "vertexProcesses": [
+    {
+      "shader": 0,
+      "topology": "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST",
+      "primitiveRestartEnable": false,
+      "cullMode": "VK_CULL_MODE_BACK_BIT",
+      "frontFace": "VK_FRONT_FACE_CLOCKWISE"
+    }, {
+      "shader": 2,
+      "topology": "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST",
+      "primitiveRestartEnable": false,
+      "cullMode": "VK_CULL_MODE_BACK_BIT",
+      "frontFace": "VK_FRONT_FACE_CLOCKWISE"
+    }
+  ],
+  "fragmentProcesses": [
+    {
+      "shader": 1,
+      "polygonMode": "VK_POLYGON_MODE_FILL",
+      "lineWidth": 1,
+      "rasterizerDiscardEnable": false,
+      "multisampleState": {
+        "sampleCount": "VK_SAMPLE_COUNT_1_BIT",
+        "minSampleShading": 1,
+        "enableSampleMask": false,
+        "sampleMask": 0,
+        "alphaToCoverageEnable": false,
+        "alphaToOneEnable": false
+      },
+      "depthState": {
+        "depthWriteEnable": true,
+        "bias": {
+          "depthBiasEnable": false,
+          "depthBiasConstantFactor": 0,
+          "depthBiasClamp": 0,
+          "depthBiasSlopeFactor": 0
+        },
+        "test": {
+          "depthTestEnable": true,
+          "depthCompareOp": "VK_COMPARE_OP_LESS",
+          "depthBoundsTestEnable": false,
+          "minDepthBounds": 0,
+          "maxDepthBounds": 1
+        }
+      },
+      "stencilState": {
+        "stencilTestEnable": false,
+        "front": null,
+        "back": null
+      },
+      "blendState": {
+        "blendStates": [
+          {
+            "blendEnable": false,
+            "srcColorBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstColorBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "colorBlendOp": "VK_BLEND_OP_ADD",
+            "srcAlphaBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstAlphaBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "alphaBlendOp": "VK_BLEND_OP_ADD",
+            "colorWriteMask": 15
+          }
+        ],
+        "logicOpEnable": false,
+        "logicOp": "VK_LOGIC_OP_COPY",
+        "blendConstants": [0, 0, 0, 0]
+      }
+    }, {
+      "shader": 3,
+      "polygonMode": "VK_POLYGON_MODE_FILL",
+      "lineWidth": 1,
+      "rasterizerDiscardEnable": false,
+      "multisampleState": {
+        "sampleCount": "VK_SAMPLE_COUNT_1_BIT",
+        "minSampleShading": 1,
+        "enableSampleMask": false,
+        "sampleMask": 0,
+        "alphaToCoverageEnable": false,
+        "alphaToOneEnable": false
+      },
+      "depthState": {
+        "depthWriteEnable": false,
+        "bias": {
+          "depthBiasEnable": false,
+          "depthBiasConstantFactor": 0,
+          "depthBiasClamp": 0,
+          "depthBiasSlopeFactor": 0
+        },
+        "test": {
+          "depthTestEnable": true,
+          "depthCompareOp": "VK_COMPARE_OP_EQUAL",
+          "depthBoundsTestEnable": false,
+          "minDepthBounds": 0,
+          "maxDepthBounds": 1
+        }
+      },
+      "stencilState": {
+        "stencilTestEnable": false,
+        "front": null,
+        "back": null
+      },
+      "blendState": {
+        "blendStates": [
+          {
+            "blendEnable": false,
+            "srcColorBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstColorBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "colorBlendOp": "VK_BLEND_OP_ADD",
+            "srcAlphaBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstAlphaBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "alphaBlendOp": "VK_BLEND_OP_ADD",
+            "colorWriteMask": 15
+          }
+        ],
+        "logicOpEnable": false,
+        "logicOp": "VK_LOGIC_OP_COPY",
+        "blendConstants": [0, 0, 0, 0]
+      }
+    }, {
+      "shader": 4,
+      "polygonMode": "VK_POLYGON_MODE_FILL",
+      "lineWidth": 1,
+      "rasterizerDiscardEnable": false,
+      "multisampleState": {
+        "sampleCount": "VK_SAMPLE_COUNT_1_BIT",
+        "minSampleShading": 1,
+        "enableSampleMask": false,
+        "sampleMask": 0,
+        "alphaToCoverageEnable": false,
+        "alphaToOneEnable": false
+      },
+      "depthState": {
+        "depthWriteEnable": true,
+        "bias": {
+          "depthBiasEnable": false,
+          "depthBiasConstantFactor": 0,
+          "depthBiasClamp": 0,
+          "depthBiasSlopeFactor": 0
+        },
+        "test": {
+          "depthTestEnable": true,
+          "depthCompareOp": "VK_COMPARE_OP_LESS",
+          "depthBoundsTestEnable": false,
+          "minDepthBounds": 0,
+          "maxDepthBounds": 1
+        }
+      },
+      "stencilState": {
+        "stencilTestEnable": false,
+        "front": null,
+        "back": null
+      },
+      "blendState": {
+        "blendStates": [
+          {
+            "blendEnable": false,
+            "srcColorBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstColorBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "colorBlendOp": "VK_BLEND_OP_ADD",
+            "srcAlphaBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstAlphaBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "alphaBlendOp": "VK_BLEND_OP_ADD",
+            "colorWriteMask": 15
+          }
+        ],
+        "logicOpEnable": false,
+        "logicOp": "VK_LOGIC_OP_COPY",
+        "blendConstants": [0, 0, 0, 0]
+      }
+    }
+  ],
   "shaders": [
     {
-      "source": "res/basic.vert",
-      "code": [23473425],
-      "stage": 536234,
-      "entry points": [
-        {
-          "name": "main"
-        }
-      ]
-    }
-  ],
-  "pipelines": [
-    {
-      "bind point": 43025,
-      "shaders": [0]
-    }
-  ],
-  "render passes": [
-    {
-      "subpasses": [
-        {
-
-        }
-      ]
+      "path": "gbuffer.vert"
+    }, {
+      "path": "gbuffer.frag"
+    }, {
+      "path": "deferred.vert"
+    }, {
+      "path": "deferred.frag"
+    }, {
+      "path": "shadow.frag"
     }
   ]
 }

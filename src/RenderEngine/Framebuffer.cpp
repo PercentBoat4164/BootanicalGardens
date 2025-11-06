@@ -7,11 +7,11 @@
 #include <vector>
 #include <volk/volk.h>
 
-Framebuffer::Framebuffer(GraphicsDevice* const device, const std::vector<std::shared_ptr<Image>>& images, VkRenderPass renderPass) : device(device),
-                                                                                                                                                      images(images),
-                                                                                                                                                      extent{images.front()->getExtent().width, images.front()->getExtent().height},
-                                                                                                                                                      rect{0, 0, extent.width, extent.height} {
-  std::vector<VkImageView> views(images.size());
+Framebuffer::Framebuffer(GraphicsDevice* const device, const std::vector<const Image*>& images, VkRenderPass renderPass) : device(device),
+                                                                                                                                     images(images),
+                                                                                                                                     extent{images.front()->getExtent().width, images.front()->getExtent().height},
+                                                                                                                                     rect{0, 0, extent.width, extent.height} {
+  std::vector<VkImageView> views{images.size()};
   for (uint32_t i{}; i < images.size(); ++i)
     views[i] = images[i]->getImageView();
   const VkFramebufferCreateInfo framebufferCreateInfo{
@@ -47,6 +47,6 @@ VkRect2D Framebuffer::getRect() const {
   return rect;
 }
 
-const std::vector<std::shared_ptr<Image>>& Framebuffer::getImages() const {
+std::vector<const Image*> Framebuffer::getImages() const {
   return images;
 }

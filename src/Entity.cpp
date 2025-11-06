@@ -5,21 +5,21 @@
 
 #include <yyjson.h>
 
-std::unordered_map<std::string, std::shared_ptr<Component>(*)(std::uint64_t, Entity&, yyjson_val*)> Entity::componentConstructors {
+std::unordered_map<std::string, Entity::ComponentConstructor> Entity::componentConstructors {
   {"PlayerController", &PlayerController::create},
   {"Plant", &Plant::create},
 };
 
-bool Entity::registerComponentConstructor(const std::string& name, std::shared_ptr<Component>(*function)(std::uint64_t, Entity&, yyjson_val*)) {
-  if (componentConstructors.find(name) != componentConstructors.end()) return false;
+bool Entity::registerComponentConstructor(const std::string& name, const ComponentConstructor& function) {
+  if (componentConstructors.contains(name)) return false;
   componentConstructors.insert({name, function});
   return true;
 }
 
-Entity::Entity(std::uint64_t id, glm::vec3 position, glm::dquat rotation, glm::vec3 scale)
+Entity::Entity(const std::uint64_t id, const glm::vec3 position, const glm::quat& rotation, const glm::vec3 scale)
     : id(id), position(position), rotation(rotation), scale(scale) {}
 
-Entity::Entity(std::uint64_t id, const Entity& other)
+Entity::Entity(const std::uint64_t id, const Entity& other)
     : id(id), position(other.position), rotation(other.rotation), scale(other.scale) {}
 
 Component* Entity::addComponent(yyjson_val* componentData) {

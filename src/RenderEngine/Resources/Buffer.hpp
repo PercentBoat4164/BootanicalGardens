@@ -4,6 +4,8 @@
 
 #include <vma/vk_mem_alloc.h>
 
+#include <memory>
+
 class Image;
 class GraphicsDevice;
 
@@ -23,11 +25,11 @@ protected:
 
 public:
   struct BufferMapping {
-    BufferMapping(GraphicsDevice* device, const std::shared_ptr<const Buffer>& buffer);
+    BufferMapping(GraphicsDevice* device, Buffer* buffer);
     ~BufferMapping();
 
-   GraphicsDevice* const device;
-    std::shared_ptr<const Buffer> buffer;
+    GraphicsDevice* const device;
+    Buffer* buffer;
     void* data{};
   };
 

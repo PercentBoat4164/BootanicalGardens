@@ -4,6 +4,9 @@
 
 #include "src/RenderEngine/GraphicsDevice.hpp"
 
+#include <ranges>
+#include <vector>
+
 
 class StagingBuffer : public Buffer {
 public:
@@ -19,18 +22,20 @@ public:
    * Creates a host visible buffer and fills it with data. This buffer can then be copied into a device visible buffer.
    * @param device The <c>GraphicsDevice</c> that this buffer is associated with.
    * @param name The name of the buffer - to be used for debugging purposes.
-   * @param data Pointer to an array of <c>size</c> <c>T</c> elements.
+   * @param data Pointer to an array of <c>size</c> elements of type <c>T</c>.
    * @param count Number of elements in the array at <c>data</c>, not number of bytes.
    */
   template<typename T> explicit StagingBuffer(GraphicsDevice* device, const char* name, const T* data, const VkDeviceSize count) : StagingBuffer(device, name, sizeof(T) * count) {
-    vmaCopyMemoryToAllocation(device->allocator, data, allocation, 0, allocationInfo.size);
+    vmaCopyMemoryToAllocation(device->allocator, data, allocation, 0, sizeof(T) * count);
   }
 
   /**
    * Creates a host visible buffer and fills it with data. This buffer can then be copied into a device visible buffer.
    * @param device The <c>GraphicsDevice</c> that this buffer is associated with.
    * @param name The name of the buffer - to be used for debugging purposes.
-   * @param data Pointer to an array of <c>size</c> <c>T</c> elements.
+   * @param data A <c>std::ranges::range</c> of elements to be uploaded to the buffer.
    */
-  template<typename T> explicit StagingBuffer(GraphicsDevice* device, const char* name, const std::vector<T>& data) : StagingBuffer(device, name, data.data(), data.size()) {}
+  explicit StagingBuffer(GraphicsDevice* device, const char* name, std::ranges::range auto&& data) : StagingBuffer(device, name, sizeof(std::ranges::range_value_t<decltype(data)>) * data.size()) {
+    vmaCopyMemoryToAllocation(device->allocator, std::ranges::to<std::vector>(data).data(), allocation, 0, sizeof(std::ranges::range_value_t<decltype(data)>) * data.size());
+  }
 };

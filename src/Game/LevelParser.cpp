@@ -7,12 +7,15 @@
 
 #include <filesystem>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp>
+
 yyjson_doc* LevelParser::doc{nullptr};
 
 Entity& LevelParser::loadEntity(yyjson_val* entityData) {
-  auto position  = Tools::jsonGet<glm::vec3>(entityData, "position");
-  auto rotation  = Tools::jsonGet<glm::quat>(entityData, "rotation");
-  auto scale     = Tools::jsonGet<glm::vec3>(entityData, "scale");
+  auto position = Tools::jsonGet<glm::vec3>(yyjson_obj_get(entityData, "position"));
+  auto rotation = Tools::jsonGet<glm::quat>(yyjson_obj_get(entityData, "rotation"));
+  auto scale    = Tools::jsonGet<glm::vec3>(yyjson_obj_get(entityData, "scale"));
   Entity& entity = Game::addEntity(position, rotation, scale);
 
   yyjson_val* components = yyjson_obj_get(entityData, "components");

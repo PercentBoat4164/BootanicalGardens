@@ -7,13 +7,13 @@ std::unordered_map<std::filesystem::path, UpdateListener::Funcs> UpdateListener:
 efsw::FileWatcher UpdateListener::watcher;
 
 void UpdateListener::handleFileAction(efsw::WatchID watchid, const std::string& dir, const std::string& filename, efsw::Action action, std::string oldFilename) {
-  Funcs funcs = directoryFuncMap.at(std::filesystem::canonical(dir));
+  const Funcs funcs = directoryFuncMap.at(std::filesystem::canonical(dir));
   switch (action) {
     case efsw::Actions::Add: if (std::get<0>(funcs)) std::get<0>(funcs)(); break;
     case efsw::Actions::Delete: if (std::get<1>(funcs)) std::get<1>(funcs)(); break;
     case efsw::Actions::Modified: if (std::get<2>(funcs)) std::get<2>(funcs)(); break;
     case efsw::Actions::Moved: if (std::get<3>(funcs)) std::get<3>(funcs)(); break;
-    default: assert(false); break;
+    default: assert(false);
   }
 }
 
