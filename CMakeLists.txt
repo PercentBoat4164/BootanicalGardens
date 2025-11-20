@@ -4,7 +4,6 @@ project("Bootanical Gardens")
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
-find_package(OpenEXR REQUIRED)
 set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 set(ASM_NASM "nasm")
@@ -33,6 +32,8 @@ CPMAddPackage(
 CPMAddPackage("gh:ibireme/yyjson#0.12.0")
 CPMAddPackage("gh:jeremy-rifkin/cpptrace#v1.0.4")
 CPMAddPackage("gh:SpartanJ/efsw#1.5.0")
+set(OPENEXR_IS_SUBPROJECT ON)
+CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.3")
 
 add_executable(BootanicalGardens
         src/Component.cpp
@@ -75,8 +76,8 @@ add_executable(BootanicalGardens
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
-target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${SDL_SOURCE_DIR}/include ${openexr_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${draco_SOURCE_DIR}/src ${CMAKE_BINARY_DIR} ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
-target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared glm::glm OpenEXR::OpenEXR yyjson fastgltf draco::draco cpptrace::cpptrace efsw)
+target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${openexr_SOURCE_DIR}/src/lib ${SDL_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${draco_SOURCE_DIR}/src ${CMAKE_BINARY_DIR} ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
+target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared glm::glm OpenEXR OpenEXRCore OpenEXRUtil yyjson fastgltf draco::draco cpptrace::cpptrace efsw)
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     target_compile_definitions(BootanicalGardens PRIVATE
             BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer.
