@@ -42,13 +42,13 @@ Window::Window(GraphicsDevice* const device) : device{device} {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = nullptr,
         .objectType = VK_OBJECT_TYPE_IMAGE,
-        .objectHandle = reinterpret_cast<uint64_t>(images[i]),
+        .objectHandle = std::bit_cast<uint64_t>(images[i]),
         .pObjectName = name.c_str()
       };
       if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
       name = swapchainImageViewNameTemplate + std::to_string(i) + "]";
       nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
-      nameInfo.objectHandle = reinterpret_cast<uint64_t>(views[i]),
+      nameInfo.objectHandle = std::bit_cast<uint64_t>(views[i]),
       nameInfo.pObjectName = name.c_str();
       if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
     }

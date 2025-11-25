@@ -43,16 +43,16 @@ PlayerController::PlayerController(const std::uint64_t id, Entity& entity) : Com
 void PlayerController::onTick() {
   //move the player using keyboard
   if (Input::keyDown(SDLK_UP) > 0 || Input::keyDown(SDLK_W) > 0) {
-    entity.position.y += movementSpeed;
+    entity.position.y += movementSpeed * Game::getTickTime();
   }
   if (Input::keyDown(SDLK_DOWN) > 0 || Input::keyDown(SDLK_S) > 0) {
-    entity.position.y -= movementSpeed;
+    entity.position.y -= movementSpeed * Game::getTickTime();
   }
   if (Input::keyDown(SDLK_LEFT) > 0 || Input::keyDown(SDLK_A) > 0) {
-    entity.position.x -= movementSpeed;
+    entity.position.x -= movementSpeed * Game::getTickTime();
   }
   if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
-    entity.position.x += movementSpeed;
+    entity.position.x += movementSpeed * Game::getTickTime();
   }
 }
 

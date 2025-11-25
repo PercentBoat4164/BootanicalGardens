@@ -10,6 +10,7 @@
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 
 #include <volk/volk.h>
+#include <vulkan/utility/vk_format_utils.h>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -77,7 +78,7 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_RENDER_PASS,
-      .objectHandle = reinterpret_cast<uint64_t>(renderPass),
+      .objectHandle = std::bit_cast<uint64_t>(renderPass),
       .pObjectName = name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(graph.device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
@@ -90,7 +91,7 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
   uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, (std::string(PassName) + " | Uniform Buffer").c_str());
   const auto image = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID));
   const VkExtent3D resolution = graph.getResolutionGroup(image.resolutionGroup).resolution;
-  copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatElementSize(image.format) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatTexelBlockSize(image.format) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
 void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {

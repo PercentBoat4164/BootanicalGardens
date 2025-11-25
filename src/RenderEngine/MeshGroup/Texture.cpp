@@ -13,7 +13,8 @@ VkSampler Texture::getSampler() const {
 std::unique_ptr<Texture> Texture::jsonGet(GraphicsDevice* device, yyjson_val* textureJSON, CommandBuffer& commandBuffer) {
   std::filesystem::path path = yyjson_get_str(yyjson_obj_get(textureJSON, "path"));
   path = (device->resourcesDirectory / "textures" / path).c_str();
-  Imf::RgbaInputFile file(path.c_str());
+  std::string pathStr = path.string();
+  Imf::RgbaInputFile file(pathStr.c_str());
   const Imath::Box2i dataWindow = file.dataWindow();
   const unsigned int width  = dataWindow.max.x - dataWindow.min.x + 1;
   const unsigned int height = dataWindow.max.y - dataWindow.min.y + 1;
@@ -21,7 +22,7 @@ std::unique_ptr<Texture> Texture::jsonGet(GraphicsDevice* device, yyjson_val* te
   Imf::FrameBuffer framebuffer;
   file.setFrameBuffer(&pixels[0][0], 1, width);
   file.readPixels(dataWindow.min.y, dataWindow.max.y);
-  auto texture = std::make_unique<Texture>(device, path, VK_FORMAT_R8G8B8A8_SRGB, VkExtent3D{width, height, 1}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+  auto texture = std::make_unique<Texture>(device, pathStr, VK_FORMAT_R8G8B8A8_SRGB, VkExtent3D{width, height, 1}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
   struct Pixel{uint8_t r; uint8_t g; uint8_t b; uint8_t a;};
   std::vector<Pixel> data(width * height);
   for (uint32_t columnIndex = 0; columnIndex < width; ++columnIndex) {
@@ -36,7 +37,7 @@ std::unique_ptr<Texture> Texture::jsonGet(GraphicsDevice* device, yyjson_val* te
       };
     }
   }
-  auto* buffer  = new StagingBuffer(device, (std::string(path) + " | upload buffer").c_str(), data);
+  auto* buffer  = new StagingBuffer(device, (pathStr + " | upload buffer").c_str(), data);
   std::vector<VkBufferImageCopy> regions{
     {
       .bufferOffset = 0,

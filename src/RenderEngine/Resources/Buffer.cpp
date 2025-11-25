@@ -55,7 +55,7 @@ Buffer::Buffer(GraphicsDevice* const device,
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_BUFFER,
-      .objectHandle = reinterpret_cast<uint64_t>(buffer),
+      .objectHandle = std::bit_cast<uint64_t>(buffer),
       .pObjectName = name
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");

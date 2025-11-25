@@ -140,7 +140,7 @@ void CommandBuffer::BindVertexBuffers::bake(VkCommandBuffer commandBuffer) {
   GraphicsInstance::setDebugDataCommand(this);
 #endif
   auto* rawBuffers = static_cast<VkBuffer*>(alloca(buffers.size() * sizeof(VkBuffer)));
-  for (size_t i = 0; i < buffers.size(); i++) rawBuffers[i] = buffers[i] ? buffers[i]->getBuffer() : nullptr;
+  for (size_t i = 0; i < buffers.size(); i++) rawBuffers[i] = buffers[i] ? buffers[i]->getBuffer() : VK_NULL_HANDLE;
   vkCmdBindVertexBuffers(commandBuffer, firstBinding, buffers.size(), rawBuffers, offsets.data());
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
   GraphicsInstance::setDebugDataCommand(nullptr);

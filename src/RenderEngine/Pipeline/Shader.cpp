@@ -148,20 +148,21 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .codeSize = binary->wordCount * sizeof(std::remove_pointer_t<decltype(binary->code)>),
-      .pCode = binary->code
+      .codeSize = code.size() * sizeof(decltype(code)::value_type),
+      .pCode = code.data()
   };
   if (const VkResult result = vkCreateShaderModule(device->device, &shaderModuleCreateInfo, nullptr, &module); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create shader module");
   spvBinaryDestroy(binary);
 
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
   if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
+    std::string name = sourcePath.string();
     const VkDebugUtilsObjectNameInfoEXT nameInfo {
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
-      .objectHandle = reinterpret_cast<uint64_t>(module),
-      .pObjectName = sourcePath.c_str()
+      .objectHandle = std::bit_cast<uint64_t>(module),
+      .pObjectName = name.c_str()
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
   }

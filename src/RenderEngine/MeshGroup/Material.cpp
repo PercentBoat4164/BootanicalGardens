@@ -265,7 +265,7 @@ std::vector<VkVertexInputAttributeDescription> Material::computeVertexAttributeD
     if (interfaceVariable->built_in > 0) continue;
     count = 0;
     for (uint32_t i = 0; i < std::max(1U, interfaceVariable->numeric.matrix.column_count); ++i) {
-      attributeDescriptions.emplace(interfaceVariable->location + i, VkVertexInputAttributeDescription{interfaceVariable->location + i, count, static_cast<VkFormat>(interfaceVariable->format), vkuFormatElementSize(static_cast<VkFormat>(interfaceVariable->format)) * i});
+      attributeDescriptions.emplace(interfaceVariable->location + i, VkVertexInputAttributeDescription{interfaceVariable->location + i, count, static_cast<VkFormat>(interfaceVariable->format), vkuFormatTexelBlockSize(static_cast<VkFormat>(interfaceVariable->format)) * i});
       count = std::numeric_limits<uint32_t>::max();
     }
   }
@@ -306,14 +306,14 @@ std::vector<VkPushConstantRange> Material::computePushConstantRanges() const {
 }
 
 Material* Material::getVertexVariation(VertexProcess* vertexProcess) const {
-  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
+  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), reinterpret_cast<std::uint64_t>(albedoTexture.lock().get()), reinterpret_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
   material->vertexProcess = vertexProcess;
   return material;
 }
 
 Material* Material::getFragmentVariation(FragmentProcess* fragmentProcess) const {
-  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), std::bit_cast<std::uint64_t>(albedoTexture.lock().get()), std::bit_cast<std::uint64_t>(normalTexture.lock().get()));
+  const std::uint64_t id = Tools::hash(vertexProcess, fragmentProcess, static_cast<std::uint64_t>(alphaMode), static_cast<std::uint64_t>(alphaCutoff), reinterpret_cast<std::uint64_t>(albedoTexture.lock().get()), reinterpret_cast<std::uint64_t>(normalTexture.lock().get()));
   Material* material = device->getMaterial(id, this);
   material->fragmentProcess = fragmentProcess;
   return material;

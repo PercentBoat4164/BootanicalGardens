@@ -52,7 +52,7 @@ class RenderGraph {
   std::vector<PerFrameData> frames;
 
   std::uint64_t frameNumber{};
-  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE};
+  std::unique_ptr<VkDescriptorPool, std::function<void(VkDescriptorPool*)>> descriptorPool{VK_NULL_HANDLE, [](VkDescriptorPool*){}};
 
   std::vector<std::shared_ptr<RenderPass>> renderPasses;
   bool outOfDate = false;
