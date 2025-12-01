@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-struct yyjson_val;
+class yyjson_val;
 
 class Shader;
 class Pipeline;

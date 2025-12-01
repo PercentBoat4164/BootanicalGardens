@@ -134,8 +134,8 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
   const spv_message_consumer consumer = [](const spv_message_level_t level, const char* source, const spv_position_t* position, const char* message) {
     GraphicsInstance::showError("During shader optimization: " + std::to_string(level) + "\n\t" + source + ":" + std::to_string(position->line) + ":" + std::to_string(position->column) + "\n\t" + message);
   };
-  spv_optimizer_t* optimizer = spvOptimizerCreate(SPV_ENV_UNIVERSAL_1_0);
-  const spv_optimizer_options optimizerOptions = spvOptimizerOptionsCreate();
+  spv_optimizer_t* const optimizer = spvOptimizerCreate(SPV_ENV_UNIVERSAL_1_0);
+  spv_optimizer_options optimizerOptions = spvOptimizerOptionsCreate();
   spvOptimizerRegisterSizePasses(optimizer);
   spvOptimizerRegisterPerformancePasses(optimizer);
   spvOptimizerSetMessageConsumer(optimizer, consumer);

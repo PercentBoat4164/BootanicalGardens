@@ -13,7 +13,7 @@ include(cmake/get_cpm.cmake)
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.329")
 set(SPIRV_REFLECT_STATIC_LIB ON)
 CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-1.4.321.0")
-CPMAddPackage("gh:libsdl-org/SDL#release-3.2.4")
+CPMAddPackage("gh:libsdl-org/SDL#release-3.2.26")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.7")
 set(FASTGLTF_DOWNLOAD_SIMDJSON ON)
 set(FASTGLTF_ENABLE_TESTS OFF)
@@ -82,7 +82,7 @@ if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     target_compile_definitions(BootanicalGardens PRIVATE
             BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer.
             BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS                                               # provides names for Vulkan objects in graphics debuggers.
-            BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION="BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION"  # enables vulkan validation if an environment variable matching this string is present
+            BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION="BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION"  # enables vulkan validation if an environment variable matching this string is present.
             BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES                                   # provides human readable names for each shader variable.
     )
 endif ()

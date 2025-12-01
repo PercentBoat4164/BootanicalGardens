@@ -190,7 +190,7 @@ Shader* GraphicsDevice::getJSONShader(const std::uint64_t id) {
 }
 
 std::weak_ptr<Texture> GraphicsDevice::getJSONTexture(const std::uint64_t id) {
-  if (id >= JSONTextureArrayCount) return std::weak_ptr<Texture>();
+  if (id >= JSONTextureArrayCount) return {};
   if (const auto it = textures.find(id); it != textures.end()) return it->second;
   CommandBuffer commandBuffer;
   std::shared_ptr<Texture> texture = textures.emplace(id, Texture::jsonGet(this, yyjson_arr_get(JSONTextureArray, id), commandBuffer)).first->second;
