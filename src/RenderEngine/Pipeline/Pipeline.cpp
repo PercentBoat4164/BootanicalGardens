@@ -231,7 +231,7 @@ void Pipeline::writeDescriptorSets(std::deque<std::tuple<void*, std::function<vo
       }
       case Tools::hash("lightData"): {
         if (uniformBuffer == nullptr) uniformBuffer = std::make_unique<UniformBuffer<LightData>>(device, "Light Data");
-        const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, -15.f, 15.f);
+        const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, 15.f, -15.f);
         const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(-1, 10, -1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
         const LightData materialData {
           .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,

@@ -40,13 +40,13 @@ void main() {
     vec3 fragmentToLightVector = normalize(lightData.light_Position - position.xyz);  // Compute a vector from the current fragment to the light in World Space.
     float cosine_Normal_fragmentToLight = max(dot(normal, fragmentToLightVector), 0);  // Compute the cosine of the angle betweeen the fragment normal and the vector to the light.
     float bias = maxBias * cosine_Normal_fragmentToLight;  // Multiply by the maxBias get the shadow bias.
-    shadowMapPosition.z -= bias;  // Apply the bias by subtracting. Subtracting brings the depth from the shadow map to be closer to zero, in other words, closer to the light source.
+    shadowMapPosition.z += bias;  // Apply the bias by adding. Adding brings the depth from the shadow map to be closer to 1, in other words, closer to the light source.
 
     /*****************************************
      * Compute the lighting on this fragment *
      *****************************************/
     vec3 light = vec3(0);
-    if (shadowMapPosition.z < shadowDepth) {  // Both shadowMapPosition.z and shadowDepth are in the light view's NDC and the shadowMapPosition.z has already had the bias applied, so we can directly compare them.
+    if (shadowMapPosition.z > shadowDepth) {  // Both shadowMapPosition.z and shadowDepth are in the light view's NDC and the shadowMapPosition.z has already had the bias applied, so we can directly compare them.
         /*********************************************************
          * The fragment is in the light, so compute the lighting *
          *********************************************************/

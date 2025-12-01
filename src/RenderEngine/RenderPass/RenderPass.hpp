@@ -64,7 +64,7 @@ public:
 
   template<typename Materials>
   requires std::ranges::range<Materials> && std::same_as<std::ranges::range_value_t<Materials>, Material*>
-  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 1}, const VkClearDepthStencilValue depth = {1, 0}) {
+  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 1}, const VkClearDepthStencilValue depth = {0, 0}) {
     imageAccesses.clear();
     // Prepare data for this render pass
     if (const std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {

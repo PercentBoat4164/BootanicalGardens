@@ -167,7 +167,7 @@ std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Collect
 void CollectShadowsRenderPass::update() {
   const PassData passData {
     .view_ViewMatrixInverse       = glm::inverse(glm::lookAtRH(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0))),
-    .view_ProjectionMatrixInverse = glm::inverse(glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 1.0f, 2.0f))
+    .view_ProjectionMatrixInverse = glm::inverse(glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 2.0f, 1.0f))
   };
   uniformBuffer->update(passData);
 }

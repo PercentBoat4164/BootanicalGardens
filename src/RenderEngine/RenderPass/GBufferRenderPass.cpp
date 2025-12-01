@@ -122,7 +122,7 @@ std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBuffer
 }
 
 void GBufferRenderPass::update() {
-  const glm::mat4x4 projectionMatrix = glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 1.0f, 2.0f);
+  const glm::mat4x4 projectionMatrix = glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 2.0f, 1.0f);
   const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0));
   const PassData passData {
     .view_ViewProjectionMatrix = projectionMatrix * viewMatrix

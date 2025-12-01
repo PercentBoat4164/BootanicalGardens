@@ -134,7 +134,7 @@
         },
         "test": {
           "depthTestEnable": true,
-          "depthCompareOp": "VK_COMPARE_OP_LESS",
+          "depthCompareOp": "VK_COMPARE_OP_GREATER",
           "depthBoundsTestEnable": false,
           "minDepthBounds": 0.0,
           "maxDepthBounds": 1.0
@@ -236,7 +236,7 @@
         },
         "test": {
           "depthTestEnable": true,
-          "depthCompareOp": "VK_COMPARE_OP_LESS",
+          "depthCompareOp": "VK_COMPARE_OP_GREATER",
           "depthBoundsTestEnable": false,
           "minDepthBounds": 0.0,
           "maxDepthBounds": 1.0
