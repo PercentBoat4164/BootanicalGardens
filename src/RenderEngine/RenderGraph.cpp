@@ -145,15 +145,15 @@ bool RenderGraph::bake() {
   {
     // Understand how attachments are used across RenderPasses
     std::unordered_map<RenderPass*, std::vector<ImageID>> pass2id;
+    pass2id.reserve(renderPasses.size());
     std::unordered_map<ImageID, std::vector<std::pair<RenderPass*, ImageAccess>>> id2decl;
     std::unordered_map<ImageID, VkImageUsageFlags> usages {
       {getImageId(RenderColor), VK_IMAGE_USAGE_TRANSFER_SRC_BIT}
     };
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
       renderPass->setup();
-      std::vector<std::pair<ImageID, ImageAccess>> accesses = renderPass->getImageAccesses();
       std::vector<ImageID> ids;
-      for (auto& [id, access] : accesses) {
+      for (auto& [id, access] : renderPass->getImageAccesses()) {
         usages[id] |= access.usage;
         if (!images.contains(id))
           continue;

@@ -28,7 +28,7 @@
 
 thread_local GraphicsInstance::DebugData GraphicsInstance::debugData{};
 vkb::Instance GraphicsInstance::instance{};
-std::unordered_set<uint32_t> GraphicsInstance::enabledExtensions{};
+std::unordered_set<uint64_t> GraphicsInstance::enabledExtensions{};
 
 // ReSharper disable once CppDFAConstantFunctionResult
 VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, const VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {

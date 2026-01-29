@@ -37,8 +37,6 @@ VkPipelineStageFlags getPipelineStages(const VkShaderStageFlags shaderStages) {
   if (shaderStages & VK_SHADER_STAGE_GEOMETRY_BIT) pipelineStages |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
   if (shaderStages & VK_SHADER_STAGE_FRAGMENT_BIT) pipelineStages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   if (shaderStages & VK_SHADER_STAGE_COMPUTE_BIT) pipelineStages |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-  if (shaderStages & VK_SHADER_STAGE_ALL_GRAPHICS) pipelineStages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-  if (shaderStages & VK_SHADER_STAGE_ALL) pipelineStages |= VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 #if VK_KHR_ray_query | VK_KHR_ray_tracing_pipeline
   if (shaderStages & VK_SHADER_STAGE_RAYGEN_BIT_KHR ||
       shaderStages & VK_SHADER_STAGE_ANY_HIT_BIT_KHR ||
@@ -113,7 +111,7 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
               .stage = getPipelineStages(shader.getStage()),
               .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
               .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-              .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+              .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
               .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
             }
           }
@@ -155,7 +153,11 @@ std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> Material:
             .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .usage = VK_IMAGE_USAGE_SAMPLED_BIT,
             .access = VK_ACCESS_SHADER_READ_BIT,
-            .stage = getPipelineStages(shader.getStage())
+            .stage = getPipelineStages(shader.getStage()),
+            .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
           }
         );
       }
