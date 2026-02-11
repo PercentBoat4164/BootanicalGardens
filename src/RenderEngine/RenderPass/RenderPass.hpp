@@ -4,6 +4,7 @@
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/MeshGroup/Texture.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 
@@ -102,8 +103,11 @@ public:
     else inputAttachmentCount = imageAccesses.size() - inputAttachmentOffset;
     boundImageOffset = imageAccesses.size();
     for (const Material* material: materials) {
+      const std::uint64_t albedo = material->albedoTexture.expired() ? 0 : Tools::hash(material->albedoTexture.lock().get());
+      const std::uint64_t normal = material->normalTexture.expired() ? 0 : Tools::hash(material->normalTexture.lock().get());
       const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& boundImageAccesses = material->computeBoundImageAccesses();
       for (auto& [id, access]: boundImageAccesses) {
+        if (albedo == id || normal == id) continue;
         auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
         if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
         else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");

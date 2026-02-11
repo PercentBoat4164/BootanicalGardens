@@ -1,6 +1,5 @@
 #include "CommandBuffer.hpp"
 
-#include "MeshGroup/Material.hpp"
 #include "Resources/Buffer.hpp"
 #include "Resources/Image.hpp"
 #include "Resources/Resource.hpp"
@@ -10,10 +9,8 @@
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
 
 #include <volk/volk.h>
-#include <vulkan/utility/vk_format_utils.h>
 
 #include <algorithm>
-#include <ranges>
 #include <utility>
 
 CommandBuffer::Command::Command(std::vector<ResourceAccess> accesses, const Type type) : accesses(std::move(accesses)), type(type)

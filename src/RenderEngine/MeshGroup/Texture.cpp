@@ -54,6 +54,25 @@ std::unique_ptr<Texture> Texture::jsonGet(GraphicsDevice* device, yyjson_val* te
     }
   };
   commandBuffer.record<CommandBuffer::CopyBufferToImage>(buffer, texture.get(), regions);
+  CommandBuffer::PipelineBarrier::ImageMemoryBarrier imageMemoryBarrier{
+    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .pNext = nullptr,
+    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = texture.get(),
+    .subresourceRange = {
+      .aspectMask = texture->getAspect(),
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = texture->getLayerCount()
+    }
+  };
+  commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, std::span<CommandBuffer::PipelineBarrier::MemoryBarrier>{}, std::span<CommandBuffer::PipelineBarrier::BufferMemoryBarrier>{}, std::span{&imageMemoryBarrier, 1});
   commandBuffer.addCleanupResource(buffer);
   return texture;
 }
