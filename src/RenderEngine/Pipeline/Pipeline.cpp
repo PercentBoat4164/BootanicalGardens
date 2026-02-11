@@ -18,7 +18,8 @@
 Pipeline::Pipeline(GraphicsDevice* const device, Material* material) : DescriptorSetRequirer(device), device(device), material(material), bindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS) {}
 
 /**@todo: Only rebake if out-of-date.*/
-void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, const uint32_t subpassIndex, std::span<VkDescriptorSetLayout> layouts, std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
+void Pipeline::bake(const std::shared_ptr<RenderPass>& renderPass, const uint32_t subpassIndex, std::span<VkDescriptorSetLayout> layouts, std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkGraphicsPipelineCreateInfo>& createInfos, std::vector<VkPipeline*>& pipelines) {
+  this->renderPass = renderPass;
   // Create the pipeline layout
   std::vector<VkPushConstantRange> pushConstantRanges = material->computePushConstantRanges();
   const VkPipelineLayoutCreateInfo createInfo {
@@ -191,70 +192,51 @@ void Pipeline::bake(const std::shared_ptr<const RenderPass>& renderPass, const u
   pipelines.push_back(&pipeline);
 }
 
-void Pipeline::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
+void Pipeline::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
   const std::unordered_map<uint32_t, Material::Binding>* bindings = material->getBindings(2);
-  std::unordered_map<uint32_t, std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>> descriptorInfos;
+  std::unordered_map<uint32_t, std::variant<std::monostate, std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>> descriptorInfos;
+
   for (auto& [binding, info] : *bindings) {
-    switch (info.nameHash) {
-      case Tools::hash("albedo"): {
-        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
-        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
+    std::variant<std::monostate, std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
+    switch (info.type) {
+      case VK_DESCRIPTOR_TYPE_SAMPLER:
+      case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+      case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+      case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+      case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+      case VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM:
+      case VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM:
+        if (std::holds_alternative<std::monostate>(data))
           data.emplace<std::vector<VkDescriptorImageInfo>>();
-        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
-          .sampler     = material->albedoTexture.lock()->getSampler(),
-          .imageView   = material->albedoTexture.lock()->getImageView(),
-          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        });
+        else if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
+          GraphicsInstance::showError("Pipeline::writeDescriptorSets: Not all descriptor types matched when writing descriptors for a single binding!");
+        renderPass->bind(std::get<std::vector<VkDescriptorImageInfo>>(data).emplace_back(), this, material, info);
         break;
-      }
-      case Tools::hash("normal"): {
-        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
-        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
-          data.emplace<std::vector<VkDescriptorImageInfo>>();
-        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
-          .sampler     = material->normalTexture.lock()->getSampler(),
-          .imageView   = material->normalTexture.lock()->getImageView(),
-          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        });
+      case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+      case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+        if (std::holds_alternative<std::monostate>(data))
+          data.emplace<std::vector<VkBufferView>>();
+        else if (!std::holds_alternative<std::vector<VkBufferView>>(data))
+          GraphicsInstance::showError("Pipeline::writeDescriptorSets: Not all descriptor types matched when writing descriptors for a single binding!");
+        renderPass->bind(std::get<std::vector<VkBufferView>>(data).emplace_back(), this, material, info);
         break;
-      }
-      case RenderGraph::getImageId(RenderGraph::ShadowDepth): {
-        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
-        if (!std::holds_alternative<std::vector<VkDescriptorImageInfo>>(data))
-          data.emplace<std::vector<VkDescriptorImageInfo>>();
-        std::get<std::vector<VkDescriptorImageInfo>>(data).push_back({
-          .sampler     = *graph.device->getSampler(),
-          .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::ShadowDepth)).image->getImageView(),
-          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        });
-        break;
-      }
-      case Tools::hash("lightData"): {
-        if (uniformBuffer == nullptr) uniformBuffer = std::make_unique<UniformBuffer<LightData>>(device, "Light Data");
-        const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, 15.f, -15.f);
-        const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(-1, 10, -1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
-        const LightData materialData {
-          .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,
-          .light_Position             = glm::vec3(-1, 10, -1)
-        };
-        uniformBuffer->update(materialData);
-        std::variant<std::vector<VkDescriptorImageInfo>, std::vector<VkDescriptorBufferInfo>, std::vector<VkBufferView>>& data = descriptorInfos[binding];
-        if (!std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(data))
+      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+        if (std::holds_alternative<std::monostate>(data))
           data.emplace<std::vector<VkDescriptorBufferInfo>>();
-        std::get<std::vector<VkDescriptorBufferInfo>>(data).push_back({
-          .buffer = uniformBuffer->getBuffer(),
-          .offset = 0,
-          .range  = uniformBuffer->getSize()
-        });
+        else if (!std::holds_alternative<std::vector<VkDescriptorBufferInfo>>(data))
+          GraphicsInstance::showError("Pipeline::writeDescriptorSets: Not all descriptor types matched when writing descriptors for a single binding!");
+        renderPass->bind(std::get<std::vector<VkDescriptorBufferInfo>>(data).emplace_back(), this, material, info);
         break;
-      }
-      default:
-#if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES
-        GraphicsInstance::showError("unknown object " + info.name);
-#else
-        GraphicsInstance::showError("unknown object with hash " + std::to_string(info.nameHash));
-#endif
-        break;
+      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
+      case VK_DESCRIPTOR_TYPE_MUTABLE_EXT:
+      case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
+      case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:
+      case VK_DESCRIPTOR_TYPE_MAX_ENUM:
+        GraphicsInstance::showError("Pipeline::writeDescriptorSets: Invalid descriptor type encountered!");
     }
   }
 

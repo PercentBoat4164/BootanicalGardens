@@ -23,10 +23,10 @@ class CommandBuffer;
 class Material {
 public:
   struct Binding {
-    uint64_t nameHash;
+    RenderGraph::ImageID id;
     VkDescriptorType type;
     uint32_t count;
-#if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
     std::string name;
 #endif
   };

@@ -2,7 +2,7 @@
 
 #include "src/Tools/Hashing.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 
 #include <spirv_reflect.h>
 #include <spirv-tools/optimizer.hpp>

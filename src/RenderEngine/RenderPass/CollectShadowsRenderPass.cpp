@@ -3,11 +3,12 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
+#include "src/Tools/ClassName.h"
 
 #include <volk/volk.h>
 #include <vulkan/utility/vk_format_utils.h>
@@ -88,13 +89,13 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
   for (auto& [material, pipeline]: pipelines) pipeline = graph.device->getPipeline(material, compatibility);
 
   framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
-  uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, (std::string(PassName) + " | Uniform Buffer").c_str());
+  passData = std::make_unique<UniformBuffer<PassData>>(graph.device, (std::string(PassName) + " | Uniform Buffer").c_str());
   const auto image = graph.getImage(RenderGraph::getImageId(RenderGraph::GBufferMaterialID));
   const VkExtent3D resolution = graph.getResolutionGroup(image.resolutionGroup).resolution;
   copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatTexelBlockSize(image.format) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
-void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph& graph) {
+void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
   // The g-buffer albedo
   uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
@@ -169,7 +170,7 @@ void CollectShadowsRenderPass::update() {
     .view_ViewMatrixInverse       = glm::inverse(glm::lookAtRH(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0))),
     .view_ProjectionMatrixInverse = glm::inverse(glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 2.0f, 1.0f))
   };
-  uniformBuffer->update(passData);
+  this->passData->update(passData);
 }
 
 void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
@@ -185,4 +186,76 @@ void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
     /**@todo: Make this happen in multiple subpasses to enhance the parallelism achievable on the GPU?*/
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
+}
+
+void CollectShadowsRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    case RenderGraph::getImageId(RenderGraph::ShadowDepth): {
+      imageInfo = {
+        .sampler     = *graph.device->getSampler(),
+        .imageView   = graph.getImage(RenderGraph::getImageId(RenderGraph::ShadowDepth)).image->getImageView(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      };
+      break;
+    }
+    default: {
+      GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void CollectShadowsRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    case Tools::hash("lightData"): {
+      const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, 15.f, -15.f);
+      const glm::mat4x4 viewMatrix       = glm::lookAtRH(glm::vec3(-1, 10, -1), glm::vec3(0, .25, 0), glm::vec3(0, 0, -1));
+      const LightData materialData {
+        .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,
+        .light_Position             = glm::vec3(-1, 10, -1)
+      };
+      if (lightData == nullptr) lightData = std::make_unique<UniformBuffer<LightData>>(graph.device, "Light Data", materialData);
+      else lightData->update(materialData);
+      bufferInfo = {
+        .buffer = lightData->getBuffer(),
+        .offset = 0,
+        .range  = lightData->getSize()
+      };
+      break;
+    }
+    default: {
+      GraphicsInstance::showError("Material has unbound buffer binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void CollectShadowsRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound buffer view binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
+      );
+      break;
+    }
+  }
 }

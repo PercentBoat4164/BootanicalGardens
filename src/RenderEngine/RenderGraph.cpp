@@ -298,7 +298,7 @@ bool RenderGraph::bake() {
       auto start = static_cast<decltype(descriptorSets)::difference_type>(index) * FRAMES_IN_FLIGHT + descriptorSets.begin();
       if (descriptorSetRequirer) {
         descriptorSetRequirer->setDescriptorSets(std::span{start, start + FRAMES_IN_FLIGHT}, layouts[index]);
-        descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes, *this);
+        descriptorSetRequirer->writeDescriptorSets(miscMemoryPool, writes);
       }
       else if (frameDataLayout) {
         auto layout = std::shared_ptr<VkDescriptorSetLayout>(new VkDescriptorSetLayout(frameDataLayout), [this](const VkDescriptorSetLayout* layout) {

@@ -3,10 +3,11 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
+#include "src/Tools/ClassName.h"
 
 #include <volk/volk.h>
 
@@ -81,14 +82,14 @@ void ShadowRenderPass::bake(const std::vector<VkAttachmentDescription>& attachme
   for (auto& [material, pipeline]: pipelines) pipeline = graph.device->getPipeline(material, compatibility);
 
   framebuffer = std::make_unique<Framebuffer>(graph.device, images, renderPass);
-  uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, "Shadow Pass | Uniform Buffer");
+  passData = std::make_unique<UniformBuffer<PassData>>(graph.device, "Shadow Pass | Uniform Buffer");
 }
 
-void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
+void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
   const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
-     .buffer = uniformBuffer->getBuffer(),
+     .buffer = passData->getBuffer(),
      .offset = 0,
-     .range = uniformBuffer->getSize()
+     .range = passData->getSize()
   }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); })));
   const uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
@@ -124,7 +125,7 @@ void ShadowRenderPass::update() {
   const PassData passData {
     .light_ViewProjectionMatrix = projectionMatrix * viewMatrix,
   };
-  uniformBuffer->update(passData);
+  this->passData->update(passData);
 }
 
 void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
@@ -141,4 +142,52 @@ void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
     }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
+}
+
+void ShadowRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void ShadowRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound buffer binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void ShadowRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound buffer view binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
+      );
+      break;
+    }
+  }
 }

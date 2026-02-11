@@ -218,7 +218,7 @@ void Material::computeDescriptorSetRequirements(std::map<DescriptorSetRequirer*,
           .pImmutableSamplers = VK_NULL_HANDLE
         };
         setBinding[binding.binding] = {
-          .nameHash = Tools::hash(binding.name),
+          .id = RenderGraph::getImageId(binding.name),
           .type = static_cast<VkDescriptorType>(binding.descriptor_type),
           .count = binding.count,
 #if BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES

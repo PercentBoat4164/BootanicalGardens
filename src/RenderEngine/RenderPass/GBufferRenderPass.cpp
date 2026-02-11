@@ -10,6 +10,7 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/Tools/ClassName.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -87,7 +88,7 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
   uniformBuffer = std::make_unique<UniformBuffer<PassData>>(graph.device, "G-Buffer Render Pass | Uniform Buffer");
 }
 
-void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes, const RenderGraph&graph) {
+void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
   const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
        .buffer = uniformBuffer->getBuffer(),
        .offset = 0,
@@ -145,4 +146,68 @@ void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
     }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
+}
+
+void GBufferRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    case RenderGraph::getImageId("albedo"): {
+      imageInfo = {
+        .sampler     = material->albedoTexture.lock()->getSampler(),
+        .imageView   = material->albedoTexture.lock()->getImageView(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      };
+      break;
+    }
+    case RenderGraph::getImageId("normal"): {
+      imageInfo = {
+        .sampler     = material->normalTexture.lock()->getSampler(),
+        .imageView   = material->normalTexture.lock()->getImageView(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+      };
+      break;
+    }
+    default: {
+      GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void GBufferRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
+      );
+      break;
+    }
+  }
+}
+
+void GBufferRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  switch (info.id) {
+    default: {
+      GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+        + info.name +
+#else
+        + std::to_string(info.id) +
+#endif
+        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
+      );
+      break;
+    }
+  }
 }

@@ -123,6 +123,9 @@ public:
   virtual std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess()            = 0;
   virtual void update()                                                                                                         = 0;
   virtual void execute(CommandBuffer& commandBuffer)                                                                            = 0;
+  virtual void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)    = 0;
+  virtual void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)   = 0;
+  virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info)             = 0;
 
   std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
   [[nodiscard]] VkRenderPass getRenderPass() const;
