@@ -23,12 +23,33 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
 }
 
 void CollectShadowsRenderPass::setup() {
-  for (Material& material: graph.device->materials | std::ranges::views::values) {
-    Material* overriddenMaterial = material.getVertexVariation(vertexProcessOverride);
-    pipelines.emplace(overriddenMaterial, nullptr);
-    materialRemap.emplace(&material, overriddenMaterial);
+  pipelines.clear();
+  materialRemap.clear();
+
+  // Collect and override the materials.
+  {
+    // A list of all fragment processes that have been overridden.
+    std::unordered_set<float> registeredFragmentProcesses;
+    for (Material& material: graph.device->materials | std::ranges::views::values) {
+      // Make sure that this fragment shader has not already been registered.
+      const float fragmentProcessId = material.fragmentProcess->id;
+      if (registeredFragmentProcesses.contains(fragmentProcessId)) continue;
+      registeredFragmentProcesses.emplace(fragmentProcessId);
+
+      // Get the overridden material
+      //   This will be identical to any other overridden material that shares the same fragment process, which is why we deduplicate them with the above logic
+      Material* overriddenMaterial = material.getVertexVariation(vertexProcessOverride);
+
+      // Register the pipeline and record the override that we did in the materialRemap
+      pipelines.emplace(overriddenMaterial, nullptr);
+      materialRemap.emplace(&material, overriddenMaterial);
+    }
   }
+
+  // Set up the render pass using the list of pipelines, each with a unique fragment process, and all with the same vertex process
   RenderPass::setup(pipelines | std::ranges::views::keys);
+
+  // Notify about the access to the GBufferMaterialID image in a CommandBuffer::CopyImageToBuffer operation
   imageAccesses.emplace_back(RenderGraph::getImageId(RenderGraph::GBufferMaterialID), RenderGraph::ImageAccess{
     .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
     .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
