@@ -8,7 +8,7 @@
 
 #include <cpptrace/basic.hpp>
 
-#include <list>
+#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -25,12 +25,11 @@ class Mesh;
 class CommandBuffer {
 public:
   enum PreprocessingFlags {
-    AddPipelineBarriers = 0x1,
-    RemovePipelineBarriers = 0x2,
-    ModifyPipelineBarriers = 0x4,
-    MergePipelineBarriers = 0x8,
-    PipelineBarriers = AddPipelineBarriers | RemovePipelineBarriers | ModifyPipelineBarriers | MergePipelineBarriers,
-    MergePipelineBinds = 0x10,
+    AddPipelineBarriers = 0x1,  // Permits adding pipeline barriers as needed for proper resource synchronization
+    RemovePipelineBarriers = 0x2,  // Permits removing superfluous pipeline barriers todo: Implement an algorithm that can do this.
+    ModifyPipelineBarriers = 0x4,  // Permits modifying existing pipeline barriers, including replacing them with `vkCmdSetEvent` and `vkCmdWaitEvents` pairs, or merging them with other pipeline barrier commands todo: Implement an algorithm that can do this.
+    PipelineBarriers = AddPipelineBarriers | RemovePipelineBarriers | ModifyPipelineBarriers,  // Adds required pipeline barrier commands, then optimize all pipeline barrier commands in the buffer
+    MergePipelineBinds = 0x8,
     StateTransitions = MergePipelineBinds,
     Everything = PipelineBarriers | StateTransitions
   };
@@ -84,7 +83,7 @@ public:
   };
 
 private:
-  std::list<std::unique_ptr<Command>> commands;
+  std::deque<std::unique_ptr<Command>> commands;
   plf::colony<Resource*> resources;
 
 public:
@@ -503,17 +502,25 @@ public:
     VkPipelineLayout layout{VK_NULL_HANDLE};
   };
 
-  template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(const const_iterator& iterator, Args&&... args) { return commands.insert(iterator, std::make_unique<T>(std::forward<Args&&>(args)...)); }
-  template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) const_iterator record(Args&&... args) { return commands.insert(commands.cend(), std::make_unique<T>(std::forward<Args&&>(args)...)); }
+private:
+  std::unordered_map<const Resource*, Command::ResourceAccess> previousAccesses;
+  State state;
+  PreprocessingFlags flags;
+
+  void record(const Command& queuedCommand);
+
+public:
+  explicit CommandBuffer(State state = {}, const PreprocessingFlags flags = Everything) : state(std::move(state)), flags(flags) {}
+
+  const State& getState() const { return state; }
+  PreprocessingFlags& getFlags() { return flags; }
+
+  template<typename T, typename... Args> requires std::constructible_from<T, Args...> && std::derived_from<T, Command> && (!std::is_same_v<T, Command>) void record(Args&&... args) {
+    std::unique_ptr<T> command = std::make_unique<T>(std::forward<Args&&>(args)...);
+    record(*command);
+    commands.emplace_back(std::move(command))->preprocess(state, flags);
+  }
   void addCleanupResource(Resource* resource);
-  /**
-   * This command will preprocess this CommandBuffer assuming a set of input states. This process involves not only modifying the recorded commands to be correct with each other, but optimizing them as well.
-   * @param state The states of all resources as they will be at the time this command buffer is submitted to the GPU
-   * @param flags The optimizations to perform
-   * @param apply Whether changes should be applied to this command buffer or not
-   * @return The states of all resources as they will be at the time this command buffer finishes executing on the GPU (Assuming it is the only executing command buffer)
-   */
-  State preprocess(State state={}, PreprocessingFlags flags=Everything, bool apply=true);
 
   [[nodiscard]] std::string toString() const;
 
@@ -523,8 +530,6 @@ public:
    */
   void bake(VkCommandBuffer commandBuffer) const;
   void clear();
-
-  void getDefaultState(State&state);
 
   ~CommandBuffer();
 };

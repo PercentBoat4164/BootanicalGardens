@@ -5,7 +5,7 @@ class Buffer;
 
 class Resource {
 public:
-  enum Type {
+  const enum Type {
     Image,
     Buffer
   } type;

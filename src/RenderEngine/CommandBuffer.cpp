@@ -339,15 +339,15 @@ std::string CommandBuffer::EndRenderPass::toString(bool includeArguments) {
 }
 
 void CommandBuffer::PipelineBarrier::preprocess(State& state, const PreprocessingFlags flags) {
-    for (auto& imageMemoryBarrier: imageMemoryBarriers) {
-      ResourceState& resourceState = state.resourceStates[imageMemoryBarrier.image];
-      if (flags & ModifyPipelineBarriers) {
-        imageMemoryBarrier.oldLayout = resourceState.layout;
-        if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM) imageMemoryBarrier.srcAccessMask = resourceState.access;
-      }
-      resourceState.layout = imageMemoryBarrier.newLayout;
-      resourceState.access = imageMemoryBarrier.dstAccessMask;
+  for (auto& imageMemoryBarrier: imageMemoryBarriers) {
+    ResourceState& resourceState = state.resourceStates[imageMemoryBarrier.image];
+    if (flags & ModifyPipelineBarriers) {
+      imageMemoryBarrier.oldLayout = resourceState.layout;
+      if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM) imageMemoryBarrier.srcAccessMask = resourceState.access;
     }
+    resourceState.layout = imageMemoryBarrier.newLayout;
+    resourceState.access = imageMemoryBarrier.dstAccessMask;
+  }
 }
 void CommandBuffer::PipelineBarrier::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -389,66 +389,61 @@ std::string CommandBuffer::PushConstants::toString(bool includeArguments) {
   return "vkCmdPushConstants";
 }
 
-void CommandBuffer::addCleanupResource(Resource* resource) {
-  resources.insert(resource);
+void CommandBuffer::record(const Command& queuedCommand) {
+  if (flags & AddPipelineBarriers) {
+    for (const Command::ResourceAccess& access: queuedCommand.accesses) {
+      const Resource::Type type = access.resource->type;
+
+      // Get the last resource access or initialize an undefined one if no previous access to the resource was made
+      const auto it                           = state.resourceStates.find(access.resource);
+      ResourceState& resourceState            = (it == state.resourceStates.end() ? state.resourceStates.emplace(access.resource, ResourceState{VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_FLAG_BITS_MAX_ENUM}).first : it)->second;
+      Command::ResourceAccess& previousAccess = previousAccesses[access.resource];
+
+      // Record the pipeline barrier command synchronizing this access
+      switch (type) {
+        case Resource::Type::Image: {
+          // Skip adding the pipeline barrier if no layout transition or access change is happening. todo: See if this could be optimized by checking for change in read-write status rather than access type.
+          if (std::ranges::contains(access.allowedLayouts, resourceState.layout) && (access.mask & resourceState.access) != access.mask) continue;
+          const auto* const image = reinterpret_cast<const Image* const>(access.resource);
+          PipelineBarrier::ImageMemoryBarrier barrier{
+              .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+              .pNext               = nullptr,
+              .srcAccessMask       = previousAccess.mask,
+              .dstAccessMask       = access.mask,
+              .oldLayout           = resourceState.layout,
+              .newLayout           = access.allowedLayouts[0],  // We always choose the layout listed first. @todo: Prefer a layout that reduces the number of memory barriers / transitions needed most if one exists.
+              .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .image               = image,
+              .subresourceRange    = image->getWholeRange()
+          };
+          commands.emplace_back(std::make_unique<PipelineBarrier>(previousAccess.stage, access.stage, 0, std::span<PipelineBarrier::MemoryBarrier>{}, std::span<PipelineBarrier::BufferMemoryBarrier>{}, std::span{&barrier, 1}))->preprocess(state, flags);
+          break;
+        }
+        case Resource::Type::Buffer: {
+          const auto* const buffer = reinterpret_cast<const Buffer* const>(access.resource);
+          PipelineBarrier::BufferMemoryBarrier barrier{
+              .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+              .pNext               = nullptr,
+              .srcAccessMask       = previousAccess.mask,
+              .dstAccessMask       = access.mask,
+              .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .buffer              = buffer,
+              .offset              = 0,
+              .size                = VK_WHOLE_SIZE
+          };
+          commands.emplace_back(std::make_unique<PipelineBarrier>(previousAccess.stage, access.stage, 0, std::span<PipelineBarrier::MemoryBarrier>{}, std::span{&barrier, 1}, std::span<PipelineBarrier::ImageMemoryBarrier>{}))->preprocess(state, flags);
+          break;
+        }
+      }
+      previousAccess = access;
+    }
+  }
 }
 
-CommandBuffer::State CommandBuffer::preprocess(State state, const PreprocessingFlags flags, const bool apply) {
-  /**@todo: Make this able to change Blits to Copies where possible for speed.*/
-  /**@todo: Make this able to add buffer and global memory barriers.*/
-  /**@todo: Think about VK_DEPENDENCY_BY_REGION_BIT. This should only really affect tiled GPUs.*/
-  /**@todo: Optimize PipelineBarrier commands. (Not necessarily in order)
-   *    - Acknowledge pre-existing PipelineBarrier commands.
-   *    - AGGRESSIVELY merge PipelineBarrier commands.
-   *    - Support promoting PipelineBarriers to SetEvent / WaitEvents.
-   *    - Rearrange commands to reduce synchronization needs.
-   */
-  getDefaultState(state);
-  std::unordered_map<const Resource*, Command::ResourceAccess> previousAccesses;
-  for (auto it = commands.begin(); it != commands.end(); ++it) {
-    if (flags & AddPipelineBarriers) {
-      for (const Command::ResourceAccess& access: (*it)->accesses) {
-        ResourceState& resourceState            = state.resourceStates[access.resource];
-        Command::ResourceAccess& previousAccess = previousAccesses[access.resource];
-        std::vector<PipelineBarrier::ImageMemoryBarrier> imageMemoryBarriers;
-        std::vector<PipelineBarrier::BufferMemoryBarrier> bufferMemoryBarriers;
-        if (access.resource->type == Resource::Image && (!std::ranges::contains(access.allowedLayouts, resourceState.layout) || (access.mask & resourceState.access) == access.mask)) {
-          const auto* const image = dynamic_cast<const Image* const>(access.resource);
-          imageMemoryBarriers.push_back({
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext               = nullptr,
-            .srcAccessMask       = previousAccess.mask,
-            .dstAccessMask       = access.mask,
-            .oldLayout           = resourceState.layout,
-            .newLayout           = access.allowedLayouts[0],  // We always prefer the layout listed first. @todo: Choose a layout that reduces the number of memory barriers / transitions needed most if one exists.
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image               = image,
-            .subresourceRange    = image->getWholeRange()
-          });
-        }
-        if (access.resource->type == Resource::Buffer) {
-          const auto* const buffer = dynamic_cast<const Buffer* const>(access.resource);
-          bufferMemoryBarriers.push_back({
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = previousAccess.mask,
-            .dstAccessMask = access.mask,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = buffer,
-            .offset = 0,
-            .size = VK_WHOLE_SIZE
-          });
-        }
-        if (apply && !imageMemoryBarriers.empty() || !bufferMemoryBarriers.empty())
-          (*record<PipelineBarrier>(it, previousAccess.stage, access.stage, 0, std::span<PipelineBarrier::MemoryBarrier>{}, bufferMemoryBarriers, imageMemoryBarriers))->preprocess(state, flags);
-        previousAccess = access;
-      }
-    }
-    (*it)->preprocess(state, flags);
-  }
-  return state;
+void CommandBuffer::addCleanupResource(Resource* resource) {
+  resources.insert(resource);
 }
 
 std::string CommandBuffer::toString() const {
@@ -468,17 +463,6 @@ void CommandBuffer::clear() {
   for (Resource* const& resource: resources) delete resource;
   resources.clear();
   commands.clear();
-}
-
-void CommandBuffer::getDefaultState(State& state) {
-  for (auto commandIterator{commands.begin()}; commandIterator != commands.end(); ++commandIterator) {
-    for (const Command::ResourceAccess& access : (*commandIterator)->accesses) {
-      switch (access.resource->type) {
-        case Resource::Image: state.resourceStates.emplace(access.resource, VK_IMAGE_LAYOUT_UNDEFINED); break;
-        case Resource::Buffer: state.resourceStates.emplace(access.resource, VK_IMAGE_LAYOUT_MAX_ENUM); break;
-      }
-    }
-  }
 }
 
 CommandBuffer::~CommandBuffer() {

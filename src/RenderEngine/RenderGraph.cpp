@@ -352,7 +352,6 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
     }
   };
   commandBuffer.record<CommandBuffer::PipelineBarrier>(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, std::span<CommandBuffer::PipelineBarrier::MemoryBarrier>{}, std::span<CommandBuffer::PipelineBarrier::BufferMemoryBarrier>{}, imageBarriers);
-  commandBuffer.preprocess();
 
   const PerFrameData& frameData = getPerFrameData();
   constexpr VkCommandBufferBeginInfo beginInfo {

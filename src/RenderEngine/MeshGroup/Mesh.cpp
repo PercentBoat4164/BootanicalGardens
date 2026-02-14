@@ -115,7 +115,6 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
   indexBuffer = std::make_unique<Buffer>(device, "Index Buffer", indexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&indexBufferTemp, indexBuffer.get());
 
-  commandBuffer.preprocess();
   device->executeCommandBufferImmediate(commandBuffer);
 }
 
