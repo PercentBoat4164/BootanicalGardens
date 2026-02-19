@@ -12,7 +12,11 @@
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
-  GraphicsInstance::create({VK_EXT_DEBUG_UTILS_EXTENSION_NAME});
+  GraphicsInstance::create({
+#if defined(VK_EXT_debug_utils)
+    VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+#endif
+  });
   {
     GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
