@@ -73,6 +73,12 @@ add_executable(BootanicalGardens
         src/Tools/ClassName.h
 
         src/Filesystem/UpdateListener.cpp
+        src/EntityComponentSystem/Archetype.cpp
+        src/EntityComponentSystem/ArchetypeSubject.cpp
+        src/EntityComponentSystem/ComponentColumn.cpp
+        src/EntityComponentSystem/AoSColumn.cpp
+        src/EntityComponentSystem/ECSRegistry.cpp
+        src/EntityComponentSystem/SoAColumn.cpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
