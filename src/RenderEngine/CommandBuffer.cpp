@@ -31,11 +31,6 @@ void CommandBuffer::BeginRenderPass::preprocess(State& state, PreprocessingFlags
   };
 
   state.renderPass = renderPass;
-  for (const auto& [id, access]: renderPass->getImageAccesses()) {
-    ResourceState& resourceState = state.resourceStates[renderPass->getGraph().getImage(id).image.get()];
-    resourceState.layout = access.layout;
-    resourceState.access = access.access;
-  }
 }
 void CommandBuffer::BeginRenderPass::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -322,6 +317,12 @@ std::string CommandBuffer::DrawIndexedIndirect::toString(bool includeArguments) 
 
 CommandBuffer::EndRenderPass::EndRenderPass() : Command({}, StateChange) {}
 void CommandBuffer::EndRenderPass::preprocess(State& state, PreprocessingFlags flags) {
+  for (const auto& [image, layout]: state.renderPass->getImageLayoutsAfterExecution()) {
+    ResourceState& resourceState = state.resourceStates[image];
+    resourceState.layout = layout;
+    // resourceState.access = access.access;
+  }
+
   state.renderPass = nullptr;
   state.pipeline = nullptr;
 }
@@ -390,6 +391,7 @@ std::string CommandBuffer::PushConstants::toString(bool includeArguments) {
 }
 
 void CommandBuffer::record(const Command& queuedCommand) {
+  // Add pipeline barrier commands
   if (flags & AddPipelineBarriers) {
     for (const Command::ResourceAccess& access: queuedCommand.accesses) {
       const Resource::Type type = access.resource->type;
@@ -411,7 +413,10 @@ void CommandBuffer::record(const Command& queuedCommand) {
               .srcAccessMask       = previousAccess.mask,
               .dstAccessMask       = access.mask,
               .oldLayout           = resourceState.layout,
-              .newLayout           = access.allowedLayouts[0],  // We always choose the layout listed first. @todo: Prefer a layout that reduces the number of memory barriers / transitions needed most if one exists.
+              .newLayout           = access.allowedLayouts[0],  // We always choose the layout listed first.
+                                                                // todo: Prefer a layout that reduces the number of memory barriers / transitions needed most if one exists.
+                                                                //   This would probably involve choosing the first layout, then when the next access happens, come back here and choose a layout that would not require a transition if one exists.
+                                                                //   That could happen again for the next access after that one too if we had successfully chosen a layout that does not require a transition.
               .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .image               = image,

@@ -178,9 +178,11 @@ bool RenderGraph::bake() {
         std::vector<std::pair<RenderPass*, ImageAccess>>& attachmentDeclarations = id2decl.at(id);
         // Find this renderpass in the declarations of this attachment.
         const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
+        const auto nextIt = std::ranges::next(thisIt);
+        const ImageAccess& thisDeclaration = thisIt->second;
+        const ImageAccess& nextDeclaration = nextIt == attachmentDeclarations.end() ? thisDeclaration : nextIt->second;
         /**@todo: Optimize load and store ops.*/
         /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
-        const ImageAccess& thisDeclaration = thisIt->second;
         descriptions.push_back({
             .flags = 0U,
             .format = image->getFormat(),
@@ -190,7 +192,7 @@ bool RenderGraph::bake() {
             .stencilLoadOp = thisDeclaration.stencilLoadOp,
             .stencilStoreOp = thisDeclaration.stencilStoreOp,
             .initialLayout = thisDeclaration.layout,
-            .finalLayout = thisDeclaration.layout
+            .finalLayout = nextDeclaration.layout
         });
         attachments.push_back(image);
       }

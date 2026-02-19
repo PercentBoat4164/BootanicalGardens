@@ -9,6 +9,10 @@
 
 /**@todo: Thread this function.*/
 void RenderPass::setRenderPassInfo(const VkRenderPassCreateInfo& createInfo, const std::vector<const Image*>&images) {
+  // Identify each image's layout after execution of this pass has finished.
+  for (uint32_t attachmentIndex = 0; attachmentIndex < createInfo.attachmentCount; ++attachmentIndex)
+    imageLayoutsAfterExecution[images[attachmentIndex]] = createInfo.pAttachments[attachmentIndex].finalLayout;
+
   // Compute the render pass's compatibility. This is given as the hash of the attributes of the render pass that determine compatibility.
   uint32_t index{};
   compatibility = 0;

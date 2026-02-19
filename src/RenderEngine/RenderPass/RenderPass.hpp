@@ -6,7 +6,6 @@
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Texture.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
-#include "src/RenderEngine/GraphicsDevice.hpp"
 
 #include <vulkan/vulkan_core.h>
 
@@ -21,6 +20,7 @@ protected:
   std::unique_ptr<Framebuffer> framebuffer;
   std::unordered_map<Material*, Pipeline*> pipelines;
   std::unordered_map<Material*, Material*> materialRemap;
+  std::unordered_map<const Image*, VkImageLayout> imageLayoutsAfterExecution;
 
   template<typename L, typename R>
   static constexpr L rollingShiftLeft(L left, R right) {
@@ -128,6 +128,7 @@ public:
   virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info)             = 0;
 
   std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
+  const std::unordered_map<const Image*, VkImageLayout>& getImageLayoutsAfterExecution() const { return imageLayoutsAfterExecution; }
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] Framebuffer* getFramebuffer() const;
   [[nodiscard]] std::unordered_map<Material*, Pipeline*> getPipelines();
