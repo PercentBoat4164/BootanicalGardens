@@ -79,9 +79,11 @@ public:
       std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> colorAttachmentAccesses = material->computeColorAttachmentAccesses();
       for (auto& [id, access]: colorAttachmentAccesses) {
         access.loadOp = loadOp;
-        clearValues.push_back(VkClearValue{.color=color});
         auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
-        if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
+        if (it == imageAccesses.end()) {
+          imageAccesses.emplace_back(id, access);
+          clearValues.push_back(VkClearValue{.color=color});
+        }
         /**@todo: If the order of rendering is known (e.g. if the meshes are sorted), then this error can go away and we can just use the first and last layouts that the image is in.*/
         else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
       }
