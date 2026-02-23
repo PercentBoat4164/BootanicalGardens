@@ -32,10 +32,6 @@ std::unordered_set<uint64_t> GraphicsInstance::enabledExtensions{};
 
 // ReSharper disable once CppDFAConstantFunctionResult
 VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, const VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-  if (messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
-    std::cerr << pCallbackData->pMessage << std::endl;
-    return VK_FALSE;
-  }
   std::string message = pCallbackData->pMessage;
   size_t pos = message.find('\n');
   while (pos != std::string::npos) {
@@ -49,7 +45,7 @@ VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBi
     stacktrace.replace(pos, 1, "\n\t\t");
     pos = stacktrace.find('\n', pos + 3);
   }
-  std::cerr << "[Vulkan Debug Callback]\n\t" << message << "\n\t" << stacktrace << "\n";
+  std::cerr << "[Vulkan Debug Callback] - " << magic_enum::enum_name<VkDebugUtilsMessageTypeFlagBitsEXT, magic_enum::detail::enum_subtype::common>(static_cast<VkDebugUtilsMessageTypeFlagBitsEXT>(messageTypes)) << " - " << magic_enum::enum_name<VkDebugUtilsMessageSeverityFlagBitsEXT, magic_enum::detail::enum_subtype::flags>(messageSeverity) << "\n\t" << message << "\n\t" << stacktrace << "\n";
   if (pUserData != nullptr) {
     const auto* debugData = static_cast<DebugData*>(pUserData);
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -84,9 +80,15 @@ void GraphicsInstance::create(std::vector<const char*> extensions) {
   builder.set_app_name("Bootanical Gardens").set_app_version(0, 0, 1);
   builder.set_engine_name("Boo Engine").set_engine_version(0, 0, 1);
 #if !NDEBUG & defined(BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION)
-  builder.enable_validation_layers(std::getenv(BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION) != nullptr);
-  builder.set_debug_callback(reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(&GraphicsInstance::debugCallback));
-  builder.set_debug_callback_user_data_pointer(&GraphicsInstance::debugData);
+  if (std::getenv(BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION) != nullptr) {
+    builder.enable_validation_layers(true);
+#if defined(VK_EXT_validation_features)
+    builder.add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
+    builder.add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
+#endif
+    builder.set_debug_callback(reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(&GraphicsInstance::debugCallback));
+    builder.set_debug_callback_user_data_pointer(&GraphicsInstance::debugData);
+  }
 #else
   builder.enable_validation_layers(false);
 #endif
