@@ -99,7 +99,7 @@ void Window::present() const {
       .pImageIndices      = &swapchainIndex,
       .pResults           = nullptr
   };
-  if (const VkResult result = vkQueuePresentKHR(device->globalQueue, &presentInfo); result != VK_SUCCESS) return GraphicsInstance::showError(result, "failed to present");
+  if (const VkResult result = vkQueuePresentKHR(device->globalQueue, &presentInfo); result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) return GraphicsInstance::showError(result, "failed to present");
 }
 
 /**
