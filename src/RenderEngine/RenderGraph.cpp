@@ -343,8 +343,8 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
     {
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext               = nullptr,
-      .srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
-      .dstAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
+      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .dstAccessMask       = 0,
       .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,

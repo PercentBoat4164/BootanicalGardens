@@ -35,8 +35,9 @@ public:
   };
 
   struct ResourceState {
+    VkAccessFlags* access{nullptr};
+    VkPipelineStageFlags* stage{nullptr};
     VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
-    VkAccessFlags access{VK_ACCESS_FLAG_BITS_MAX_ENUM};
   };
 
   struct State {
@@ -49,15 +50,9 @@ public:
 
   struct Command {
     struct ResourceAccess {
-      enum TypeBits : uint8_t {
-        Read  = 1 << 0,
-        Write = 1 << 1
-      };
-      using Type = uint8_t;
-      Type type{Read};
       const Resource* resource{nullptr};
-      VkPipelineStageFlags stage{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
-      VkAccessFlags mask{VK_ACCESS_NONE};
+      VkPipelineStageFlags stage{0};
+      VkAccessFlags mask{0};
       std::vector<VkImageLayout> allowedLayouts{};
     };
     std::vector<ResourceAccess> accesses;
@@ -111,7 +106,7 @@ public:
           std::vector<ResourceAccess> accesses;
           accesses.reserve(attachments.size());
           for (const auto& [id, access]: attachments) {
-            accesses.emplace_back(ResourceAccess::Write | ResourceAccess::Read, renderPass->getGraph().getImage(id).image.get(), access.stage, access.access, std::vector{access.layout});
+            accesses.emplace_back(renderPass->getGraph().getImage(id).image.get(), access.stage, access.access, std::vector{access.layout});
           }
           return accesses;
         }(), StateChange),
@@ -190,8 +185,8 @@ public:
   struct BlitImageToImage final : Command {
     template<std::ranges::range T = std::span<VkImageBlit>>
     BlitImageToImage(const Image* const source, const Image* const destination, T&& regions=T{}, const VkFilter filter=VK_FILTER_NEAREST) :
-        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-                 ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}
+        Command({ResourceAccess{source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                 ResourceAccess{destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}
         }, Copy),
         src(source),
         dst(destination),
@@ -220,7 +215,7 @@ public:
   struct ClearColorImage final : Command {
     template<std::ranges::range T = std::span<VkImageSubresourceRange>>
     explicit ClearColorImage(const Image* const image, const VkClearColorValue value={}, T&& subresourceRanges=T{}) :
-        Command({ResourceAccess{ResourceAccess::Write, image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
+        Command({ResourceAccess{image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
         image(image),
         value(value),
         ranges(std::ranges::to<std::vector>(subresourceRanges)) {
@@ -240,7 +235,7 @@ public:
   struct ClearDepthStencilImage final : Command {
     template<std::ranges::range T = std::span<VkImageSubresourceRange>>
     explicit ClearDepthStencilImage(const Image* const image, const VkClearDepthStencilValue value={1}, T&& subresourceRanges=T{}) :
-        Command({ResourceAccess{ResourceAccess::Write, image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
+        Command({ResourceAccess{image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}, Copy),
         image(image),
         value(value),
         ranges(std::ranges::to<std::vector>(subresourceRanges)) {
@@ -260,8 +255,8 @@ public:
   struct CopyBufferToBuffer final : Command {
     template<std::ranges::range T = std::span<VkBufferCopy>>
     CopyBufferToBuffer(const Buffer* const source, const Buffer* const destination, T&& regions=T{}) :
-        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
-             ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+        Command({ResourceAccess{source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
+             ResourceAccess{destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
              Copy),
         src(source),
         dst(destination),
@@ -285,8 +280,8 @@ public:
   struct CopyBufferToImage final : Command {
     template<std::ranges::range T = std::span<VkBufferImageCopy>>
     CopyBufferToImage(const Buffer* const source, const Image* const destination, T&& regions=T{}) :
-        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
-                 ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+        Command({ResourceAccess{source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT},
+                 ResourceAccess{destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
                  Copy),
         src(source),
         dst(destination),
@@ -317,8 +312,8 @@ public:
   struct CopyImageToBuffer final : Command {
     template<std::ranges::range T = std::span<VkBufferImageCopy>>
     CopyImageToBuffer(const Image* const source, const Buffer* const destination, T&& regions=T{}) :
-        Command({ResourceAccess{ResourceAccess::Read, source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-             ResourceAccess{ResourceAccess::Write, destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+        Command({ResourceAccess{source, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+             ResourceAccess{destination, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
              Copy),
         src(source),
         dst(destination),
@@ -349,10 +344,10 @@ public:
   struct CopyImageToImage final : Command {
     template<std::ranges::range T = std::span<VkImageCopy>>
     CopyImageToImage(const Image* const src, const Image* const dst, T&& regions=T{}) :
-        Command(src == dst ? std::vector{ResourceAccess{ResourceAccess::Read, src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-                                         ResourceAccess{ResourceAccess::Write, dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}
-                           : std::vector{ResourceAccess{ResourceAccess::Read, src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
-                                         ResourceAccess{ResourceAccess::Write, dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
+        Command(src == dst ? std::vector{ResourceAccess{src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                                         ResourceAccess{dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}}
+                           : std::vector{ResourceAccess{src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, {VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}},
+                                         ResourceAccess{dst, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, {VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR}}},
                 Copy),
         src(src),
         dst(dst),
@@ -460,9 +455,9 @@ public:
       srcStageMask(srcStageMask),
       dstStageMask(dstStageMask),
       dependencyFlags(dependencyFlags),
-      memoryBarriers(std::ranges::to<std::vector>(memoryBarriers)),
-      bufferMemoryBarriers(std::ranges::to<std::vector>(bufferMemoryBarriers)),
-      imageMemoryBarriers(std::ranges::to<std::vector>(imageMemoryBarriers)) {}
+      memoryBarriers(std::ranges::to<std::deque>(memoryBarriers)),
+      bufferMemoryBarriers(std::ranges::to<std::deque>(bufferMemoryBarriers)),
+      imageMemoryBarriers(std::ranges::to<std::deque>(imageMemoryBarriers)) {}
   private:
     void preprocess(State& state, PreprocessingFlags flags) override;
     void bake(VkCommandBuffer commandBuffer) override;
@@ -471,9 +466,11 @@ public:
     VkPipelineStageFlags srcStageMask;
     VkPipelineStageFlags dstStageMask;
     VkDependencyFlags dependencyFlags;
-    std::vector<MemoryBarrier> memoryBarriers;
-    std::vector<BufferMemoryBarrier> bufferMemoryBarriers;
-    std::vector<ImageMemoryBarrier> imageMemoryBarriers;
+    std::deque<MemoryBarrier> memoryBarriers;
+    std::deque<BufferMemoryBarrier> bufferMemoryBarriers;
+    std::deque<ImageMemoryBarrier> imageMemoryBarriers;
+
+    friend CommandBuffer;
   };
 
   struct PushConstants final : Command {
@@ -503,7 +500,6 @@ public:
   };
 
 private:
-  std::unordered_map<const Resource*, Command::ResourceAccess> previousAccesses;
   State state;
   PreprocessingFlags flags;
 

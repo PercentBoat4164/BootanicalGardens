@@ -204,7 +204,6 @@ void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
     commandBuffer.record<CommandBuffer::PushConstants>(pipeline->getMaterial()->fragmentProcess->id, VK_SHADER_STAGE_VERTEX_BIT);
     commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::vector{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
     commandBuffer.record<CommandBuffer::Draw>(3);  // No vertex buffer needs to be bound for this call because the vertex shader generates the vertex positions automatically.
-    /**@todo: Make this happen in multiple subpasses to enhance the parallelism achievable on the GPU?*/
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }

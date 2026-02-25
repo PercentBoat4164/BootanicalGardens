@@ -32,6 +32,8 @@ std::unordered_set<uint64_t> GraphicsInstance::enabledExtensions{};
 
 // ReSharper disable once CppDFAConstantFunctionResult
 VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, const VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+  if (messageSeverity <= VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) return VK_FALSE;
+  if (messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) return VK_FALSE;
   std::string message = pCallbackData->pMessage;
   size_t pos = message.find('\n');
   while (pos != std::string::npos) {

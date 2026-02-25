@@ -53,8 +53,8 @@ private:
   [[nodiscard]] void* getView() const override;
 
   static VkImageAspectFlags aspectFromFormat(const VkFormat format) {
-    return (vkuFormatIsDepthOnly(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_NONE) |
-           (vkuFormatIsDepthAndStencil(format) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_NONE) |
-           (vkuFormatIsColor(format) ? VK_IMAGE_ASPECT_COLOR_BIT: VK_IMAGE_ASPECT_NONE);
+    return (vkuFormatIsDepthOnly(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+           (vkuFormatIsDepthAndStencil(format) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : 0) |
+           (vkuFormatIsColor(format) ? VK_IMAGE_ASPECT_COLOR_BIT: 0);
   }
 };

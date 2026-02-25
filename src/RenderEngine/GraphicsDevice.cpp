@@ -246,7 +246,7 @@ GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferAs
   if (const VkResult result = vkBeginCommandBuffer(vkCmdBuf, &beginInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to begin VkCommandBuffer");
   commandBuffer.bake(vkCmdBuf);
   if (const VkResult result = vkEndCommandBuffer(vkCmdBuf); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to end VkCommandBuffer");
-  std::array<VkPipelineStageFlags, 1> arr{VK_PIPELINE_STAGE_NONE};
+  std::array<VkPipelineStageFlags, 1> arr{};
   const VkSubmitInfo submitInfo{
       .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
       .pNext                = nullptr,
