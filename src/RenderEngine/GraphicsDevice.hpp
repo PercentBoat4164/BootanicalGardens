@@ -2,7 +2,6 @@
 
 #include "yyjson.h"
 #include "src/RenderEngine/DescriptorSetAllocator.hpp"
-#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
 
 #include <VkBootstrap.h>
 #include <vma/vk_mem_alloc.h>
@@ -11,7 +10,10 @@
 #include <filesystem>
 #include <unordered_map>
 
+#include "src/Tools/Hashing.hpp"
+
 struct FragmentProcess;
+struct VertexProcess;
 class Shader;
 class Texture;
 class Material;
@@ -28,11 +30,14 @@ public:
   VkCommandPool commandPool{VK_NULL_HANDLE};
   DescriptorSetAllocator descriptorSetAllocator{*this};
 
+  using ImageID = decltype(Tools::hash(""));
+
   std::unordered_map<std::uint64_t, VkSampler> samplers;
   std::unordered_map<std::uint64_t, FragmentProcess> fragmentProcesses;
   std::unordered_map<std::uint64_t, VertexProcess> vertexProcesses;
   std::unordered_map<std::uint64_t, std::unique_ptr<Shader>> shaders;
-  std::unordered_map<std::uint64_t, std::shared_ptr<Texture>> textures;
+  std::unordered_map<ImageID, std::uint64_t> JSONTextures;
+  std::unordered_map<ImageID, std::shared_ptr<Texture>> textures;
   std::unordered_map<std::uint64_t, Pipeline> pipelines;
   std::unordered_map<std::uint64_t, Material> overrideMaterials;
   std::unordered_map<std::uint64_t, Material> materials;
@@ -63,7 +68,8 @@ public:
   VertexProcess* getJSONVertexProcess(const std::string& name);
   VertexProcess* getJSONVertexProcess(std::uint64_t id);
   Shader* getJSONShader(std::uint64_t id);
-  std::weak_ptr<Texture> getJSONTexture(std::uint64_t id);
+  static ImageID getJSONTextureID(std::uint64_t id);
+  std::shared_ptr<Texture> getJSONTexture(ImageID id);
   Pipeline* getPipeline(Material* material, std::uint64_t renderPassCompatibility);
   Material* getMaterial(std::uint64_t id, const Material* material);
   Material* getMaterial(std::uint64_t id);

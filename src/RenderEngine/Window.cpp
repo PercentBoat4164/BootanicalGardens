@@ -34,7 +34,11 @@ Window::Window(GraphicsDevice* const device) : device{device} {
   std::string swapchainImageViewNameTemplate = windowTitle + " | Swapchain Image View [";
 #endif
   for (uint32_t i{}; i < swapchain.image_count; ++i) {
-    swapchainImages.emplace_back(std::make_shared<Image>(device, "swapchainImage" + std::to_string(i), images[i], swapchain.image_format, VkExtent3D{swapchain.extent.width, swapchain.extent.height, 1}, swapchain.image_usage_flags, 1, VK_SAMPLE_COUNT_1_BIT, views[i]));
+    swapchainImages.emplace_back(std::make_shared<Image>(device,
+#if !defined(NDEBUG)
+      "swapchainImage" + std::to_string(i),
+#endif
+      images[i], swapchain.image_format, VkExtent3D{swapchain.extent.width, swapchain.extent.height, 1}, swapchain.image_usage_flags, 1, VK_SAMPLE_COUNT_1_BIT, views[i]));
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
     if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
       std::string name = swapchainImageNameTemplate + std::to_string(i) + "]";

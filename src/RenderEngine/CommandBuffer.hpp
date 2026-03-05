@@ -102,11 +102,11 @@ public:
     /**@todo: Make renderPass const when declareAccesses has been made constable*/
     explicit BeginRenderPass(RenderPass* renderPass, T&& clearValues=T{}, const VkRect2D renderArea={}) :
         Command([&]->std::vector<ResourceAccess>{
-          std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->getImageAccesses();
+          std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->getImageAccesses();
           std::vector<ResourceAccess> accesses;
           accesses.reserve(attachments.size());
           for (const auto& [id, access]: attachments) {
-            accesses.emplace_back(renderPass->getGraph().getImage(id).image.get(), access.stage, access.access, std::vector{access.layout});
+            accesses.emplace_back(renderPass->getGraph().getImage(id).get(), access.stage, access.access, std::vector{access.layout});
           }
           return accesses;
         }(), StateChange),

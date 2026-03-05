@@ -95,4 +95,4 @@ RenderPass::~RenderPass() {
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }
 Framebuffer* RenderPass::getFramebuffer() const { return framebuffer.get(); }
 std::unordered_map<Material*, Pipeline*> RenderPass::getPipelines() { return pipelines; }
-const RenderGraph& RenderPass::getGraph() const { return graph; }
+RenderGraph& RenderPass::getGraph() const { return graph; }

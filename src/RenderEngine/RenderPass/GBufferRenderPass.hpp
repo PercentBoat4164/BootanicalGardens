@@ -19,7 +19,7 @@ public:
   void setup() override;
   void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) override;
   void writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) override;
-  std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess() override;
+  std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess() override;
   void update() override;
   void execute (CommandBuffer& commandBuffer) override;
   void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) override;

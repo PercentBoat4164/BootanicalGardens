@@ -113,6 +113,9 @@ GraphicsDevice::GraphicsDevice(const std::filesystem::path& path) {
   JSONMaterialArrayCount = yyjson_arr_size(JSONMaterialArray);
   JSONMeshArray = yyjson_obj_get(root, "meshes");
   JSONMeshArrayCount = yyjson_arr_size(JSONMeshArray);
+
+  for (std::uint64_t i = 0; i < JSONTextureArrayCount; ++i)
+    JSONTextures[getJSONTextureID(i)] = i;
 }
 
 GraphicsDevice::~GraphicsDevice() {
@@ -189,12 +192,20 @@ Shader* GraphicsDevice::getJSONShader(const std::uint64_t id) {
   return shaders.emplace(id, std::make_unique<Shader>(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_arr_get(JSONShaderArray, id), "path")))).first->second.get();
 }
 
-std::weak_ptr<Texture> GraphicsDevice::getJSONTexture(const std::uint64_t id) {
-  if (id >= JSONTextureArrayCount) return {};
+GraphicsDevice::ImageID GraphicsDevice::getJSONTextureID(const std::uint64_t id) {
+  return Tools::hash(std::to_string(id));
+}
+
+std::shared_ptr<Texture> GraphicsDevice::getJSONTexture(const ImageID id) {
   if (const auto it = textures.find(id); it != textures.end()) return it->second;
+  const auto it = JSONTextures.find(id);
+  if (it == JSONTextures.end()) return nullptr;
+  const std::uint64_t idx = it->second;
+  if (idx >= JSONTextureArrayCount) return nullptr;
   CommandBuffer commandBuffer;
-  std::shared_ptr<Texture> texture = textures.emplace(id, Texture::jsonGet(this, yyjson_arr_get(JSONTextureArray, id), commandBuffer)).first->second;
+  const std::shared_ptr texture = Texture::jsonGet(this, yyjson_arr_get(JSONTextureArray, idx), commandBuffer);
   executeCommandBufferImmediate(commandBuffer);
+  textures.emplace(id, texture);
   return texture;
 }
 

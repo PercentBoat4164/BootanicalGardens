@@ -19,6 +19,37 @@
 
 GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
   fragmentProcessOverride = graph.device->getJSONFragmentProcess("Geometry Buffer Render Pass | Fragment Shader Override");
+  RenderGraph::ImageParameters parameters {
+#if !defined(NDEBUG)
+    .name = "GBufferAlbedo",
+#endif
+    .layers = 1,
+    .mipLevels = 1,
+    .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+    .sampleCount = VK_SAMPLE_COUNT_1_BIT,
+    .resolution = graph.settings.renderResolution
+  };
+  graph.setImageParameters(RenderGraph::GBufferAlbedo, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferPosition";
+#endif
+  graph.setImageParameters(RenderGraph::GBufferPosition, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferNormal";
+#endif
+  graph.setImageParameters(RenderGraph::GBufferNormal, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferMaterialID";
+#endif
+  parameters.format = VK_FORMAT_R32_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferMaterialID, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferDepth";
+#endif
+  parameters.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  parameters.format = VK_FORMAT_D32_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferDepth, parameters);
 }
 
 void GBufferRenderPass::setup() {
@@ -109,8 +140,8 @@ void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fu
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
 }
 
-std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
-  return {{RenderGraph::getImageId(RenderGraph::GBufferDepth), {
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::GBufferDepth, {
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -149,35 +180,23 @@ void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
 }
 
 void GBufferRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    case RenderGraph::getImageId("albedo"): {
-      imageInfo = {
-        .sampler     = material->albedoTexture.lock()->getSampler(),
-        .imageView   = material->albedoTexture.lock()->getImageView(),
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      };
-      break;
-    }
-    case RenderGraph::getImageId("normal"): {
-      imageInfo = {
-        .sampler     = material->normalTexture.lock()->getSampler(),
-        .imageView   = material->normalTexture.lock()->getImageView(),
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      };
-      break;
-    }
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
-      );
-      break;
-    }
+  if (const std::shared_ptr<Image> texture = graph.getImage(info.id); texture != nullptr) {
+    imageInfo = {
+      .sampler = texture->getSampler(),
+      .imageView = texture->getImageView(),
+      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    return;
   }
+
+  GraphicsInstance::showError("Material has unbound image binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+    + info.name +
+#else
+    + std::to_string(info.id) +
+#endif
+    " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
+  );
 }
 
 void GBufferRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {

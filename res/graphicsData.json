@@ -21,40 +21,50 @@
       "fragmentProcess": 1,
       "alphaMode": 0,
       "alphaCutoff": null,
-      "albedoTexture": 0,
-      "normalTexture": 1
+      "textures": {
+        "albedo": 0,
+        "normal": 1
+      }
     }, {
       "name": "FlightHelmet | Hose",
       "vertexProcess": 0,
       "fragmentProcess": 1,
       "alphaMode": 0,
       "alphaCutoff": null,
-      "albedoTexture": 3,
-      "normalTexture": 4
+      "textures": {
+        "albedo": 3,
+        "normal": 4
+      }
     }, {
       "name": "FlightHelmet | Leather",
       "vertexProcess": 0,
       "fragmentProcess": 1,
       "alphaMode": 0,
       "alphaCutoff": null,
-      "albedoTexture": 6,
-      "normalTexture": 7
+      "textures": {
+        "albedo": 6,
+        "normal": 7
+      }
     }, {
       "name": "FlightHelmet | Lenses",
       "vertexProcess": 0,
       "fragmentProcess": 1,
       "alphaMode": 2,
       "alphaCutoff": null,
-      "albedoTexture": 9,
-      "normalTexture": 10
+      "textures": {
+        "albedo": 9,
+        "normal": 10
+      }
     }, {
       "name": "FlightHelmet | Metal",
       "vertexProcess": 0,
       "fragmentProcess": 1,
       "alphaMode": 0,
       "alphaCutoff": null,
-      "albedoTexture": 12,
-      "normalTexture": 13
+      "textures": {
+        "albedo": 12,
+        "normal": 13
+      }
     }
   ],
   "textures": [

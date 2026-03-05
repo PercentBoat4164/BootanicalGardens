@@ -16,6 +16,18 @@
 
 ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
   fragmentProcessOverride = graph.device->getJSONFragmentProcess("Shadow Render Pass | Fragment Shader Override");
+  const RenderGraph::ImageParameters parameters {
+#if !defined(NDEBUG)
+    .name = "Shadow Map",
+#endif
+    .layers = 1,
+    .mipLevels = 1,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    .format = VK_FORMAT_D32_SFLOAT,
+    .sampleCount = VK_SAMPLE_COUNT_1_BIT,
+    .resolution = graph.settings.renderResolution
+  };
+  graph.setImageParameters(RenderGraph::ShadowMap, parameters);
 }
 
 void ShadowRenderPass::setup() {
@@ -106,8 +118,8 @@ void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fun
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
 }
 
-std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
-  return {{RenderGraph::getImageId(RenderGraph::ShadowDepth), {
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::ShadowMap, {
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
