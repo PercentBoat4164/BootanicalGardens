@@ -10,6 +10,8 @@ DescriptorSetRequirer::~DescriptorSetRequirer() {
   vkDestroyDescriptorSetLayout(device->device, layout, nullptr);
 }
 
+void DescriptorSetRequirer::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {}
+
 std::shared_ptr<VkDescriptorSet> DescriptorSetRequirer::getDescriptorSet(const std::size_t index) const {
-  return descriptorSets[index];
+  return descriptorSets.at(index);
 }

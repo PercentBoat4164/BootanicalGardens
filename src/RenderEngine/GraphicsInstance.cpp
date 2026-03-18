@@ -8,7 +8,7 @@
 #define VOLK_IMPLEMENTATION
 #include <volk/volk.h>
 #define VMA_IMPLEMENTATION
-#if !NDEBUG
+#if !NDEBUG & BOOTANICAL_GARDENS_ENABLE_GPU_MEMORY_TRACING
   /**@todo: Write a better debug log function once logging methods have been decided upon.*/
   #define VMA_DEBUG_LOG_FORMAT(format, ...)  \
   do {                                       \
@@ -28,7 +28,7 @@
 
 thread_local GraphicsInstance::DebugData GraphicsInstance::debugData{};
 vkb::Instance GraphicsInstance::instance{};
-std::unordered_set<uint64_t> GraphicsInstance::enabledExtensions{};
+std::unordered_set<std::uint64_t> GraphicsInstance::enabledExtensions{};
 
 // ReSharper disable once CppDFAConstantFunctionResult
 VkBool32 GraphicsInstance::debugCallback(const VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, const VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {

@@ -13,6 +13,7 @@ class ShadowRenderPass : public RenderPass {
   std::unique_ptr<UniformBuffer<PassData>> passData;
 
   FragmentProcess* fragmentProcessOverride;
+  std::shared_ptr<Image> shadowMap;
 
 public:
   explicit ShadowRenderPass(RenderGraph& graph);
@@ -23,7 +24,4 @@ public:
   std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess() override;
   void update() override;
   void execute(CommandBuffer& commandBuffer) override;
-  void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
-  void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
-  void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
 };

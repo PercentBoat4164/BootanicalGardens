@@ -63,9 +63,10 @@ public:
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
   ~RenderPass() override;
 
+protected:
   template<typename Materials>
   requires std::ranges::range<Materials> && std::same_as<std::ranges::range_value_t<Materials>, Material*>
-  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 1}, const VkClearDepthStencilValue depth = {0, 0}) {
+  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 0}, const VkClearDepthStencilValue depth = {0, 0}) {
     imageAccesses.clear();
     // Prepare data for this render pass
     if (const std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {
@@ -117,14 +118,16 @@ public:
     imageAccesses.shrink_to_fit();
     return clearValues;
   }
+
+public:
   virtual void setup()                                                                                                          = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) = 0;
-  virtual std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess()            = 0;
-  virtual void update()                                                                                                         = 0;
+  virtual std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess();
+  virtual void update();
   virtual void execute(CommandBuffer& commandBuffer)                                                                            = 0;
-  virtual void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)    = 0;
-  virtual void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)   = 0;
-  virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info)             = 0;
+  virtual void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info);
+  virtual void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info);
+  virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info);
 
   std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
   const std::unordered_map<const Image*, VkImageLayout>& getImageLayoutsAfterExecution() const { return imageLayoutsAfterExecution; }

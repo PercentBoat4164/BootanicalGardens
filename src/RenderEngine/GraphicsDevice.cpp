@@ -96,7 +96,7 @@ GraphicsDevice::GraphicsDevice(const std::filesystem::path& path) {
   if (const VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create command pool");
 
   yyjson_read_err error;
-  graphicsJSON = yyjson_read_file(path.string().c_str(), YYJSON_READ_ALLOW_INF_AND_NAN, nullptr, &error);
+  graphicsJSON = yyjson_read_file(path.string().c_str(), YYJSON_READ_ALLOW_INF_AND_NAN | YYJSON_READ_ALLOW_COMMENTS, nullptr, &error);
   if (graphicsJSON == nullptr) GraphicsInstance::showError("failed to read graphics data JSON: " + std::string(error.msg));
   resourcesDirectory = path.parent_path();
   yyjson_val* root = yyjson_doc_get_root(graphicsJSON);
@@ -125,7 +125,7 @@ GraphicsDevice::~GraphicsDevice() {
   textures.clear();
   pipelines.clear();
   overrideMaterials.clear();
-  materials.clear();
+  objectMaterials.clear();
   meshes.clear();
   vkDestroyCommandPool(device, commandPool, nullptr);
   descriptorSetAllocator.destroy();
@@ -138,7 +138,7 @@ GraphicsDevice::~GraphicsDevice() {
 }
 
 VkSampler* GraphicsDevice::getSampler(const VkFilter magnificationFilter, const VkFilter minificationFilter, const VkSamplerMipmapMode mipmapMode, const VkSamplerAddressMode addressMode, const float lodBias, const VkBorderColor borderColor) {
-  std::uint64_t id = Tools::hash(magnificationFilter, minificationFilter, mipmapMode, addressMode, lodBias, borderColor);
+  const std::uint64_t id = Tools::hash(magnificationFilter, minificationFilter, mipmapMode, addressMode, lodBias, borderColor);
   if (const auto it = samplers.find(id); it != samplers.end())
     return &it->second;
   const VkSamplerCreateInfo createInfo{
@@ -156,7 +156,7 @@ VkSampler* GraphicsDevice::getSampler(const VkFilter magnificationFilter, const 
       .maxAnisotropy           = 0,
       .compareEnable           = VK_FALSE,
       .compareOp               = VK_COMPARE_OP_NEVER,
-      .minLod                  = std::numeric_limits<float>::min(),
+      .minLod                  = 0,
       .maxLod                  = std::numeric_limits<float>::max(),
       .borderColor             = borderColor,
       .unnormalizedCoordinates = VK_FALSE
@@ -220,10 +220,16 @@ Material* GraphicsDevice::getMaterial(const std::uint64_t id, const Material* ma
   return &overrideMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{*material}).first->second;
 }
 
-Material* GraphicsDevice::getMaterial(const std::uint64_t id) {
+Material* GraphicsDevice::getJSONObjectMaterial(const std::uint64_t id) {
   if (id >= JSONMaterialArrayCount) return nullptr;
-  if (const auto it = materials.find(id); it != materials.end()) return &it->second;
-  return &materials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id)}).first->second;
+  if (const auto it = objectMaterials.find(id); it != objectMaterials.end()) return &it->second;
+  return &objectMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id)}).first->second;
+}
+
+Material* GraphicsDevice::getJSONNonObjectMaterial(std::uint64_t id) {
+  if (id >= JSONMaterialArrayCount) return nullptr;
+  if (const auto it = nonObjectMaterials.find(id); it != nonObjectMaterials.end()) return &it->second;
+  return &nonObjectMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id)}).first->second;
 }
 
 Mesh* GraphicsDevice::getJSONMesh(const std::uint64_t id) {

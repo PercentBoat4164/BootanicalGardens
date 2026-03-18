@@ -126,11 +126,12 @@ bool RenderGraph::bake() {
       const auto& accesses = renderPass->getImageAccesses();
       std::uint64_t index = 0;
       for (auto& [id, access] : accesses) {
-        // We only track attachment images, not images used exclusively as textures.
-        if (index >= renderPass->boundImageOffset && index < renderPass->boundImageOffset + renderPass->boundImageCount) continue;
+        // We only track registered images
+        const auto it = imageParameters.find(id);
+        if (it == imageParameters.end()) continue;
 
         // Register this usage
-        imageParameters.at(id).usage |= access.usage;
+        it->second.usage |= access.usage;
         id2decl[id].emplace_back(renderPass.get(), access);
         ids.push_back(id);
 
@@ -138,6 +139,9 @@ bool RenderGraph::bake() {
         ++index;
       }
       pass2id[renderPass.get()] = ids;
+
+      // Ensure that the renderColor's imageParameters entry has the VK_IMAGE_USAGE_TRANSFER_SRC_BIT usage bit.
+      imageParameters[RenderColor].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
 
     // Bake RenderPasses

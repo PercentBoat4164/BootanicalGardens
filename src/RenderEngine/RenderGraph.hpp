@@ -111,9 +111,11 @@ public:
   explicit RenderGraph(GraphicsDevice* device);
   ~RenderGraph();
 
-  [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
+  [[nodiscard]] std::uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
   static constexpr GraphicsDevice::ImageID getAttachmentId(const std::string_view& name) { return Tools::hash(name); }
   void setImageParameters(const GraphicsDevice::ImageID id, const ImageParameters& parameters) { imageParameters[id] = parameters; }
+  ImageParameters& getImageParameters(const GraphicsDevice::ImageID id) { return imageParameters[id]; }
+  void addImageUsageParameters(const GraphicsDevice::ImageID id, const VkImageUsageFlags usage) { imageParameters.at(id).usage |= usage; }
   [[nodiscard]] std::shared_ptr<Image> getImage(GraphicsDevice::ImageID id);
 
   static bool combineImageAccesses(ImageAccess& dst, const ImageAccess& src);
@@ -138,5 +140,5 @@ public:
   static constexpr GraphicsDevice::ImageID GBufferMaterialID   = Tools::hash("gBufferMaterialID");
   static constexpr GraphicsDevice::ImageID GBufferDepth        = Tools::hash("gBufferDepth");
   static constexpr GraphicsDevice::ImageID RenderColor         = Tools::hash("renderColor");
-  static constexpr GraphicsDevice::ImageID ShadowMap         = Tools::hash("shadowMap");
+  static constexpr GraphicsDevice::ImageID ShadowMap           = Tools::hash("shadowMap");
 };

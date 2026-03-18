@@ -1,4 +1,4 @@
-#include "CollectShadowsRenderPass.hpp"
+#include "ShadeRenderPass.hpp"
 
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
@@ -18,8 +18,8 @@
 
 #include <filesystem>
 
-CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
-  vertexProcessOverride = graph.device->getJSONVertexProcess("Collect Shadows Render Pass | Vertex Shader Override");
+ShadeRenderPass::ShadeRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
+  vertexProcessOverride = graph.device->getJSONVertexProcess("Shade Render Pass | Vertex Shader Override");
   const RenderGraph::ImageParameters parameters {
 #if !defined(NDEBUG)
     .name = "RenderColor",
@@ -34,15 +34,15 @@ CollectShadowsRenderPass::CollectShadowsRenderPass(RenderGraph& graph) : RenderP
   graph.setImageParameters(RenderGraph::RenderColor, parameters);
 }
 
-void CollectShadowsRenderPass::setup() {
+void ShadeRenderPass::setup() {
   pipelines.clear();
   materialRemap.clear();
 
-  // Collect and override the materials.
+  // Collect and override objectMaterials.
   {
     // A list of all fragment processes that have been overridden.
     std::unordered_set<float> registeredFragmentProcesses;
-    for (Material& material: graph.device->materials | std::ranges::views::values) {
+    for (Material& material: graph.device->objectMaterials | std::ranges::views::values) {
       // Make sure that this fragment shader has not already been registered.
       const float fragmentProcessId = material.fragmentProcess->id;
       if (registeredFragmentProcesses.contains(fragmentProcessId)) continue;
@@ -70,7 +70,7 @@ void CollectShadowsRenderPass::setup() {
   });
 }
 
-void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
+void ShadeRenderPass::bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) {
   std::vector<VkAttachmentReference> attachmentReferences(attachmentDescriptions.size());
   uint32_t i{~0U};
   for (VkAttachmentReference& attachmentReference: attachmentReferences) {
@@ -128,7 +128,7 @@ void CollectShadowsRenderPass::bake(const std::vector<VkAttachmentDescription>& 
   copyBuffer = std::make_unique<Buffer>(graph.device, "MaterialID -> Depth Copy Buffer", vkuFormatTexelBlockSize(image->getFormat()) * resolution.width * resolution.height * resolution.depth, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
 }
 
-void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
+void ShadeRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
   // The g-buffer albedo
   uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
@@ -185,7 +185,7 @@ void CollectShadowsRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, 
   for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
 }
 
-std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> CollectShadowsRenderPass::getDepthStencilAttachmentAccess() {
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> ShadeRenderPass::getDepthStencilAttachmentAccess() {
   return {{RenderGraph::GBufferDepth, {
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -198,7 +198,7 @@ std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> Coll
   }}};
 }
 
-void CollectShadowsRenderPass::update() {
+void ShadeRenderPass::update() {
   const PassData passData {
     .view_ViewMatrixInverse       = glm::inverse(glm::lookAtRH(glm::vec3(1, 1, 1), glm::vec3(0, .25, 0), glm::vec3(0, -1, 0))),
     .view_ProjectionMatrixInverse = glm::inverse(glm::perspectiveRH_ZO(glm::radians(60.0f), 8.0f / 6.0f, 2.0f, 1.0f))
@@ -206,7 +206,7 @@ void CollectShadowsRenderPass::update() {
   this->passData->update(passData);
 }
 
-void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
+void ShadeRenderPass::execute(CommandBuffer& commandBuffer) {
   commandBuffer.record<CommandBuffer::CopyImageToBuffer>(graph.getImage(RenderGraph::GBufferMaterialID).get(), copyBuffer.get());
   commandBuffer.record<CommandBuffer::CopyBufferToImage>(copyBuffer.get(), graph.getImage(RenderGraph::GBufferDepth).get());
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
@@ -220,31 +220,7 @@ void CollectShadowsRenderPass::execute(CommandBuffer& commandBuffer) {
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }
 
-void CollectShadowsRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    case RenderGraph::ShadowMap: {
-      imageInfo = {
-        .sampler     = *graph.device->getSampler(),
-        .imageView   = graph.getImage(RenderGraph::ShadowMap)->getImageView(),
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      };
-      break;
-    }
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void CollectShadowsRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+void ShadeRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
   switch (info.id) {
     case Tools::hash("lightData"): {
       const glm::mat4x4 projectionMatrix = glm::orthoRH_ZO(-1.f, 1.f, -1.f, 1.f, 15.f, -15.f);
@@ -263,30 +239,7 @@ void CollectShadowsRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline
       break;
     }
     default: {
-      GraphicsInstance::showError("Material has unbound buffer binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void CollectShadowsRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound buffer view binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<CollectShadowsRenderPass>()) + "."
-      );
+      RenderPass::bind(bufferInfo, pipeline, material, info);
       break;
     }
   }

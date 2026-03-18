@@ -3,7 +3,6 @@
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
-#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 
 #include <volk/volk.h>
 
@@ -90,6 +89,54 @@ RenderPass::~RenderPass() {
     vkDestroyRenderPass(graph.device->device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
   }
+}
+
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> RenderPass::getDepthStencilAttachmentAccess() {
+  return std::nullopt;
+}
+
+void RenderPass::update() {}
+
+void RenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  if (const std::shared_ptr<Image> texture = graph.getImage(info.id); texture != nullptr) {
+    imageInfo = {
+      .sampler = texture->getSampler(),
+      .imageView = texture->getImageView(),
+      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    return;
+  }
+
+  GraphicsInstance::showError("Material '" + material->name + "' has unbound " + std::string(magic_enum::enum_name(info.type)) + " binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+    + info.name +
+#else
+    + std::to_string(info.id) +
+#endif
+    " for RenderPass."
+  );
+}
+
+void RenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  GraphicsInstance::showError("Material '" + material->name + "' has unbound " + std::string(magic_enum::enum_name(info.type)) + " binding '"
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+    + info.name +
+#else
+    + std::to_string(info.id) +
+#endif
+    "' for RenderPass."
+  );
+}
+
+void RenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
+  GraphicsInstance::showError("Material '" + material->name + "' has unbound " + std::string(magic_enum::enum_name(info.type)) + " binding "
+#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
+  + info.name +
+#else
+  + std::to_string(info.id) +
+#endif
+  " for RenderPass."  /**todo: Add the ability to name the specific render pass when we upgrade to C++26 w/ reflection.**/
+);
 }
 
 VkRenderPass RenderPass::getRenderPass() const { return renderPass; }

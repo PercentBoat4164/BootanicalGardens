@@ -7,7 +7,7 @@ class Texture : public Image {
   VkSampler* sampler;
 
 public:
-  [[nodiscard]] VkSampler getSampler() const;
+  [[nodiscard]] VkSampler getSampler() const override;
 
   template <typename... Args> requires(std::constructible_from<Image, GraphicsDevice* const,
 #if !defined(NDEBUG)

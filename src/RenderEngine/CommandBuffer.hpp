@@ -99,7 +99,6 @@ public:
 
   struct BeginRenderPass final : Command {
     template<std::ranges::range T = std::span<VkClearValue>>
-    /**@todo: Make renderPass const when declareAccesses has been made constable*/
     explicit BeginRenderPass(RenderPass* renderPass, T&& clearValues=T{}, const VkRect2D renderArea={}) :
         Command([&]->std::vector<ResourceAccess>{
           std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> attachments = renderPass->getImageAccesses();

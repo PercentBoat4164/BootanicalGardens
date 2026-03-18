@@ -397,6 +397,14 @@ void CommandBuffer::record(const Command& queuedCommand) {
       // Get the last resource access or initialize an undefined one if no previous access to the resource was made
       const auto it                = state.resourceStates.find(access.resource);
       ResourceState& resourceState = (it == state.resourceStates.end() ? state.resourceStates.emplace(access.resource, ResourceState{}).first : it)->second;
+      // If we have never referenced this resource before and now we are trying to sample it, assume it is a texture that has been properly initialized.
+      if (resourceState.layout == VK_IMAGE_LAYOUT_UNDEFINED && std::ranges::contains(access.allowedLayouts, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+        resourceState = {
+          .access = nullptr,
+          .stage = nullptr,
+          .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        };
+      }
 
       const bool srcWrite = resourceState.access == nullptr ? true : vkuAccessIsWrite(*resourceState.access);
       const bool dstWrite = vkuAccessIsWrite(access.mask);

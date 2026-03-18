@@ -3,11 +3,14 @@
 #include "src/InputEngine/Input.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline/Pipeline.hpp"
-#include "src/RenderEngine/RenderPass/CollectShadowsRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
 #include "src/RenderEngine/MeshGroup/MeshGroup.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/ShadeRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.hpp"
 #include "src/RenderEngine/Window.hpp"
 
 int main() {
@@ -30,7 +33,10 @@ int main() {
     renderGraph.settings.renderResolution = window.getResolution();
     renderGraph.insert<ShadowRenderPass>();
     renderGraph.insert<GBufferRenderPass>();
-    renderGraph.insert<CollectShadowsRenderPass>();
+    renderGraph.insert<ShadeRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass>();
 
     LevelParser::loadLevel("../res/levels/Level1.json");
 

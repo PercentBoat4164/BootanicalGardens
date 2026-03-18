@@ -7,7 +7,7 @@
 
 template<typename T> class UniformBuffer;
 
-class CollectShadowsRenderPass : public RenderPass {
+class ShadeRenderPass : public RenderPass {
   struct PassData {
     glm::mat4 view_ViewMatrixInverse;
     glm::mat4 view_ProjectionMatrixInverse;
@@ -24,7 +24,7 @@ class CollectShadowsRenderPass : public RenderPass {
   std::unique_ptr<Buffer> copyBuffer;
 
 public:
-  explicit CollectShadowsRenderPass(RenderGraph& graph);
+  explicit ShadeRenderPass(RenderGraph& graph);
 
   void setup() override;
   void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&) override;
@@ -32,7 +32,5 @@ public:
   std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess() override;
   void update() override;
   void execute(CommandBuffer& commandBuffer) override;
-  void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
   void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
-  void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) override;
 };

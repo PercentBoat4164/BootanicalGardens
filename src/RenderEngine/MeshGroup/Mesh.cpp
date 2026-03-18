@@ -119,7 +119,7 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
 }
 
 Mesh::InstanceReference Mesh::addInstance(const uint64_t materialID, glm::mat4 mat) {
-  Material* material = indexBuffer->device->getMaterial(materialID);
+  Material* material = indexBuffer->device->getJSONObjectMaterial(materialID);
   InstanceCollection& instanceCollection = instances[material];
   InstanceReference instanceReference;
   instanceReference.material = material;

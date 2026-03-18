@@ -101,7 +101,7 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
     case Tools::hash(".vert"): shaderKind = shaderc_glsl_default_vertex_shader; break;
     case Tools::hash(".tesc"): shaderKind = shaderc_glsl_default_tess_control_shader; break;
     case Tools::hash(".tese"): shaderKind = shaderc_glsl_default_tess_evaluation_shader; break;
-    case Tools::hash(".geom"): shaderKind = shaderc_glsl_geometry_shader; break;
+    case Tools::hash(".geom"): shaderKind = shaderc_glsl_default_geometry_shader; break;
     case Tools::hash(".frag"): shaderKind = shaderc_glsl_default_fragment_shader; break;
     case Tools::hash(".comp"): shaderKind = shaderc_glsl_default_compute_shader; break;
     case Tools::hash(".mesh"): shaderKind = shaderc_glsl_default_mesh_shader; break;
@@ -119,7 +119,6 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
 
   // Compile with debug info and reflection data
   compilerOptions.SetGenerateDebugInfo();
-  compilerOptions.SetHlsl16BitTypes(true);
   compilerOptions.SetOptimizationLevel(shaderc_optimization_level_zero);
   const shaderc::CompilationResult compilationResult = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), compilerOptions);
   if (compilationResult.GetNumErrors() > 0) GraphicsInstance::showError(compilationResult.GetErrorMessage());
