@@ -34,5 +34,5 @@ public:
    * @param writes A vector of all the descriptor writes to apply. These will all be applied in one shot. Any data stored in the pointers of the writes must be valid after this function exits. It is recommended to use the <c>miscMemoryPool</c> for this purpose.
    */
   virtual void writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes);
-  [[nodiscard]] std::shared_ptr<VkDescriptorSet> getDescriptorSet(std::size_t index) const;
+  [[nodiscard]] VkDescriptorSet getDescriptorSet(std::size_t index) const;
 };

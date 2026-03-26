@@ -10,7 +10,6 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/Tools/ClassName.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -21,20 +20,21 @@ GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, Opa
   fragmentProcessOverride = graph.device->getJSONFragmentProcess("Geometry Buffer Render Pass | Fragment Shader Override");
   RenderGraph::ImageParameters parameters {
 #if !defined(NDEBUG)
-    .name = "GBufferAlbedo",
+    .name = "GBufferTextureCoordinate",
 #endif
     .layers = 1,
     .mipLevels = 1,
     .usage = 0,
-    .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+    .format = VK_FORMAT_R16G16_SFLOAT,
     .sampleCount = VK_SAMPLE_COUNT_1_BIT,
     .resolution = graph.settings.renderResolution
   };
-  graph.setImageParameters(RenderGraph::GBufferAlbedo, parameters);
+  graph.setImageParameters(RenderGraph::GBufferTextureCoordinate, parameters);
 #if !defined(NDEBUG)
-  parameters.name = "GBufferPosition";
+  parameters.name = "GBufferTangent";
 #endif
-  graph.setImageParameters(RenderGraph::GBufferPosition, parameters);
+  parameters.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferTangent, parameters);
 #if !defined(NDEBUG)
   parameters.name = "GBufferNormal";
 #endif
@@ -136,7 +136,7 @@ void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fu
       }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); }))),
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
 std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
@@ -170,7 +170,7 @@ void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
     for (auto& [material, instanceData]: mesh.instances) {
       const Pipeline* pipeline = pipelines.at(materialRemap.at(material));
       commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(frameIndex)}, 1);
       commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
       commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
     }

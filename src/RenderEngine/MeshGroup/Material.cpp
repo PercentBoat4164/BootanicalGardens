@@ -10,6 +10,9 @@
 #include <ranges>
 
 Material::Material(GraphicsDevice* device, yyjson_val* json) : device(device) {
+  static float globalID = 1.0f / static_cast<float>((1UL << 32U) - 1U);
+  id = globalID;
+  globalID += 1.0f / static_cast<float>((1UL << 32U) - 1U);
   name = yyjson_get_str(yyjson_obj_get(json, "name"));
   yyjson_val* val = yyjson_obj_get(json, "vertexProcess");
   vertexProcess = device->getJSONVertexProcess(yyjson_get_uint(val));

@@ -278,7 +278,7 @@ void Pipeline::writeDescriptorSets(std::deque<std::tuple<void*, std::function<vo
 
     // Generate a VkWriteDescriptorSet for each descriptor set.
     for (uint64_t i{}; i < descriptorSets.size(); ++i) {
-      write.dstSet = *getDescriptorSet(i);
+      write.dstSet = getDescriptorSet(i);
       writes[offset++] = write;
     }
   }

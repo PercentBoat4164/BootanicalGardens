@@ -115,7 +115,7 @@ void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fun
       .pBufferInfo = bufferInfo,
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
 std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
@@ -148,7 +148,7 @@ void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
     for (auto& [material, instanceData]: mesh.instances) {
       Pipeline* pipeline = pipelines.at(materialRemap.at(material));
       commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(graph.getFrameIndex())}, 1);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(graph.getFrameIndex())}, 1);
       commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
       commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
     }

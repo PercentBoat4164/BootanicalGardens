@@ -32,6 +32,8 @@ public:
 #endif
   };
 
+  float id;
+
   GraphicsDevice* device;
 
   VertexProcess* vertexProcess;

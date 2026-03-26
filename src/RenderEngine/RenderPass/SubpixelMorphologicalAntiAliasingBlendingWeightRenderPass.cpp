@@ -103,7 +103,7 @@ void SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass::writeDescriptorS
       }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); }))),
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
 void SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass::update() {
@@ -146,7 +146,7 @@ void SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass::execute(CommandB
   const Pipeline* pipeline = pipelines.at(material);
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
+  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(frameIndex), pipeline->getDescriptorSet(frameIndex)}, 1);
   commandBuffer.record<CommandBuffer::Draw>(3);
   commandBuffer.record<CommandBuffer::EndRenderPass>();
 }

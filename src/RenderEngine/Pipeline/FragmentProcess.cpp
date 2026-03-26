@@ -6,10 +6,7 @@
 #include <yyjson.h>
 
 FragmentProcess FragmentProcess::jsonGet(GraphicsDevice* device, yyjson_val* jsonData) {
-  static float id = 0;
   FragmentProcess fragmentProcess;
-  fragmentProcess.id = id;
-  id += 1.0 / static_cast<double>((1UL << 32U) - 1U);
   fragmentProcess.blendState.blendStates.emplace_back();
   std::uint64_t uintValue;
   const char* enumValue;

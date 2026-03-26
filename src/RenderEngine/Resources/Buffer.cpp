@@ -21,8 +21,8 @@ Buffer::Buffer(GraphicsDevice* const device,
                const VkBufferUsageFlags usage,
                const VkMemoryPropertyFlags required,
                const VkMemoryPropertyFlags preferred,
-               const VmaMemoryUsage memoryUsage, const
-               VmaAllocationCreateFlags flags
+               const VmaMemoryUsage memoryUsage,
+               const VmaAllocationCreateFlags flags
               ) :
     Resource(Resource::Buffer, device),
     size(bufferSize) {
@@ -86,9 +86,9 @@ std::shared_ptr<Buffer::BufferMapping> Buffer::map() {
 }
 
 void* Buffer::getObject() const {
-  return reinterpret_cast<void *>(buffer);
+  return reinterpret_cast<void*>(buffer);
 }
 
 void* Buffer::getView() const {
-  return reinterpret_cast<void *>(view);
+  return reinterpret_cast<void*>(view);
 }

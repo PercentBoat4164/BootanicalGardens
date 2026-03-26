@@ -25,8 +25,10 @@ class Shader {
 
 public:
   explicit Shader(GraphicsDevice* device, yyjson_val* obj);
-  explicit Shader(GraphicsDevice* device, const std::filesystem::path& sourcePath);
+  explicit Shader(GraphicsDevice* device, const std::filesystem::path& sourcePath, std::vector<std::pair<std::string, std::string>> definitions = {});
   ~Shader();
+
+  static std::unique_ptr<Shader> jsonGet(GraphicsDevice* graphicsDevice, yyjson_val* jsonData);
 
   void save(yyjson_mut_doc* doc, yyjson_mut_val* obj) const;
 

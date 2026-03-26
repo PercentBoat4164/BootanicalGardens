@@ -134,11 +134,11 @@ public:
    */
   void execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore);
 
-  static constexpr GraphicsDevice::ImageID GBufferAlbedo       = Tools::hash("gBufferAlbedo");
-  static constexpr GraphicsDevice::ImageID GBufferPosition     = Tools::hash("gBufferPosition");
-  static constexpr GraphicsDevice::ImageID GBufferNormal       = Tools::hash("gBufferNormal");
-  static constexpr GraphicsDevice::ImageID GBufferMaterialID   = Tools::hash("gBufferMaterialID");
-  static constexpr GraphicsDevice::ImageID GBufferDepth        = Tools::hash("gBufferDepth");
-  static constexpr GraphicsDevice::ImageID RenderColor         = Tools::hash("renderColor");
-  static constexpr GraphicsDevice::ImageID ShadowMap           = Tools::hash("shadowMap");
+  static constexpr GraphicsDevice::ImageID GBufferTextureCoordinate  = Tools::hash("gBufferTextureCoordinate");
+  static constexpr GraphicsDevice::ImageID GBufferNormal             = Tools::hash("gBufferNormal");
+  static constexpr GraphicsDevice::ImageID GBufferTangent            = Tools::hash("gBufferTangent");
+  static constexpr GraphicsDevice::ImageID GBufferMaterialID         = Tools::hash("gBufferMaterialID");
+  static constexpr GraphicsDevice::ImageID GBufferDepth              = Tools::hash("gBufferDepth");
+  static constexpr GraphicsDevice::ImageID RenderColor               = Tools::hash("renderColor");
+  static constexpr GraphicsDevice::ImageID ShadowMap                 = Tools::hash("shadowMap");
 };

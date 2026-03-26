@@ -100,19 +100,21 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
     else std::memset(tangentsVertexBufferTempMap->data, 0, tangentsVertexBufferTempMap->buffer->getSize());
   }
 
-  positionsVertexBuffer = std::make_unique<Buffer>(device, "Vertex Buffer | Positions", positionsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  std::string shortPath = path.lexically_relative(std::filesystem::current_path()).string();
+
+  positionsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Positions").c_str(), positionsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&positionsVertexBufferTemp, positionsVertexBuffer.get());
 
-  textureCoordinatesVertexBuffer = std::make_unique<Buffer>(device, "Vertex Buffer | Texture Coordinates", textureCoordinatesVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  textureCoordinatesVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Texture Coordinates").c_str(), textureCoordinatesVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&textureCoordinatesVertexBufferTemp, textureCoordinatesVertexBuffer.get());
 
-  normalsVertexBuffer = std::make_unique<Buffer>(device, "Vertex Buffer | Normals", normalsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  normalsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Normals").c_str(), normalsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&normalsVertexBufferTemp, normalsVertexBuffer.get());
 
-  tangentsVertexBuffer = std::make_unique<Buffer>(device, "Vertex Buffer | Tangents", tangentsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  tangentsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Tangents").c_str(), tangentsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&tangentsVertexBufferTemp, tangentsVertexBuffer.get());
 
-  indexBuffer = std::make_unique<Buffer>(device, "Index Buffer", indexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  indexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Indices").c_str(), indexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&indexBufferTemp, indexBuffer.get());
 
   device->executeCommandBufferImmediate(commandBuffer);
@@ -124,7 +126,7 @@ Mesh::InstanceReference Mesh::addInstance(const uint64_t materialID, glm::mat4 m
   InstanceReference instanceReference;
   instanceReference.material = material;
   instanceReference.modelInstanceID = instanceCollection.modelInstances.emplace(mat);
-  instanceReference.materialInstanceID = instanceCollection.materialInstances.emplace(material->fragmentProcess->id);
+  instanceReference.materialInstanceID = instanceCollection.materialInstances.emplace(material->id);
   instanceReference.perInstanceDataID = instanceCollection.perInstanceData.emplace(mat);
   instanceCollection.stale = true;
   stale = true;

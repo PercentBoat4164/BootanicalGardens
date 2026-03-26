@@ -12,6 +12,8 @@
       "path": "metal.glb"
     }, {
       "path": "rubberwood.glb"
+    }, {
+      "path": "square.glb"
     }
   ],
   "materials": [
@@ -89,6 +91,17 @@
       "alphaMode": 0,
       "alphaCutoff": null,
       "textures": {}
+    }, {
+      "name": "Brick Wall With POM",
+      "vertexProcess": 0,
+      "fragmentProcess": 8,
+      "alphaMode": 0,
+      "alphaCutoff": null,
+      "textures": {
+        "albedo": 17,
+        "normal": 18,
+        "displacement": 19
+      }
     }
   ],
   "textures": [
@@ -142,6 +155,15 @@
       "colorSpace": "linear"
     }, {
       "path": "SMAA/SearchTex.exr",
+      "colorSpace": "linear"
+    }, {
+      "path": "Square/brickWallAlbedo.exr",
+      "colorSpace": "srgb"
+    }, {
+      "path": "Square/brickWallNormal.exr",
+      "colorSpace": "linear"
+    }, {
+      "path": "Square/brickWallDisplacement.exr",
       "colorSpace": "linear"
     }
   ],
@@ -592,6 +614,57 @@
         "logicOp": "VK_LOGIC_OP_COPY",
         "blendConstants": [0.0, 0.0, 0.0, 0.0]
       }
+    }, {
+      "shader": 13,
+      "polygonMode": "VK_POLYGON_MODE_FILL",
+      "lineWidth": 1.0,
+      "rasterizerDiscardEnable": false,
+      "multisampleState": {
+        "sampleCount": "VK_SAMPLE_COUNT_1_BIT",
+        "minSampleShading": 1,
+        "enableSampleMask": false,
+        "sampleMask": 0,
+        "alphaToCoverageEnable": false,
+        "alphaToOneEnable": false
+      },
+      "depthState": {
+        "depthWriteEnable": false,
+        "bias": {
+          "depthBiasEnable": false,
+          "depthBiasConstantFactor": 0.0,
+          "depthBiasClamp": 0.0,
+          "depthBiasSlopeFactor": 0.0
+        },
+        "test": {
+          "depthTestEnable": true,
+          "depthCompareOp": "VK_COMPARE_OP_EQUAL",
+          "depthBoundsTestEnable": false,
+          "minDepthBounds": 0.0,
+          "maxDepthBounds": 1.0
+        }
+      },
+      "stencilState": {
+        "stencilTestEnable": false,
+        "front": null,
+        "back": null
+      },
+      "blendState": {
+        "blendStates": [
+          {
+            "blendEnable": false,
+            "srcColorBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstColorBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "colorBlendOp": "VK_BLEND_OP_ADD",
+            "srcAlphaBlendFactor": "VK_BLEND_FACTOR_ONE",
+            "dstAlphaBlendFactor": "VK_BLEND_FACTOR_ZERO",
+            "alphaBlendOp": "VK_BLEND_OP_ADD",
+            "colorWriteMask": 15
+          }
+        ],
+        "logicOpEnable": false,
+        "logicOp": "VK_LOGIC_OP_COPY",
+        "blendConstants": [0.0, 0.0, 0.0, 0.0]
+      }
     }
   ],
   "shaders": [
@@ -615,14 +688,17 @@
       "path": "SMAA/EdgeDetection/ColorEdgeDetection.frag"
     }, {
       "path": "SMAA/BlendingWeight/BlendingWeight.vert"
-//      "path": "SMAA/BlendingWeight/smaaBlendWeight.vert"
     }, {
       "path": "SMAA/BlendingWeight/BlendingWeight.frag"
-//      "path": "SMAA/BlendingWeight/smaaBlendWeight.frag"
     }, {
       "path": "SMAA/NeighborhoodBlending/NeighborhoodBlending.vert"
     }, {
       "path": "SMAA/NeighborhoodBlending/NeighborhoodBlending.frag"
+    }, {
+      "path": "deferred.frag",
+      "definitions": {
+        "PARALLAX_MAPPING": "1"
+      }
     }
   ]
 }

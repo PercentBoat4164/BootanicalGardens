@@ -189,6 +189,7 @@ VertexProcess* GraphicsDevice::getJSONVertexProcess(const std::uint64_t id) {
 Shader* GraphicsDevice::getJSONShader(const std::uint64_t id) {
   if (id >= JSONShaderArrayCount) return nullptr;
   if (const auto it = shaders.find(id); it != shaders.end()) return it->second.get();
+  return shaders.emplace(id, Shader::jsonGet(this, yyjson_arr_get(JSONShaderArray, id))).first->second.get();
   return shaders.emplace(id, std::make_unique<Shader>(this, resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(yyjson_arr_get(JSONShaderArray, id), "path")))).first->second.get();
 }
 

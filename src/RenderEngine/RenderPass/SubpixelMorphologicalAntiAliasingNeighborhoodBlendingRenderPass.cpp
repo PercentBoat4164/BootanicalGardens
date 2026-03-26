@@ -131,7 +131,7 @@ void SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass::writeDescr
       }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); }))),
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
 void SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass::update() {
@@ -156,7 +156,7 @@ void SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass::execute(Co
   const Pipeline* pipeline = pipelines.at(material);
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(frameIndex), *pipeline->getDescriptorSet(frameIndex)}, 1);
+  commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(frameIndex), pipeline->getDescriptorSet(frameIndex)}, 1);
   commandBuffer.record<CommandBuffer::Draw>(3);
   commandBuffer.record<CommandBuffer::EndRenderPass>();
   commandBuffer.record<CommandBuffer::CopyImageToImage>(graph.getImage(RenderGraph::getAttachmentId("SMAAResults")).get(), graph.getImage(RenderGraph::RenderColor).get());

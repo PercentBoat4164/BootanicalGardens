@@ -12,7 +12,6 @@ class yyjson_val;
 
 struct FragmentProcess {
   Shader* shader = nullptr;
-  float id;
 
   VkPolygonMode polygonMode         = VK_POLYGON_MODE_FILL;
   float lineWidth                   = 1;
