@@ -79,6 +79,7 @@ add_executable(BootanicalGardens
         src/EntityComponentSystem/AoSColumn.cpp
         src/EntityComponentSystem/ECSRegistry.cpp
         src/EntityComponentSystem/SoAColumn.cpp
+        src/EntityComponentSystem/JsonParser.cpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)

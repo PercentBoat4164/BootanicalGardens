@@ -23,8 +23,8 @@ int main() {
     Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
 
     // Declare the window
-    Window window{&graphicsDevice};
-
+    //Window window{&graphicsDevice};
+/*
     // Build the RenderGraph
     RenderGraph renderGraph{&graphicsDevice};
     renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution(), VK_SAMPLE_COUNT_1_BIT);
@@ -38,14 +38,15 @@ int main() {
     renderGraph.setImage(RenderGraph::ShadowDepth, RenderGraph::ShadowResolution, VK_FORMAT_D32_SFLOAT, true);
     renderGraph.insert<GBufferRenderPass>();
     renderGraph.insert<ShadowRenderPass>();
-    renderGraph.insert<CollectShadowsRenderPass>();
+    renderGraph.insert<CollectShadowsRenderPass>();*/
 
-    LevelParser::loadLevel("../res/levels/Level1.json");
+    //todo: Replace this with a new method.
+    //LevelParser::loadLevel("../res/levels/Level1.json");
 
-    renderGraph.bake();
+    //renderGraph.bake();
 
     do {
-      graphicsDevice.update();
+      /*graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();
       // Make sure that the GPU is appropriately waiting for the display (V-Sync)
@@ -54,10 +55,10 @@ int main() {
       renderGraph.update();
       renderGraph.execute(swapchainImage, window.getSemaphore());
       // Tell the GPU to show the final image when it has finished rendering this frame
-      window.present();
+      window.present();*/
     } while (Game::tick());
   }
-  GraphicsInstance::destroy();
+  //GraphicsInstance::destroy();
   return 0;
 }
 
