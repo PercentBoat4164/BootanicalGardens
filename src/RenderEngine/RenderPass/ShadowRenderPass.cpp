@@ -16,6 +16,18 @@
 
 ShadowRenderPass::ShadowRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
   fragmentProcessOverride = graph.device->getJSONFragmentProcess("Shadow Render Pass | Fragment Shader Override");
+  const RenderGraph::ImageParameters parameters {
+#if !defined(NDEBUG)
+    .name = "Shadow Map",
+#endif
+    .layers = 1,
+    .mipLevels = 1,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    .format = VK_FORMAT_D32_SFLOAT,
+    .sampleCount = VK_SAMPLE_COUNT_1_BIT,
+    .resolution = graph.settings.renderResolution
+  };
+  graph.setImageParameters(RenderGraph::ShadowMap, parameters);
 }
 
 void ShadowRenderPass::setup() {
@@ -103,11 +115,11 @@ void ShadowRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fun
       .pBufferInfo = bufferInfo,
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
-std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
-  return {{RenderGraph::getImageId(RenderGraph::ShadowDepth), {
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> ShadowRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::ShadowMap, {
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -136,58 +148,10 @@ void ShadowRenderPass::execute(CommandBuffer& commandBuffer) {
     for (auto& [material, instanceData]: mesh.instances) {
       Pipeline* pipeline = pipelines.at(materialRemap.at(material));
       commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(graph.getFrameIndex())}, 1);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(graph.getFrameIndex())}, 1);
       commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
       commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
     }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
-}
-
-void ShadowRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void ShadowRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound buffer binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void ShadowRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound buffer view binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<ShadowRenderPass>()) + "."
-      );
-      break;
-    }
-  }
 }

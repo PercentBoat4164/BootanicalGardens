@@ -14,7 +14,7 @@ std::unordered_map<SDL_Keycode, float> Input::keys{};
  * @param event The event to be handled
  */
 void Input::onEvent(SDL_Event event) {
-  SDL_Keycode code = event.key.key;
+  const SDL_Keycode code = event.key.key;
   if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) keys[code] = -0.0f;
   else if (event.type == SDL_EVENT_KEY_UP) keys[code] = 0.0f;
 }
@@ -46,7 +46,7 @@ bool Input::initialize() {
  * @return whether the key has been pressed
  */
 bool Input::keyPressed(const SDL_Keycode key) {
-  return keys[key] == Game::getTickTime();
+  return keys[key] == -static_cast<float>(Game::getTickTime());
 }
 
 /**
@@ -68,7 +68,7 @@ float Input::keyDown(const SDL_Keycode key) {
  * @return whether the key has been released
  */
 bool Input::keyReleased(const SDL_Keycode key) {
-  return keys[key] == Game::getTickTime();
+  return keys[key] == static_cast<float>(Game::getTickTime());
 }
 
 /**

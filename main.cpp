@@ -3,50 +3,47 @@
 #include "src/InputEngine/Input.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/Pipeline/Pipeline.hpp"
-#include "src/RenderEngine/RenderPass/CollectShadowsRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
 #include "src/RenderEngine/MeshGroup/MeshGroup.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/ShadeRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass.hpp"
+#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.hpp"
 #include "src/RenderEngine/Window.hpp"
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
-//   GraphicsInstance::create({
-// #if defined(VK_EXT_debug_utils)
-//     VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-// #endif
-//   });
+  GraphicsInstance::create({
+#if defined(VK_EXT_debug_utils)
+    VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+#endif
+  });
   {
-    // GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
+    GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
-    // Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
+    Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
 
     // Declare the window
-    //Window window{&graphicsDevice};
-/*
+    Window window{&graphicsDevice};
+
     // Build the RenderGraph
     RenderGraph renderGraph{&graphicsDevice};
-    renderGraph.setResolutionGroup(RenderGraph::RenderResolution, window.getResolution(), VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setImage(RenderGraph::RenderColor, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, false);
-    renderGraph.setImage(RenderGraph::GBufferAlbedo, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_UNORM, true);
-    renderGraph.setImage(RenderGraph::GBufferPosition, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SFLOAT, true);
-    renderGraph.setImage(RenderGraph::GBufferNormal, RenderGraph::RenderResolution, VK_FORMAT_R16G16B16A16_SFLOAT, true);
-    renderGraph.setImage(RenderGraph::GBufferMaterialID, RenderGraph::RenderResolution, VK_FORMAT_R32_SFLOAT, true);
-    renderGraph.setImage(RenderGraph::GBufferDepth, RenderGraph::RenderResolution, VK_FORMAT_D32_SFLOAT, true);
-    renderGraph.setResolutionGroup(RenderGraph::ShadowResolution, VkExtent3D{1024, 1024, 1}, VK_SAMPLE_COUNT_1_BIT);
-    renderGraph.setImage(RenderGraph::ShadowDepth, RenderGraph::ShadowResolution, VK_FORMAT_D32_SFLOAT, true);
-    renderGraph.insert<GBufferRenderPass>();
+    renderGraph.settings.renderResolution = window.getResolution();
     renderGraph.insert<ShadowRenderPass>();
-    renderGraph.insert<CollectShadowsRenderPass>();*/
+    renderGraph.insert<GBufferRenderPass>();
+    renderGraph.insert<ShadeRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass>();
+    // renderGraph.insert<SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass>();
 
-    //todo: Replace this with a new method.
-    //LevelParser::loadLevel("../res/levels/Level1.json");
+    LevelParser::loadLevel("../res/levels/Level1.json");
 
-    //renderGraph.bake();
+    renderGraph.bake();
 
     do {
-      /*graphicsDevice.update();
+      graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();
       // Make sure that the GPU is appropriately waiting for the display (V-Sync)
@@ -55,10 +52,10 @@ int main() {
       renderGraph.update();
       renderGraph.execute(swapchainImage, window.getSemaphore());
       // Tell the GPU to show the final image when it has finished rendering this frame
-      window.present();*/
+      window.present();
     } while (Game::tick());
   }
-  //GraphicsInstance::destroy();
+  GraphicsInstance::destroy();
   return 0;
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DescriptorSetRequirer.hpp"
+#include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/Tools/Hashing.hpp"
 
 #include <plf_colony.h>
@@ -60,26 +60,21 @@ class RenderGraph {
 public:
   GraphicsDevice* const device;
 
-  using ImageID = std::uint64_t;
-  using ResolutionGroupID = std::uint64_t;
+  struct ImageParameters {
+#if !defined(NDEBUG)
+    std::string name;
+#endif
+    std::uint64_t layers;
+    std::uint64_t mipLevels;
+    VkImageUsageFlags usage;
+    VkFormat format;
+    VkSampleCountFlags sampleCount;
+    VkExtent3D resolution;
+  };
 
 private:
-  struct ImageProperties {
-    ResolutionGroupID resolutionGroup;
-    VkFormat format;
-    bool inheritSampleCount;
-    std::shared_ptr<Image> image;
-    std::string name;  /**@todo: Try to limit the usage of this to just debug builds.*/
-  };
-
-  struct ResolutionGroupProperties {
-    VkExtent3D resolution;
-    VkSampleCountFlags sampleCount;
-    plf::colony<ImageID> attachments;
-  };
-
-  std::unordered_map<ResolutionGroupID, ResolutionGroupProperties> resolutionGroups;
-  std::unordered_map<ImageID, ImageProperties> images;
+  std::unordered_map<GraphicsDevice::ImageID, ImageParameters> imageParameters;
+  std::unordered_map<GraphicsDevice::ImageID, std::shared_ptr<Image>> images;
 
 public:
   static uint8_t FRAMES_IN_FLIGHT;
@@ -94,6 +89,10 @@ public:
     VkAttachmentLoadOp stencilLoadOp{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
     VkAttachmentStoreOp stencilStoreOp{VK_ATTACHMENT_STORE_OP_DONT_CARE};
   };
+
+  struct Settings {
+    VkExtent3D renderResolution{};
+  } settings;
 
   using iterator = decltype(renderPasses)::iterator;
   using reverse_iterator = decltype(renderPasses)::reverse_iterator;
@@ -112,24 +111,12 @@ public:
   explicit RenderGraph(GraphicsDevice* device);
   ~RenderGraph();
 
-  [[nodiscard]] uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
-  static constexpr ResolutionGroupID getResolutionGroupId(const std::string_view name) { return Tools::hash(name); }
-  void setResolutionGroup(const std::string_view& name, VkExtent3D resolution, VkSampleCountFlags sampleCount);
-  [[nodiscard]] ResolutionGroupProperties getResolutionGroup(ResolutionGroupID id) const;
-  [[nodiscard]] bool hasResolutionGroup(ResolutionGroupID id) const;
-  static constexpr ImageID getImageId(const std::string_view name) { return Tools::hash(name); }
-
-  /**
-   * Set an attachment's properties. This does <em>not</em> create the actual image. The actual image will be created during baking.
-   * @param name The name of the attachment. Pass an empty string to keep the name that the AttachmentID used to have - useful if you have a pre-existing id.
-   * @param groupName The resolution group that this attachment should belong to.
-   * @param format VkFormat of the image.
-   * @param inheritSampleCount Use the sample count of the resolution group. If this is false, the sample count is forced to VK_SAMPLE_COUNT_1_BIT
-   * @exception std::out_of_range The `groupName` resolution group does not exist. Use `setResolutionGroup` first.
-   */
-  void setImage(const std::string_view& name, const std::string_view& groupName, VkFormat format, bool inheritSampleCount);
-  [[nodiscard]] ImageProperties getImage(ImageID id) const;
-  [[nodiscard]] bool hasImage(ImageID id) const;
+  [[nodiscard]] std::uint64_t getFrameIndex() const { return frameNumber % FRAMES_IN_FLIGHT; }
+  static constexpr GraphicsDevice::ImageID getAttachmentId(const std::string_view& name) { return Tools::hash(name); }
+  void setImageParameters(const GraphicsDevice::ImageID id, const ImageParameters& parameters) { imageParameters[id] = parameters; }
+  ImageParameters& getImageParameters(const GraphicsDevice::ImageID id) { return imageParameters[id]; }
+  void addImageUsageParameters(const GraphicsDevice::ImageID id, const VkImageUsageFlags usage) { imageParameters.at(id).usage |= usage; }
+  [[nodiscard]] std::shared_ptr<Image> getImage(GraphicsDevice::ImageID id);
 
   static bool combineImageAccesses(ImageAccess& dst, const ImageAccess& src);
 
@@ -147,21 +134,11 @@ public:
    */
   void execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore);
 
-  static constexpr std::string_view VoidResolutionGroup = "void";
-  static constexpr std::string_view VoidImage           = "void";
-  static constexpr std::string_view RenderResolution    = "Render";
-  static constexpr std::string_view GBufferAlbedo       = "gBufferAlbedo";
-  static constexpr std::string_view GBufferPosition     = "gBufferPosition";
-  static constexpr std::string_view GBufferNormal       = "gBufferNormal";
-  static constexpr std::string_view GBufferMaterialID   = "gBufferMaterialID";
-  static constexpr std::string_view GBufferDepth        = "gBufferDepth";
-  static constexpr std::string_view RenderColor         = "renderColor";
-  static constexpr std::string_view ShadowResolution    = "Shadow";
-  static constexpr std::string_view ShadowDepth         = "shadowMap";
-
-private:
-  /**
-   * Builds the images stored in <c>backingImages</c> from <c>attachmentProperties</c>
-   */
-  void buildImages(const std::unordered_map<ImageID, VkImageUsageFlags>& usages);
+  static constexpr GraphicsDevice::ImageID GBufferTextureCoordinate  = Tools::hash("gBufferTextureCoordinate");
+  static constexpr GraphicsDevice::ImageID GBufferNormal             = Tools::hash("gBufferNormal");
+  static constexpr GraphicsDevice::ImageID GBufferTangent            = Tools::hash("gBufferTangent");
+  static constexpr GraphicsDevice::ImageID GBufferMaterialID         = Tools::hash("gBufferMaterialID");
+  static constexpr GraphicsDevice::ImageID GBufferDepth              = Tools::hash("gBufferDepth");
+  static constexpr GraphicsDevice::ImageID RenderColor               = Tools::hash("renderColor");
+  static constexpr GraphicsDevice::ImageID ShadowMap                 = Tools::hash("shadowMap");
 };

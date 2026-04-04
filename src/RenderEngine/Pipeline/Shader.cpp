@@ -87,7 +87,7 @@ Shader::Shader(GraphicsDevice* const device, yyjson_val* obj) : device(device) {
   if (!has_main) return;
 }
 
-Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& sourcePath) : device(device), sourcePath(sourcePath) {
+Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& sourcePath, std::vector<std::pair<std::string, std::string>> definitions) : device(device), sourcePath(sourcePath) {
   /**@todo: Use one global compiler and one global optimizer.
    *   - Switch to Slang.
    */
@@ -101,7 +101,7 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
     case Tools::hash(".vert"): shaderKind = shaderc_glsl_default_vertex_shader; break;
     case Tools::hash(".tesc"): shaderKind = shaderc_glsl_default_tess_control_shader; break;
     case Tools::hash(".tese"): shaderKind = shaderc_glsl_default_tess_evaluation_shader; break;
-    case Tools::hash(".geom"): shaderKind = shaderc_glsl_geometry_shader; break;
+    case Tools::hash(".geom"): shaderKind = shaderc_glsl_default_geometry_shader; break;
     case Tools::hash(".frag"): shaderKind = shaderc_glsl_default_fragment_shader; break;
     case Tools::hash(".comp"): shaderKind = shaderc_glsl_default_compute_shader; break;
     case Tools::hash(".mesh"): shaderKind = shaderc_glsl_default_mesh_shader; break;
@@ -119,8 +119,11 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
 
   // Compile with debug info and reflection data
   compilerOptions.SetGenerateDebugInfo();
-  compilerOptions.SetHlsl16BitTypes(true);
   compilerOptions.SetOptimizationLevel(shaderc_optimization_level_zero);
+  for (auto& [define, value] : definitions) {
+    if (value.empty()) compilerOptions.AddMacroDefinition(define);
+    compilerOptions.AddMacroDefinition(define, value);
+  }
   const shaderc::CompilationResult compilationResult = compiler.CompileGlslToSpv(contents.c_str(), contents.size(), shaderKind, sourcePath.string().data(), compilerOptions);
   if (compilationResult.GetNumErrors() > 0) GraphicsInstance::showError(compilationResult.GetErrorMessage());
   code = {compilationResult.cbegin(), compilationResult.cend()};
@@ -172,6 +175,18 @@ Shader::Shader(GraphicsDevice* const device, const std::filesystem::path& source
 Shader::~Shader() {
   vkDestroyShaderModule(device->device, module, nullptr);
   module = VK_NULL_HANDLE;
+}
+std::unique_ptr<Shader> Shader::jsonGet(GraphicsDevice* graphicsDevice, yyjson_val* jsonData) {
+  yyjson_val* jsonDefinitions = yyjson_obj_get(jsonData, "definitions");
+  std::vector<std::pair<std::string, std::string>> definitions;
+  definitions.reserve(yyjson_obj_size(jsonDefinitions));
+  std::size_t idx, max;
+  yyjson_val* define, * value;
+  yyjson_obj_foreach(jsonDefinitions, idx, max, define, value) {
+    definitions.emplace_back(yyjson_get_str(define), yyjson_get_str(value));
+  }
+  std::filesystem::path path = graphicsDevice->resourcesDirectory / "shaders" / yyjson_get_str(yyjson_obj_get(jsonData, "path"));
+  return std::make_unique<Shader>(graphicsDevice, path, definitions);
 }
 
 void Shader::save(yyjson_mut_doc* doc, yyjson_mut_val* obj) const {

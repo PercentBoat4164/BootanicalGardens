@@ -10,7 +10,6 @@
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/Tools/ClassName.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -19,6 +18,38 @@
 
 GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, OpaqueBit) {
   fragmentProcessOverride = graph.device->getJSONFragmentProcess("Geometry Buffer Render Pass | Fragment Shader Override");
+  RenderGraph::ImageParameters parameters {
+#if !defined(NDEBUG)
+    .name = "GBufferTextureCoordinate",
+#endif
+    .layers = 1,
+    .mipLevels = 1,
+    .usage = 0,
+    .format = VK_FORMAT_R16G16_SFLOAT,
+    .sampleCount = VK_SAMPLE_COUNT_1_BIT,
+    .resolution = graph.settings.renderResolution
+  };
+  graph.setImageParameters(RenderGraph::GBufferTextureCoordinate, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferTangent";
+#endif
+  parameters.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferTangent, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferNormal";
+#endif
+  graph.setImageParameters(RenderGraph::GBufferNormal, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferMaterialID";
+#endif
+  parameters.format = VK_FORMAT_R32_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferMaterialID, parameters);
+#if !defined(NDEBUG)
+  parameters.name = "GBufferDepth";
+#endif
+  parameters.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  parameters.format = VK_FORMAT_D32_SFLOAT;
+  graph.setImageParameters(RenderGraph::GBufferDepth, parameters);
 }
 
 void GBufferRenderPass::setup() {
@@ -89,11 +120,6 @@ void GBufferRenderPass::bake(const std::vector<VkAttachmentDescription>& attachm
 }
 
 void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::function<void(void*)>>>& miscMemoryPool, std::vector<VkWriteDescriptorSet>& writes) {
-  const auto bufferInfo = static_cast<VkDescriptorBufferInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
-       .buffer = uniformBuffer->getBuffer(),
-       .offset = 0,
-       .range = uniformBuffer->getSize()
-  }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); })));
   const uint32_t offset = writes.size();
   writes.resize(offset + descriptorSets.size(), {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -103,14 +129,18 @@ void GBufferRenderPass::writeDescriptorSets(std::deque<std::tuple<void*, std::fu
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
       .pImageInfo = nullptr,
-      .pBufferInfo = bufferInfo,
+      .pBufferInfo = static_cast<VkDescriptorBufferInfo*>(std::get<0>(miscMemoryPool.emplace_back(new VkDescriptorBufferInfo{
+        .buffer = uniformBuffer->getBuffer(),
+        .offset = 0,
+        .range = uniformBuffer->getSize()
+      }, [](void* mem) { delete static_cast<VkDescriptorBufferInfo*>(mem); }))),
       .pTexelBufferView = nullptr
   });
-  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = *getDescriptorSet(i);
+  for (uint64_t i{}; i < descriptorSets.size(); ++i) writes[offset + i].dstSet = getDescriptorSet(i);
 }
 
-std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
-  return {{RenderGraph::getImageId(RenderGraph::GBufferDepth), {
+std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> GBufferRenderPass::getDepthStencilAttachmentAccess() {
+  return {{RenderGraph::GBufferDepth, {
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -132,82 +162,18 @@ void GBufferRenderPass::update() {
 }
 
 void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
-  const uint64_t frameIndex = graph.getFrameIndex();
+  const std::uint64_t frameIndex = graph.getFrameIndex();
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
   for (const Mesh& mesh : graph.device->meshes | std::ranges::views::values) {
     commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{mesh.positionsVertexBuffer.get(), mesh.textureCoordinatesVertexBuffer.get(), mesh.normalsVertexBuffer.get(), mesh.tangentsVertexBuffer.get()});
     commandBuffer.record<CommandBuffer::BindIndexBuffer>(mesh.indexBuffer.get());
     for (auto& [material, instanceData]: mesh.instances) {
-      Pipeline* pipeline = pipelines.at(materialRemap.at(material));
+      const Pipeline* pipeline = pipelines.at(materialRemap.at(material));
       commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{*getDescriptorSet(graph.getFrameIndex()), *pipeline->getDescriptorSet(frameIndex)}, 1);
+      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(frameIndex)}, 1);
       commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
       commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
     }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();
-}
-
-void GBufferRenderPass::bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    case RenderGraph::getImageId("albedo"): {
-      imageInfo = {
-        .sampler     = material->albedoTexture.lock()->getSampler(),
-        .imageView   = material->albedoTexture.lock()->getImageView(),
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      };
-      break;
-    }
-    case RenderGraph::getImageId("normal"): {
-      imageInfo = {
-        .sampler     = material->normalTexture.lock()->getSampler(),
-        .imageView   = material->normalTexture.lock()->getImageView(),
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-      };
-      break;
-    }
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void GBufferRenderPass::bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
-      );
-      break;
-    }
-  }
-}
-
-void GBufferRenderPass::bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info) {
-  switch (info.id) {
-    default: {
-      GraphicsInstance::showError("Material has unbound image binding "
-#if defined(BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES)
-        + info.name +
-#else
-        + std::to_string(info.id) +
-#endif
-        " for " + std::string(Tools::className<GBufferRenderPass>()) + "."
-      );
-      break;
-    }
-  }
 }

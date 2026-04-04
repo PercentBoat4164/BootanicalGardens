@@ -6,7 +6,6 @@
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Texture.hpp"
 #include "src/RenderEngine/RenderGraph.hpp"
-#include "src/RenderEngine/GraphicsDevice.hpp"
 
 #include <vulkan/vulkan_core.h>
 
@@ -21,6 +20,7 @@ protected:
   std::unique_ptr<Framebuffer> framebuffer;
   std::unordered_map<Material*, Pipeline*> pipelines;
   std::unordered_map<Material*, Material*> materialRemap;
+  std::unordered_map<const Image*, VkImageLayout> imageLayoutsAfterExecution;
 
   template<typename L, typename R>
   static constexpr L rollingShiftLeft(L left, R right) {
@@ -57,18 +57,19 @@ public:
   uint32_t inputAttachmentOffset{~0U};
   uint32_t boundImageCount{0};
   uint32_t boundImageOffset{~0U};
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> imageAccesses;
+  std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> imageAccesses;
   std::vector<VkClearValue> clearValues;
 
   explicit RenderPass(RenderGraph& graph, MeshFilter meshFilter = OpaqueBit | TransparentBit);
   ~RenderPass() override;
 
+protected:
   template<typename Materials>
   requires std::ranges::range<Materials> && std::same_as<std::ranges::range_value_t<Materials>, Material*>
-  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 1}, const VkClearDepthStencilValue depth = {0, 0}) {
+  std::vector<VkClearValue> setup(Materials&& materials, const VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, const VkClearColorValue color = {0, 0, 0, 0}, const VkClearDepthStencilValue depth = {0, 0}) {
     imageAccesses.clear();
     // Prepare data for this render pass
-    if (const std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {
+    if (const std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> optionalDepthStencilAttachmentAccess = getDepthStencilAttachmentAccess(); optionalDepthStencilAttachmentAccess.has_value()) {
       clearValues.push_back(VkClearValue{.depthStencil=depth});
       depthStencilAttachmentOffset = imageAccesses.size();
       auto [id, access] = optionalDepthStencilAttachmentAccess.value();
@@ -76,12 +77,14 @@ public:
     }
     colorAttachmentOffset = imageAccesses.size();
     for (const Material* material: materials) {
-      std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> colorAttachmentAccesses = material->computeColorAttachmentAccesses();
+      std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> colorAttachmentAccesses = material->computeColorAttachmentAccesses();
       for (auto& [id, access]: colorAttachmentAccesses) {
         access.loadOp = loadOp;
-        clearValues.push_back(VkClearValue{.color=color});
-        auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
-        if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
+        const auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
+        if (it == imageAccesses.end()) {
+          imageAccesses.emplace_back(id, access);
+          clearValues.push_back(VkClearValue{.color=color});
+        }
         /**@todo: If the order of rendering is known (e.g. if the meshes are sorted), then this error can go away and we can just use the first and last layouts that the image is in.*/
         else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
       }
@@ -92,9 +95,9 @@ public:
     inputAttachmentOffset = imageAccesses.size();
     for (const Material* material: materials) {
       /**@todo: Add automatic support for resolve attachments.*/
-      const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
+      const std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>>& inputAttachmentAccesses = material->computeInputAttachmentAccesses();
       for (auto& [id, access]: inputAttachmentAccesses) {
-        auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
+        const auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
         if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
         else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
       }
@@ -103,12 +106,9 @@ public:
     else inputAttachmentCount = imageAccesses.size() - inputAttachmentOffset;
     boundImageOffset = imageAccesses.size();
     for (const Material* material: materials) {
-      const std::uint64_t albedo = material->albedoTexture.expired() ? 0 : Tools::hash(material->albedoTexture.lock().get());
-      const std::uint64_t normal = material->normalTexture.expired() ? 0 : Tools::hash(material->normalTexture.lock().get());
-      const std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>>& boundImageAccesses = material->computeBoundImageAccesses();
+      const std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>>& boundImageAccesses = material->computeBoundImageAccesses();
       for (auto& [id, access]: boundImageAccesses) {
-        if (albedo == id || normal == id) continue;
-        auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
+        const auto it = std::ranges::find(imageAccesses, id, &decltype(imageAccesses)::value_type::first);
         if (it == imageAccesses.end()) imageAccesses.emplace_back(id, access);
         else if (!RenderGraph::combineImageAccesses(it->second, access)) GraphicsInstance::showError("Use of the same attachment in different layouts within the same render pass is not supported. Use multiple render passes.");
       }
@@ -118,20 +118,23 @@ public:
     imageAccesses.shrink_to_fit();
     return clearValues;
   }
+
+public:
   virtual void setup()                                                                                                          = 0;
   virtual void bake(const std::vector<VkAttachmentDescription>& attachmentDescriptions, const std::vector<const Image*>&images) = 0;
-  virtual std::optional<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess()            = 0;
-  virtual void update()                                                                                                         = 0;
+  virtual std::optional<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getDepthStencilAttachmentAccess();
+  virtual void update();
   virtual void execute(CommandBuffer& commandBuffer)                                                                            = 0;
-  virtual void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)    = 0;
-  virtual void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info)   = 0;
-  virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info)             = 0;
+  virtual void bind(VkDescriptorImageInfo& imageInfo, Pipeline* pipeline, Material* material, const Material::Binding& info);
+  virtual void bind(VkDescriptorBufferInfo& bufferInfo, Pipeline* pipeline, Material* material, const Material::Binding& info);
+  virtual void bind(VkBufferView& bufferView, Pipeline* pipeline, Material* material, const Material::Binding& info);
 
-  std::vector<std::pair<RenderGraph::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
+  std::vector<std::pair<GraphicsDevice::ImageID, RenderGraph::ImageAccess>> getImageAccesses() const { return imageAccesses; }
+  const std::unordered_map<const Image*, VkImageLayout>& getImageLayoutsAfterExecution() const { return imageLayoutsAfterExecution; }
   [[nodiscard]] VkRenderPass getRenderPass() const;
   [[nodiscard]] Framebuffer* getFramebuffer() const;
   [[nodiscard]] std::unordered_map<Material*, Pipeline*> getPipelines();
-  [[nodiscard]] const RenderGraph& getGraph() const;
+  [[nodiscard]] RenderGraph& getGraph() const;
 };
 
 template<> struct std::hash<RenderPass> { size_t operator()(const RenderPass& pass) const noexcept { return pass.compatibility; } };

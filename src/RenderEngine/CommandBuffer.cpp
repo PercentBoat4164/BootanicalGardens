@@ -1,12 +1,13 @@
 #include "CommandBuffer.hpp"
 
-#include "Resources/Buffer.hpp"
-#include "Resources/Image.hpp"
-#include "Resources/Resource.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/Resources/Buffer.hpp"
+#include "src/RenderEngine/Resources/Image.hpp"
+#include "src/RenderEngine/Resources/Resource.hpp"
 #include "src/RenderEngine/Framebuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
-#include "Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
+#include "src/Tools/Vulkan/Access.h"
 
 #include <volk/volk.h>
 
@@ -31,11 +32,6 @@ void CommandBuffer::BeginRenderPass::preprocess(State& state, PreprocessingFlags
   };
 
   state.renderPass = renderPass;
-  for (const auto& [id, access]: renderPass->getImageAccesses()) {
-    ResourceState& resourceState = state.resourceStates[renderPass->getGraph().getImage(id).image.get()];
-    resourceState.layout = access.layout;
-    resourceState.access = access.access;
-  }
 }
 void CommandBuffer::BeginRenderPass::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -264,7 +260,7 @@ void CommandBuffer::Draw::preprocess(State& state, PreprocessingFlags flags) {
   if (state.renderPass == nullptr) GraphicsInstance::showError("must call BeginRenderPass before Draw");
   if (state.pipeline == nullptr) GraphicsInstance::showError("must call BindPipeline before Draw");
   if (vertexCount != 0) return;
-  if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindVertexBuffers before Draw, unless vertexCount (" + std::to_string(vertexCount) + ") != 0");
+  if (state.vertexBuffers.empty()) GraphicsInstance::showError("must call BindVertexBuffers before Draw, or set vertexCount != 0");
 }
 void CommandBuffer::Draw::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
@@ -322,6 +318,13 @@ std::string CommandBuffer::DrawIndexedIndirect::toString(bool includeArguments) 
 
 CommandBuffer::EndRenderPass::EndRenderPass() : Command({}, StateChange) {}
 void CommandBuffer::EndRenderPass::preprocess(State& state, PreprocessingFlags flags) {
+  for (const auto& [image, layout]: state.renderPass->getImageLayoutsAfterExecution()) {
+    ResourceState& resourceState = state.resourceStates[image];
+    resourceState.layout = layout;
+    resourceState.access = nullptr;
+    resourceState.stage = nullptr;
+  }
+
   state.renderPass = nullptr;
   state.pipeline = nullptr;
 }
@@ -340,13 +343,7 @@ std::string CommandBuffer::EndRenderPass::toString(bool includeArguments) {
 
 void CommandBuffer::PipelineBarrier::preprocess(State& state, const PreprocessingFlags flags) {
   for (auto& imageMemoryBarrier: imageMemoryBarriers) {
-    ResourceState& resourceState = state.resourceStates[imageMemoryBarrier.image];
-    if (flags & ModifyPipelineBarriers) {
-      imageMemoryBarrier.oldLayout = resourceState.layout;
-      if (resourceState.access != VK_ACCESS_FLAG_BITS_MAX_ENUM) imageMemoryBarrier.srcAccessMask = resourceState.access;
-    }
-    resourceState.layout = imageMemoryBarrier.newLayout;
-    resourceState.access = imageMemoryBarrier.dstAccessMask;
+    assert(imageMemoryBarrier.newLayout != VK_IMAGE_LAYOUT_UNDEFINED);
   }
 }
 void CommandBuffer::PipelineBarrier::bake(VkCommandBuffer commandBuffer) {
@@ -374,7 +371,6 @@ std::string CommandBuffer::PipelineBarrier::toString(bool includeArguments) {
 void CommandBuffer::PushConstants::preprocess(State& state, PreprocessingFlags flags) {
   layout = state.pipeline->getLayout();
 }
-
 void CommandBuffer::PushConstants::bake(VkCommandBuffer commandBuffer) {
 #if BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING
   GraphicsInstance::setDebugDataCommand(this);
@@ -384,61 +380,114 @@ void CommandBuffer::PushConstants::bake(VkCommandBuffer commandBuffer) {
   GraphicsInstance::setDebugDataCommand(nullptr);
 #endif
 }
-
 std::string CommandBuffer::PushConstants::toString(bool includeArguments) {
   return "vkCmdPushConstants";
 }
 
 void CommandBuffer::record(const Command& queuedCommand) {
+  // Add pipeline barrier commands
   if (flags & AddPipelineBarriers) {
+    // Create the PipelineBarrier command
+    auto pipelineBarrier = std::make_unique<PipelineBarrier>(0, 0, 0, std::span<PipelineBarrier::MemoryBarrier>{}, std::span<PipelineBarrier::BufferMemoryBarrier>{}, std::span<PipelineBarrier::ImageMemoryBarrier>{});
+
+    // Add necessary synchronization items to it
     for (const Command::ResourceAccess& access: queuedCommand.accesses) {
       const Resource::Type type = access.resource->type;
 
       // Get the last resource access or initialize an undefined one if no previous access to the resource was made
-      const auto it                           = state.resourceStates.find(access.resource);
-      ResourceState& resourceState            = (it == state.resourceStates.end() ? state.resourceStates.emplace(access.resource, ResourceState{VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_FLAG_BITS_MAX_ENUM}).first : it)->second;
-      Command::ResourceAccess& previousAccess = previousAccesses[access.resource];
+      const auto it                = state.resourceStates.find(access.resource);
+      ResourceState& resourceState = (it == state.resourceStates.end() ? state.resourceStates.emplace(access.resource, ResourceState{}).first : it)->second;
+      // If we have never referenced this resource before and now we are trying to sample it, assume it is a texture that has been properly initialized.
+      if (resourceState.layout == VK_IMAGE_LAYOUT_UNDEFINED && std::ranges::contains(access.allowedLayouts, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+        resourceState = {
+          .access = nullptr,
+          .stage = nullptr,
+          .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        };
+      }
 
-      // Record the pipeline barrier command synchronizing this access
+      const bool srcWrite = resourceState.access == nullptr ? true : vkuAccessIsWrite(*resourceState.access);
+      const bool dstWrite = vkuAccessIsWrite(access.mask);
+
       switch (type) {
         case Resource::Type::Image: {
-          // Skip adding the pipeline barrier if no layout transition or access change is happening. todo: See if this could be optimized by checking for change in read-write status rather than access type.
-          if (std::ranges::contains(access.allowedLayouts, resourceState.layout) && (access.mask & resourceState.access) != access.mask) continue;
+          // Obtain a barrier
           const auto* const image = reinterpret_cast<const Image* const>(access.resource);
-          PipelineBarrier::ImageMemoryBarrier barrier{
+          PipelineBarrier::ImageMemoryBarrier& barrier = pipelineBarrier->imageMemoryBarriers.emplace_back(PipelineBarrier::ImageMemoryBarrier{
               .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
               .pNext               = nullptr,
-              .srcAccessMask       = previousAccess.mask,
+              .srcAccessMask       = 0,
               .dstAccessMask       = access.mask,
               .oldLayout           = resourceState.layout,
-              .newLayout           = access.allowedLayouts[0],  // We always choose the layout listed first. @todo: Prefer a layout that reduces the number of memory barriers / transitions needed most if one exists.
+              .newLayout           = access.allowedLayouts[0],  // We always choose the layout listed first.
+                                                                // todo: Prefer a layout that reduces the number of memory barriers / transitions needed most if one exists.
+                                                                //   This would probably involve choosing the first layout, then when the next access happens, come back here and choose a layout that would not require a transition if one exists. This command could then be removed if not needed.
+                                                                //   That could happen again for the next access after that one too if we had successfully chosen a layout that does not require a transition.
               .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .image               = image,
               .subresourceRange    = image->getWholeRange()
-          };
-          commands.emplace_back(std::make_unique<PipelineBarrier>(previousAccess.stage, access.stage, 0, std::span<PipelineBarrier::MemoryBarrier>{}, std::span<PipelineBarrier::BufferMemoryBarrier>{}, std::span{&barrier, 1}))->preprocess(state, flags);
+          });
+
+          // Check if this resource requires synchronization for this operation
+          if (!srcWrite && !dstWrite &&  // READ -> READ
+              !std::ranges::contains(access.allowedLayouts, resourceState.layout)) {  // No layout transition is required
+            // Accumulate this operation as it does not require explicit synchronization separate from other reads
+            *resourceState.access |= access.mask;
+            *resourceState.stage  |= access.stage;
+            pipelineBarrier->imageMemoryBarriers.pop_back();
+            continue;  // Do not generate READ -> READ synchronization barriers
+          }
+          // Synchronization required
+          pipelineBarrier->dstStageMask |= access.stage;
+
+          barrier.srcAccessMask = resourceState.access != nullptr ? *resourceState.access : 0;
+          pipelineBarrier->srcStageMask |= resourceState.stage != nullptr ? *resourceState.stage : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+          // Update the resource state
+          resourceState.access = &barrier.dstAccessMask;
+          resourceState.stage  = &pipelineBarrier->dstStageMask;
+          resourceState.layout = barrier.newLayout;
           break;
         }
         case Resource::Type::Buffer: {
           const auto* const buffer = reinterpret_cast<const Buffer* const>(access.resource);
-          PipelineBarrier::BufferMemoryBarrier barrier{
+          PipelineBarrier::BufferMemoryBarrier& barrier = pipelineBarrier->bufferMemoryBarriers.emplace_back(PipelineBarrier::BufferMemoryBarrier{
               .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
               .pNext               = nullptr,
-              .srcAccessMask       = previousAccess.mask,
+              .srcAccessMask       = 0,
               .dstAccessMask       = access.mask,
               .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .buffer              = buffer,
               .offset              = 0,
               .size                = VK_WHOLE_SIZE
-          };
-          commands.emplace_back(std::make_unique<PipelineBarrier>(previousAccess.stage, access.stage, 0, std::span<PipelineBarrier::MemoryBarrier>{}, std::span{&barrier, 1}, std::span<PipelineBarrier::ImageMemoryBarrier>{}))->preprocess(state, flags);
+          });
+
+          // Check if this resource requires synchronization for this operation
+          if (!srcWrite && !dstWrite) {  // READ -> READ
+            // Accumulate this operation as it does not require explicit synchronization separate from other reads
+            *resourceState.access |= access.mask;
+            *resourceState.stage  |= access.stage;
+            pipelineBarrier->bufferMemoryBarriers.pop_back();
+            continue;  // Do not generate READ -> READ synchronization barriers
+          }
+          // Synchronization required
+          pipelineBarrier->dstStageMask |= access.stage;
+
+          barrier.srcAccessMask = resourceState.access != nullptr ? *resourceState.access : 0;
+          pipelineBarrier->srcStageMask |= resourceState.stage != nullptr ? *resourceState.stage : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+          // Update the resource state
+          resourceState.access = &barrier.dstAccessMask;
+          resourceState.stage  = &pipelineBarrier->dstStageMask;
           break;
         }
       }
-      previousAccess = access;
     }
+    // Do not record the barrier if it is empty
+    if (pipelineBarrier->memoryBarriers.empty() && pipelineBarrier->bufferMemoryBarriers.empty() && pipelineBarrier->imageMemoryBarriers.empty()) return;
+    commands.emplace_back(std::move(pipelineBarrier))->preprocess(state, flags);
   }
 }
 

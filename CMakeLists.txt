@@ -10,10 +10,10 @@ set(ASM_NASM "nasm")
 
 set(CPM_SOURCE_CACHE external)
 include(cmake/get_cpm.cmake)
-CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.329")
+CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.342")
 set(SPIRV_REFLECT_STATIC_LIB ON)
-CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-1.4.321.0")
-CPMAddPackage("gh:libsdl-org/SDL#release-3.2.26")
+CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-1.4.341.0")
+CPMAddPackage("gh:libsdl-org/SDL#release-3.4.0")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.7")
 set(FASTGLTF_DOWNLOAD_SIMDJSON ON)
 set(FASTGLTF_ENABLE_TESTS OFF)
@@ -22,18 +22,18 @@ set(FASTGLTF_ENABLE_DOCS OFF)
 CPMAddPackage("gh:spnda/fastgltf@0.9.0")
 set(DRACO_INSTALL OFF)
 CPMAddPackage("gh:google/draco#1.5.7")
-CPMAddPackage("gh:mattreecebentley/plf_colony#06e2148a90fd8b9e81696ae9c056c8bd6b29c856")  # v7.5.41
+CPMAddPackage("gh:mattreecebentley/plf_colony#f4e1ff97b75e2b201169f1b0b40ac9106bd927aa")  # v7.6.03
 CPMAddPackage(
         NAME glm
-        GIT_TAG 1.0.2
+        GIT_TAG 1.0.3
         GITHUB_REPOSITORY g-truc/glm
         OPTIONS CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON  # Workaround for glm bug #1279
 )
 CPMAddPackage("gh:ibireme/yyjson#0.12.0")
 CPMAddPackage("gh:jeremy-rifkin/cpptrace#v1.0.4")
-CPMAddPackage("gh:SpartanJ/efsw#1.5.0")
+CPMAddPackage("gh:SpartanJ/efsw#1.5.1")
 set(OPENEXR_IS_SUBPROJECT ON)
-CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.3")
+CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.4")
 
 add_executable(BootanicalGardens
         src/Component.cpp
@@ -54,10 +54,13 @@ add_executable(BootanicalGardens
         src/RenderEngine/Pipeline/Shader.cpp
         src/RenderEngine/Pipeline/VertexProcess.cpp
         src/RenderEngine/RenderGraph.cpp
-        src/RenderEngine/RenderPass/CollectShadowsRenderPass.cpp
         src/RenderEngine/RenderPass/GBufferRenderPass.cpp
         src/RenderEngine/RenderPass/RenderPass.cpp
+        src/RenderEngine/RenderPass/ShadeRenderPass.cpp
         src/RenderEngine/RenderPass/ShadowRenderPass.cpp
+        src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass.cpp
+        src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass.cpp
+        src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.cpp
         src/RenderEngine/MeshGroup/Material.cpp
         src/RenderEngine/MeshGroup/Mesh.cpp
         src/RenderEngine/MeshGroup/MeshGroup.cpp
@@ -69,8 +72,6 @@ add_executable(BootanicalGardens
         src/RenderEngine/Resources/StagingBuffer.cpp
         src/RenderEngine/Resources/UniformBuffer.cpp
         src/RenderEngine/Window.cpp
-
-        src/Tools/ClassName.h
 
         src/Filesystem/UpdateListener.cpp
         src/EntityComponentSystem/Archetype.cpp

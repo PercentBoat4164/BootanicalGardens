@@ -4,14 +4,12 @@
 #include "src/Game/Game.hpp"
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
-#include "Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
 #include "src/RenderEngine/RenderPass/RenderPass.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
-#include "src/RenderEngine/MeshGroup/Mesh.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
 #include "src/RenderEngine/Window.hpp"
-#include "src/Tools/Hashing.hpp"
 
 #include <volk/volk.h>
 
@@ -83,43 +81,18 @@ RenderGraph::~RenderGraph() {
   if (const VkResult result = vkWaitForFences(device->device, fences.size(), fences.data(), VK_TRUE, std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1U)).count()); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to wait for fences");
 }
 
-void RenderGraph::setResolutionGroup(const std::string_view& name, const VkExtent3D resolution, const VkSampleCountFlags sampleCount) {
-  ResolutionGroupProperties& group = resolutionGroups[getResolutionGroupId(name)];
-  group.resolution = resolution;
-  group.sampleCount = sampleCount;
-  for (ImageID attachmentId : group.attachments) if (std::weak_ptr<Image> image = images[attachmentId].image; !image.expired()) image.lock()->rebuild(resolution, sampleCount);
+std::shared_ptr<Image> RenderGraph::getImage(const GraphicsDevice::ImageID id) {
+  if (const auto it = images.find(id); it != images.end()) return it->second;
   outOfDate = true;
-}
-
-RenderGraph::ResolutionGroupProperties RenderGraph::getResolutionGroup(const ResolutionGroupID id) const {
-  return resolutionGroups.at(id);
-}
-
-bool RenderGraph::hasResolutionGroup(const ResolutionGroupID id) const {
-  return resolutionGroups.contains(id);
-}
-
-void RenderGraph::setImage(const std::string_view& name, const std::string_view& groupName, const VkFormat format, const bool inheritSampleCount) {
-  const ImageID id = getImageId(name);
-  const ResolutionGroupID groupId = getResolutionGroupId(groupName);
-  ImageProperties& image = images[id];
-  image = {
-    .resolutionGroup = groupId,
-    .format = format,
-    .inheritSampleCount = inheritSampleCount,
-    .image = image.image,
-    .name = std::string(name.empty() ? image.name : name)
-  };
-  if (plf::colony<ImageID>& resolutionGroupAttachments = resolutionGroups.at(groupId).attachments; std::ranges::find(resolutionGroupAttachments, id) == resolutionGroupAttachments.end()) resolutionGroupAttachments.insert(id);
-  outOfDate = true;
-}
-
-RenderGraph::ImageProperties RenderGraph::getImage(const ImageID id) const {
-  return images.at(id);
-}
-
-bool RenderGraph::hasImage(const ImageID id) const {
-  return images.contains(id);
+  if (const auto it = imageParameters.find(id); it != imageParameters.end()) {
+    const ImageParameters& params = it->second;
+    return images[id] = std::make_shared<Image>(device,
+#if !defined(NDEBUG)
+      params.name,
+#endif
+      params.format, params.resolution, params.usage, params.mipLevels, params.sampleCount);
+  }
+  return device->getJSONTexture(id);
 }
 
 bool RenderGraph::combineImageAccesses(ImageAccess& dst, const ImageAccess& src) {
@@ -144,43 +117,52 @@ bool RenderGraph::bake() {
    *************************/
   {
     // Understand how attachments are used across RenderPasses
-    std::unordered_map<RenderPass*, std::vector<ImageID>> pass2id;
+    std::unordered_map<RenderPass*, std::vector<GraphicsDevice::ImageID>> pass2id;
     pass2id.reserve(renderPasses.size());
-    std::unordered_map<ImageID, std::vector<std::pair<RenderPass*, ImageAccess>>> id2decl;
-    std::unordered_map<ImageID, VkImageUsageFlags> usages {
-      {getImageId(RenderColor), VK_IMAGE_USAGE_TRANSFER_SRC_BIT}
-    };
+    std::unordered_map<GraphicsDevice::ImageID, std::vector<std::pair<RenderPass*, ImageAccess>>> id2decl;
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
       renderPass->setup();
-      std::vector<ImageID> ids;
-      for (auto& [id, access] : renderPass->getImageAccesses()) {
-        usages[id] |= access.usage;
-        if (!images.contains(id))
-          continue;
+      std::vector<GraphicsDevice::ImageID> ids;
+      const auto& accesses = renderPass->getImageAccesses();
+      std::uint64_t index = 0;
+      for (auto& [id, access] : accesses) {
+        // We only track registered images
+        const auto it = imageParameters.find(id);
+        if (it == imageParameters.end()) continue;
+
+        // Register this usage
+        it->second.usage |= access.usage;
         id2decl[id].emplace_back(renderPass.get(), access);
         ids.push_back(id);
+
+        // We will now look at the next image.
+        ++index;
       }
       pass2id[renderPass.get()] = ids;
+
+      // Ensure that the renderColor's imageParameters entry has the VK_IMAGE_USAGE_TRANSFER_SRC_BIT usage bit.
+      imageParameters[RenderColor].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
-    buildImages(usages);
 
     // Bake RenderPasses
     for (const std::shared_ptr<RenderPass>& renderPass : renderPasses) {
-      const std::vector<ImageID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
+      const std::vector<GraphicsDevice::ImageID>& renderPassAttachmentIDs = pass2id.at(renderPass.get());
       std::vector<VkAttachmentDescription> descriptions;
       descriptions.reserve(renderPassAttachmentIDs.size());
       std::vector<const Image*> attachments;
       attachments.reserve(renderPassAttachmentIDs.size());
-      for (const ImageID& id: renderPassAttachmentIDs) {
+      for (const GraphicsDevice::ImageID& id: renderPassAttachmentIDs) {
         /**@todo: Add support for aliasing attachments.*/
         /**@todo: Add support for reordering render passes.*/
-        const Image* image = getImage(id).image.get();
+        const Image* image = getImage(id).get();
         std::vector<std::pair<RenderPass*, ImageAccess>>& attachmentDeclarations = id2decl.at(id);
         // Find this renderpass in the declarations of this attachment.
         const auto thisIt = std::ranges::find(attachmentDeclarations, renderPass.get(), &decltype(id2decl)::mapped_type::value_type::first);
+        const auto nextIt = std::ranges::next(thisIt);
+        const ImageAccess& thisDeclaration = thisIt->second;
+        const ImageAccess& nextDeclaration = nextIt == attachmentDeclarations.end() ? thisDeclaration : nextIt->second;
         /**@todo: Optimize load and store ops.*/
         /**@todo: Log an error if the format does not include a stencil buffer, but the stencilLoadOp or stencilStoreOp are not DONT_CARE.*/
-        const ImageAccess& thisDeclaration = thisIt->second;
         descriptions.push_back({
             .flags = 0U,
             .format = image->getFormat(),
@@ -190,35 +172,12 @@ bool RenderGraph::bake() {
             .stencilLoadOp = thisDeclaration.stencilLoadOp,
             .stencilStoreOp = thisDeclaration.stencilStoreOp,
             .initialLayout = thisDeclaration.layout,
-            .finalLayout = thisDeclaration.layout
+            .finalLayout = nextDeclaration.layout
         });
         attachments.push_back(image);
       }
       renderPass->bake(descriptions, attachments);
       if (renderPass->compatibility == -1U) GraphicsInstance::showError("`RenderPass::bake()` failed to update the RenderPass compatibility.");
-    }
-
-    for (Material& material : device->materials | std::ranges::views::values) {
-      if (std::weak_ptr<Texture> albedo = material.albedoTexture; !albedo.expired()) {
-        std::shared_ptr<Texture> tex = albedo.lock();
-        images[Tools::hash(tex.get())] = {
-          .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-          .format = tex->getFormat(),
-          .inheritSampleCount = false,
-          .image = tex,
-          .name = material.name + " | Albedo Texture"
-        };
-      }
-      if (std::weak_ptr<Texture> const normal = material.normalTexture; !normal.expired()) {
-        std::shared_ptr<Texture> tex = normal.lock();
-        images[Tools::hash(tex.get())] = {
-          .resolutionGroup = getResolutionGroupId(VoidResolutionGroup),
-          .format = tex->getFormat(),
-          .inheritSampleCount = false,
-          .image = tex,
-          .name = material.name + " | Normal Texture"
-        };
-      }
     }
   }
 
@@ -336,13 +295,13 @@ void RenderGraph::update() const {
 void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaphore semaphore) {
   CommandBuffer commandBuffer;
   for (const std::shared_ptr<RenderPass>& renderPass: renderPasses) renderPass->execute(commandBuffer);
-  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(getImageId(RenderColor)).image.get(), swapchainImage.get());
+  commandBuffer.record<CommandBuffer::BlitImageToImage>(getImage(RenderColor).get(), swapchainImage.get());
   std::vector<CommandBuffer::PipelineBarrier::ImageMemoryBarrier> imageBarriers = {
     {
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext               = nullptr,
-      .srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
-      .dstAccessMask       = VK_ACCESS_MEMORY_READ_BIT,
+      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .dstAccessMask       = 0,
       .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -377,13 +336,6 @@ void RenderGraph::execute(const std::shared_ptr<Image>& swapchainImage, VkSemaph
   };
   if (const VkResult result = vkQueueSubmit(device->globalQueue, 1, &submitInfo, frameData.renderFence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to submit recorded command buffer to queue");
   ++frameNumber;
-}
-
-void RenderGraph::buildImages(const std::unordered_map<ImageID, VkImageUsageFlags>& usages) {
-  for (auto& [id, properties]: images) {
-    const auto& resolutionGroup = resolutionGroups[properties.resolutionGroup];
-    properties.image = std::make_shared<Image>(device, properties.name, properties.format, resolutionGroup.resolution, usages.at(id), 1, properties.inheritSampleCount ? resolutionGroup.sampleCount : VK_SAMPLE_COUNT_1_BIT);
-  }
 }
 
 const RenderGraph::PerFrameData& RenderGraph::getPerFrameData(const uint64_t frameIndex) const { return frames[frameIndex == static_cast<decltype(frameIndex)>(-1) ? getFrameIndex() : frameIndex]; }

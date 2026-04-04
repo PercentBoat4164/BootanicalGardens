@@ -10,7 +10,15 @@
 
 #include <utility>
 
-Image::Image(GraphicsDevice* const device, std::string name, VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount, VkImageView view) : Resource(Resource::Image, device), _name(std::move(name)), _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {
+Image::Image(GraphicsDevice* const device,
+#if !defined(NDEBUG)
+  std::string name,
+#endif
+  VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount, VkImageView view) : Resource(Resource::Image, device),
+#if !defined(NDEBUG)
+    _name(std::move(name)),
+#endif
+    _shouldDestroy(false), _image(image), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(view), _mipLevels(mipLevels), _sampleCount(sampleCount) {
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
   if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
     VkDebugUtilsObjectNameInfoEXT nameInfo {
@@ -30,7 +38,15 @@ Image::Image(GraphicsDevice* const device, std::string name, VkImage image, cons
 #endif
 }
 
-Image::Image(GraphicsDevice* const device, std::string name, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount) : Resource(Resource::Image, device), _name(std::move(name)), _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
+Image::Image(GraphicsDevice* const device,
+#if !defined(NDEBUG)
+  std::string name,
+#endif
+  const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const uint32_t mipLevels, const VkSampleCountFlags sampleCount) : Resource(Resource::Image, device),
+#if !defined(NDEBUG)
+    _name(std::move(name)),
+#endif
+    _format(format), _aspect(aspectFromFormat(format)), _extent(extent), _usage(usage), _view(VK_NULL_HANDLE), _mipLevels(mipLevels), _sampleCount(sampleCount) {
   const VkImageCreateInfo imageCreateInfo {
     .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext         = nullptr,
@@ -52,6 +68,7 @@ Image::Image(GraphicsDevice* const device, std::string name, const VkFormat form
   };
   if (const VkResult result = vmaCreateImage(device->allocator, &imageCreateInfo, &allocationCreateInfo, &_image, &allocation, nullptr); result != VK_SUCCESS) GraphicsInstance::showError(result, "Failed to create image");
   if (_image == VK_NULL_HANDLE) return;  /**@todo: Find out why (check device supported formats and limits), then report the error.**/
+#if !defined(NDEBUG)
   if (!_name.empty()) vmaSetAllocationName(device->allocator, allocation, _name.c_str());
 #if VK_EXT_debug_utils & BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS
   if (GraphicsInstance::extensionEnabled(Tools::hash(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))) {
@@ -64,6 +81,7 @@ Image::Image(GraphicsDevice* const device, std::string name, const VkFormat form
     };
     if (const VkResult result = vkSetDebugUtilsObjectNameEXT(device->device, &nameInfo); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to set debug utils object name");
   }
+#endif
 #endif
   const VkImageViewCreateInfo imageViewCreateInfo {
     .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -111,15 +129,27 @@ Image::~Image() {
 }
 
 void Image::rebuild(const VkExtent3D newExtent, const VkSampleCountFlags newSampleCount) {
+#if !defined(NDEBUG)
   std::string name = _name;
+#endif
   VkFormat format = _format;
   VkImageUsageFlags usage = _usage;
   uint32_t mipLevels = _mipLevels;
   VkSampleCountFlags sampleCount = newSampleCount == VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM ? _sampleCount : newSampleCount;
   VkExtent3D extent = newExtent.width == 0 || newExtent.height == 0 || newExtent.depth == 0 ? _extent : newExtent;
   std::destroy_at(this);
-  std::construct_at(this, device, name, format, extent, usage, mipLevels, sampleCount);
+  std::construct_at(this, device,
+#if !defined(NDEBUG)
+    name,
+#endif
+    format, extent, usage, mipLevels, sampleCount);
 }
+
+#if !defined(NDEBUG)
+std::string_view Image::getName() const {
+  return _name;
+}
+#endif
 
 VkImage Image::getImage() const {
   return _image;
@@ -177,6 +207,10 @@ VkImageSubresourceRange Image::getWholeRange() const {
     .baseArrayLayer = 0,
     .layerCount = _layerCount
   };
+}
+
+VkSampler Image::getSampler() const {
+  return *device->getSampler();
 }
 
 void* Image::getObject() const {
