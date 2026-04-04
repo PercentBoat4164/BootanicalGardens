@@ -12,15 +12,15 @@
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
-  GraphicsInstance::create({
-#if defined(VK_EXT_debug_utils)
-    VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-#endif
-  });
+//   GraphicsInstance::create({
+// #if defined(VK_EXT_debug_utils)
+//     VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+// #endif
+//   });
   {
-    GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
+    // GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
-    Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
+    // Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
 
     // Declare the window
     //Window window{&graphicsDevice};
