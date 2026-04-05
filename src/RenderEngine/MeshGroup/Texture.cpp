@@ -8,6 +8,8 @@
 #include <OpenEXR/ImfChannelListAttribute.h>
 #include <OpenEXR/ImfArray.h>
 
+#include <vulkan/utility/vk_format_utils.h>
+
 VkSampler Texture::getSampler() const {
   return *sampler;
 }
@@ -30,7 +32,7 @@ std::unique_ptr<Texture> Texture::jsonGet(GraphicsDevice* device, yyjson_val* te
 #endif
     linearColor ? VK_FORMAT_R16G16B16A16_UNORM : VK_FORMAT_B8G8R8A8_SRGB, VkExtent3D{width, height, 1}, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  auto* buffer = new StagingBuffer(device, (pathStr + " | upload buffer").c_str(), vkuFormatElementSize(texture->getFormat()) * width * height);
+  auto* buffer = new StagingBuffer(device, (pathStr + " | upload buffer").c_str(), vkuFormatTexelBlockSize(texture->getFormat()) * width * height);
   const std::shared_ptr<Buffer::BufferMapping> mapping = buffer->map();
 
   struct Pixel_B8G8R8A8_SRGB{std::uint8_t b, g, r, a;};

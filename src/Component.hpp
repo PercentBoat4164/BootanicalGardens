@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <memory>
+#include <cstdint>
 
 class Entity;
 

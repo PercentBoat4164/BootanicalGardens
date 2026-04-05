@@ -14,13 +14,13 @@ class SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass : public RenderP
     struct SMAAParameters {
       float threshold;
       float depthThreshold;
-      uint  maxSearchSteps;
-      uint  maxSearchStepsDiag;
+      std::uint32_t  maxSearchSteps;
+      std::uint32_t  maxSearchStepsDiag;
 
-      uint  cornerRounding;
-      uint  pad0;
-      uint  pad1;
-      uint  pad2;
+      std::uint32_t  cornerRounding;
+      std::uint32_t  pad0;
+      std::uint32_t  pad1;
+      std::uint32_t  pad2;
     } parameters;
     glm::vec4 subsampleIndices;
 

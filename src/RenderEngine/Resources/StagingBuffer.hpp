@@ -26,7 +26,7 @@ public:
    * @param count Number of elements in the array at <c>data</c>, not number of bytes.
    */
   template<typename T> explicit StagingBuffer(GraphicsDevice* device, const char* name, const T* data, const VkDeviceSize count) : StagingBuffer(device, name, sizeof(T) * count) {
-    vmaCopyMemoryToAllocation(device->allocator, data, allocation, 0, sizeof(T) * count);
+    return vmaCopyMemoryToAllocation(device->allocator, data, allocation, 0, sizeof(T) * count);
   }
 
   /**
