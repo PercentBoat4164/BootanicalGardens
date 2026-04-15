@@ -5,9 +5,11 @@
 #include "Plant.hpp"
 #include "src/Entity.hpp"
 #include "src/Game/Game.hpp"
+#include "src/RenderEngine/CommandBuffer.hpp"
+#include "src/RenderEngine/MeshGroup/MeshGroup.hpp"
 
-#include <iostream>
 #include <functional>
+#include <iostream>
 
 class Iput {
 public:  // Way 1
@@ -42,18 +44,36 @@ PlayerController::PlayerController(const std::uint64_t id, Entity& entity) : Com
 
 void PlayerController::onTick() {
   //move the player using keyboard
+  bool moved = false;
   if (Input::keyDown(SDLK_UP) > 0 || Input::keyDown(SDLK_W) > 0) {
     entity.position.y += movementSpeed * Game::getTickTime();
+    moved = true;
   }
   if (Input::keyDown(SDLK_DOWN) > 0 || Input::keyDown(SDLK_S) > 0) {
     entity.position.y -= movementSpeed * Game::getTickTime();
+    moved = true;
   }
   if (Input::keyDown(SDLK_LEFT) > 0 || Input::keyDown(SDLK_A) > 0) {
     entity.position.x -= movementSpeed * Game::getTickTime();
+    moved = true;
   }
   if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
     entity.position.x += movementSpeed * Game::getTickTime();
+    moved = true;
   }
+
+  if (!moved) return;
+
+  auto* meshGroup = entity.getComponentOfType<MeshGroup>();
+  if (meshGroup == nullptr) return;
+
+  CommandBuffer commandBuffer;
+  for (auto& [mesh, instances] : meshGroup->meshes) {
+    for (auto& instance : instances) {
+      mesh->updateInstance(instance, glm::translate(glm::rotate(glm::scale(glm::identity<glm::mat4>(), entity.scale), glm::angle(entity.rotation), glm::axis(entity.rotation)), entity.position), commandBuffer);
+    }
+  }
+  if (!commandBuffer.empty()) meshGroup->device->executeCommandBufferImmediate(commandBuffer);
 }
 
 std::shared_ptr<Component> PlayerController::create(std::uint64_t id, Entity& entity, yyjson_val* obj) {

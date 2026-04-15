@@ -10,13 +10,15 @@
 #include "src/RenderEngine/MeshGroup/Vertex.hpp"
 #include "src/Tools/Hashing.hpp"
 
+#include <cstddef>
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/core.hpp>
 
 #include <draco/core/decoder_buffer.h>
 
 Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
-  std::filesystem::path path = device->resourcesDirectory / "meshes" / yyjson_get_str(yyjson_obj_get(json, "path"));
+  name = yyjson_get_str(yyjson_obj_get(json, "path"));
+  const std::filesystem::path path = device->resourcesDirectory / "meshes" / name;
   fastgltf::GltfFileStream file(path);
   fastgltf::Asset asset;
   {  // Destroy the fastgltf::Parser and the fastgltf::Expected<> after they are no longer necessary
@@ -42,28 +44,28 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
   }
 
   // Determine vertex count (GLTF spec states that "All attribute accessors for a given primitive <b>MUST</b> have the same <c>count</c>." Therefore, the count of the first accessor for this primitive is used to decide the vertex count)
-  std::size_t vertexCount = asset.accessors[primitive.attributes[0].accessorIndex].count;
+  const std::size_t vertexCount = asset.accessors[primitive.attributes[0].accessorIndex].count;
   StagingBuffer positionsVertexBufferTemp(device, "Vertex Upload Buffer | Positions", vertexCount * sizeof(glm::vec3));
   StagingBuffer textureCoordinatesVertexBufferTemp(device, "Vertex Upload Buffer | Texture Coordinates", vertexCount * sizeof(glm::vec2));
   StagingBuffer normalsVertexBufferTemp(device, "Vertex Upload Buffer | Normals", vertexCount * sizeof(glm::vec3));
   StagingBuffer tangentsVertexBufferTemp(device, "Vertex Upload Buffer | Tangents", vertexCount * sizeof(glm::vec3));
   StagingBuffer indexBufferTemp(device, "Index Upload Buffer", asset.accessors[primitive.indicesAccessor.value()].count * sizeof(uint32_t));
-  std::shared_ptr<Buffer::BufferMapping> positionsVertexBufferTempMap = positionsVertexBufferTemp.map();
-  std::shared_ptr<Buffer::BufferMapping> textureCoordinatesVertexBufferTempMap = textureCoordinatesVertexBufferTemp.map();
-  std::shared_ptr<Buffer::BufferMapping> normalsVertexBufferTempMap = normalsVertexBufferTemp.map();
-  std::shared_ptr<Buffer::BufferMapping> tangentsVertexBufferTempMap = tangentsVertexBufferTemp.map();
-  std::shared_ptr<Buffer::BufferMapping> indexBufferTempMap = indexBufferTemp.map();
+  const std::shared_ptr<Buffer::BufferMapping> positionsVertexBufferTempMap = positionsVertexBufferTemp.map();
+  const std::shared_ptr<Buffer::BufferMapping> textureCoordinatesVertexBufferTempMap = textureCoordinatesVertexBufferTemp.map();
+  const std::shared_ptr<Buffer::BufferMapping> normalsVertexBufferTempMap = normalsVertexBufferTemp.map();
+  const std::shared_ptr<Buffer::BufferMapping> tangentsVertexBufferTempMap = tangentsVertexBufferTemp.map();
+  const std::shared_ptr<Buffer::BufferMapping> indexBufferTempMap = indexBufferTemp.map();
   if (primitive.dracoCompression) {
     std::size_t size;
     const char* byteBuf = std::visit(fastgltf::visitor {
-      [&size](const auto& arg){
+      [&size](const auto&){
         return reinterpret_cast<const char*>(size = 0);
       },
-      [&size](const fastgltf::sources::Array& array){
+      [&size](const fastgltf::sources::Array& array) -> const char* {
         size = array.bytes.size();
         return reinterpret_cast<const char*>(array.bytes.data());
       },
-      [&size](const fastgltf::sources::Vector& vector){
+      [&size](const fastgltf::sources::Vector& vector) -> const char* {
         size = vector.bytes.size();
         return reinterpret_cast<const char*>(vector.bytes.data());
       }
@@ -71,10 +73,10 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
     draco::DecoderBuffer buffer;
     buffer.Init(byteBuf, size);
     draco::Decoder decoder;
-    draco::StatusOr<std::unique_ptr<draco::Mesh>> statusOrMesh = decoder.DecodeMeshFromBuffer(&buffer);
+    draco::StatusOr<std::unique_ptr<draco::Mesh>> const statusOrMesh = decoder.DecodeMeshFromBuffer(&buffer);
     if (!statusOrMesh.ok()) GraphicsInstance::showError("failed to decode Draco compressed mesh: '" + statusOrMesh.status().error_msg_string() + "', Status: '" + std::string(magic_enum::enum_name<draco::Status::Code>(statusOrMesh.status().code())) + "'");
     for (auto i = draco::FaceIndex(0); i < statusOrMesh.value()->num_faces(); ++i)
-      std::memcpy(static_cast<uint32_t*>(indexBufferTempMap->data) + i.value() * 3, reinterpret_cast<const uint32_t*>(statusOrMesh.value()->face(i).data()), sizeof(uint32_t) * 3);
+      std::memcpy(static_cast<uint32_t*>(indexBufferTempMap->data) + static_cast<size_t>(i.value() * 3), reinterpret_cast<const uint32_t*>(statusOrMesh.value()->face(i).data()), sizeof(uint32_t) * 3);
     const draco::PointAttribute* position = statusOrMesh.value()->GetNamedAttribute(draco::GeometryAttribute::POSITION);
     const draco::PointAttribute* texCoords = statusOrMesh.value()->GetNamedAttribute(draco::GeometryAttribute::TEX_COORD);
     const draco::PointAttribute* normals = statusOrMesh.value()->GetNamedAttribute(draco::GeometryAttribute::NORMAL);
@@ -100,84 +102,173 @@ Mesh::Mesh(GraphicsDevice* device, yyjson_val* json) : device(device) {
     else std::memset(tangentsVertexBufferTempMap->data, 0, tangentsVertexBufferTempMap->buffer->getSize());
   }
 
-  std::string shortPath = path.lexically_relative(std::filesystem::current_path()).string();
-
-  positionsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Positions").c_str(), positionsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  positionsVertexBuffer = std::make_unique<Buffer>(device, (name + " | Positions").c_str(), positionsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&positionsVertexBufferTemp, positionsVertexBuffer.get());
 
-  textureCoordinatesVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Texture Coordinates").c_str(), textureCoordinatesVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  textureCoordinatesVertexBuffer = std::make_unique<Buffer>(device, (name + " | Texture Coordinates").c_str(), textureCoordinatesVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&textureCoordinatesVertexBufferTemp, textureCoordinatesVertexBuffer.get());
 
-  normalsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Normals").c_str(), normalsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  normalsVertexBuffer = std::make_unique<Buffer>(device, (name + " | Normals").c_str(), normalsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&normalsVertexBufferTemp, normalsVertexBuffer.get());
 
-  tangentsVertexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Tangents").c_str(), tangentsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  tangentsVertexBuffer = std::make_unique<Buffer>(device, (name + " | Tangents").c_str(), tangentsVertexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&tangentsVertexBufferTemp, tangentsVertexBuffer.get());
 
-  indexBuffer = std::make_unique<Buffer>(device, (shortPath + " | Indices").c_str(), indexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
+  indexBuffer = std::make_unique<Buffer>(device, (name + " | Indices").c_str(), indexBufferTemp.getSize(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
   commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(&indexBufferTemp, indexBuffer.get());
 
   device->executeCommandBufferImmediate(commandBuffer);
 }
 
-Mesh::InstanceReference Mesh::addInstance(const uint64_t materialID, glm::mat4 mat) {
-  Material* material = indexBuffer->device->getJSONObjectMaterial(materialID);
-  InstanceCollection& instanceCollection = instances[material];
-  InstanceReference instanceReference;
-  instanceReference.material = material;
-  instanceReference.modelInstanceID = instanceCollection.modelInstances.emplace(mat);
-  instanceReference.materialInstanceID = instanceCollection.materialInstances.emplace(material->id);
-  instanceReference.perInstanceDataID = instanceCollection.perInstanceData.emplace(mat);
-  instanceCollection.stale = true;
-  stale = true;
-  return instanceReference;
-}
+void Mesh::InstanceGroup::reserveInstanceCount(const std::size_t count, CommandBuffer& commandBuffer) {
+  if (reservedInstanceCount == count) return;
 
-void Mesh::removeInstance(InstanceReference&& instanceReference) {
-  const auto it = instances.find(instanceReference.material);
-  if (it == instances.end()) return;
-  InstanceCollection& instanceCollection = it->second;
-  instanceCollection.modelInstances.erase(instanceReference.modelInstanceID);
-  instanceCollection.materialInstances.erase(instanceReference.materialInstanceID);
-  instanceCollection.perInstanceData.erase(instanceReference.perInstanceDataID);
-  instanceCollection.stale = true;
-  stale = true;
-}
+  Buffer* oldMaterialInstanceBuffer;
+  Buffer* oldTransformInstanceBuffer;
 
-void Mesh::update(CommandBuffer& commandBuffer) {
-  if (!stale) return;
-  for (InstanceCollection& instanceCollection: instances | std::ranges::views::values) {
-    if (!instanceCollection.stale) continue;
-    if (instanceCollection.perInstanceData.empty()) {
-      instanceCollection.materialInstanceBuffer = nullptr;
-      instanceCollection.modelInstanceBuffer = nullptr;
-    } else {
-      if (const std::size_t materialSize = instanceCollection.materialInstances.size() * sizeof(decltype(InstanceCollection::materialInstances)::value_type); instanceCollection.materialInstanceBuffer == nullptr || instanceCollection.materialInstanceBuffer->getSize() != materialSize) {
-        // Re-build the buffers
-        const std::size_t modelSize = instanceCollection.modelInstances.size() * sizeof(decltype(InstanceCollection::modelInstances)::value_type);
-        instanceCollection.materialInstanceBuffer = nullptr;  // Make sure that the old buffer has been deleted before building the new one.
-        instanceCollection.modelInstanceBuffer = nullptr;
-        instanceCollection.materialInstanceBuffer = std::make_unique<Buffer>(device, "Mesh-Material Instance Buffer", materialSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
-        instanceCollection.modelInstanceBuffer = std::make_unique<Buffer>(device, "Mesh-Transform Instance Buffer", modelSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT);
-      } {  // Update the material buffer
-        auto* stagingBuffer = new StagingBuffer(device, "Mesh-Material Instance Staging Buffer", instanceCollection.materialInstanceBuffer->getSize());
-        const std::shared_ptr<Buffer::BufferMapping> map = stagingBuffer->map();
-        std::size_t i = std::numeric_limits<std::size_t>::max();
-        for (const float materialInstance: instanceCollection.materialInstances)
-          static_cast<float*>(map->data)[++i] = materialInstance;
-        commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(stagingBuffer, instanceCollection.materialInstanceBuffer.get());
-        commandBuffer.addCleanupResource(stagingBuffer);
-      } {  // Update the model buffer
-        auto* stagingBuffer = new StagingBuffer(device, "Mesh-Model Instance Staging Buffer", instanceCollection.modelInstanceBuffer->getSize());
-        const std::shared_ptr<Buffer::BufferMapping> map = stagingBuffer->map();
-        std::size_t i = std::numeric_limits<std::size_t>::max();
-        for (const glm::mat4& modelInstance: instanceCollection.modelInstances)
-          static_cast<glm::mat4*>(map->data)[++i] = modelInstance;
-        commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(stagingBuffer, instanceCollection.modelInstanceBuffer.get());
-        commandBuffer.addCleanupResource(stagingBuffer);
-      }
-    }
-    instanceCollection.stale = false;
+  if (reservedInstanceCount != 0) {
+    oldMaterialInstanceBuffer = materialInstanceBuffer.get();
+    oldTransformInstanceBuffer = transformInstanceBuffer.get();
+
+    commandBuffer.addCleanupResource(std::move(materialInstanceBuffer));
+    commandBuffer.addCleanupResource(std::move(transformInstanceBuffer));
   }
-  stale = false;
+
+  materialInstanceBuffer = std::make_unique<Buffer>(parent->device, (parent->name + " | Materials").c_str(), sizeof(Material::MaterialID) * count, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+  transformInstanceBuffer = std::make_unique<Buffer>(parent->device, (parent->name + " | Transforms").c_str(), sizeof(glm::mat4) * count, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_STRATEGY_MIN_MEMORY_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+
+  if (reservedInstanceCount != 0) {
+    commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(oldMaterialInstanceBuffer, materialInstanceBuffer.get());
+    commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(oldTransformInstanceBuffer, transformInstanceBuffer.get());
+  }
+
+  reservedInstanceCount = count;
 }
+
+Mesh::InstanceID Mesh::InstanceGroup::addInstance(const Material::MaterialID materialId, const glm::mat4& transform, CommandBuffer& commandBuffer) {
+  // Allocate the temporary buffer for transfer
+  auto tempBuffer = std::make_unique<Buffer>(parent->device, "Temporary transfer buffer", sizeof(Material::MaterialID) + sizeof(glm::mat4), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_STRATEGY_MIN_TIME_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+
+  // Copy the data into the temporary buffer
+  {
+    const std::shared_ptr<Buffer::BufferMapping> tempBufferMap = tempBuffer->map();
+    std::memcpy(tempBufferMap->data, &materialId, sizeof(Material::MaterialID));
+    std::memcpy(static_cast<char*>(tempBufferMap->data) + sizeof(Material::MaterialID), &transform, sizeof(glm::mat4));
+  }
+
+  // Copy the data from the temporary buffer into the instance buffers
+  VkBufferCopy copy {
+    .srcOffset = 0,
+    .dstOffset = instanceCount * sizeof(Material::MaterialID),
+    .size = sizeof(Material::MaterialID)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(tempBuffer.get(), materialInstanceBuffer.get(), std::span{&copy, 1});
+  copy = {
+    .srcOffset = sizeof(Material::MaterialID),
+    .dstOffset = instanceCount * sizeof(glm::mat4),
+    .size = sizeof(glm::mat4)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(tempBuffer.get(), transformInstanceBuffer.get(), std::span{&copy, 1});
+  commandBuffer.addCleanupResource(std::move(tempBuffer));
+
+  // Record this instance
+  const InstanceID instanceId = parent->instanceUuid;
+  instanceIds.push_back(instanceId);
+  // Update the parent mesh's instanceReferences
+  parent->instanceReferences[instanceId] = {
+    .material = material,
+    .index = instanceCount
+  };
+
+  // Increment the instance counters
+  ++instanceCount;
+  return parent->instanceUuid++;
+}
+
+void Mesh::InstanceGroup::removeInstance(const size_t index, CommandBuffer& commandBuffer) {
+  // Map the instance buffers, then copy the last instance data over the old instance data
+  VkBufferCopy copy {
+    .srcOffset = --instanceCount * sizeof(Material::MaterialID),
+    .dstOffset = index * sizeof(Material::MaterialID),
+    .size = sizeof(Material::MaterialID)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(materialInstanceBuffer.get(), materialInstanceBuffer.get(), std::span{&copy, 1});
+  copy = {
+    .srcOffset = instanceCount * sizeof(glm::mat4),
+    .dstOffset = index * sizeof(glm::mat4),
+    .size = sizeof(glm::mat4)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(transformInstanceBuffer.get(), transformInstanceBuffer.get(), std::span{&copy, 1});
+
+  // Get the old instance's ID
+  InstanceID& instanceId = instanceIds.at(index);
+  // Update the parent mesh's instanceReferences
+  parent->instanceReferences.erase(instanceId);
+  // Copy the last instance's ID over the old instance's ID
+  instanceId = instanceIds.at(instanceCount);
+  instanceIds.pop_back();
+}
+
+Mesh::InstanceGroup& Mesh::getInstanceGroup(Material* const material) {
+  const auto it = instanceGroups.find(material);
+  if (it != instanceGroups.end()) return it->second;
+  return instanceGroups.emplace(material, InstanceGroup{this, material, 1}).first->second;
+}
+
+Mesh::InstanceID Mesh::addInstance(Material* const material, const glm::mat4& transform, CommandBuffer& commandBuffer) {
+  InstanceGroup& group = getInstanceGroup(material);
+  if (group.instanceCount + 1 > group.reservedInstanceCount) {
+    const std::size_t startingPoint = std::max(group.reservedInstanceCount, 1UL);
+    group.reserveInstanceCount(startingPoint << 1, commandBuffer);
+  }
+  return group.addInstance(material->id, transform, commandBuffer);
+}
+
+void Mesh::removeInstance(const InstanceID id, CommandBuffer& commandBuffer) {
+  InstanceReference& reference = instanceReferences.at(id);
+  getInstanceGroup(reference.material).removeInstance(reference.index, commandBuffer);
+  instanceReferences.erase(id);
+}
+
+void Mesh::updateInstance(const InstanceID id, Material* material, CommandBuffer& commandBuffer) {
+  InstanceReference& reference = instanceReferences.at(id);
+  InstanceGroup& oldGroup = instanceGroups.at(reference.material);
+  InstanceGroup& newGroup = instanceGroups.try_emplace(material, this, material, 1).first->second;
+  if (newGroup.instanceCount + 1 > newGroup.reservedInstanceCount)
+    newGroup.reserveInstanceCount(newGroup.instanceCount * 2, commandBuffer);
+
+  // Copy the instance from the old group into the new group
+  VkBufferCopy copy {
+    .srcOffset = reference.index * sizeof(Material::MaterialID),
+    .dstOffset = newGroup.instanceCount * sizeof(Material::MaterialID),
+    .size = sizeof(Material::MaterialID)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(oldGroup.materialInstanceBuffer.get(), newGroup.materialInstanceBuffer.get(), std::span{&copy, 1});
+  copy = {
+    .srcOffset = reference.index * sizeof(glm::mat4),
+    .dstOffset = newGroup.instanceCount * sizeof(glm::mat4),
+    .size = sizeof(glm::mat4)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(oldGroup.transformInstanceBuffer.get(), newGroup.transformInstanceBuffer.get(), std::span{&copy, 1});
+  oldGroup.removeInstance(reference.index, commandBuffer);
+
+  // Update the mesh's instance references
+  reference.index = newGroup.instanceCount++;
+  reference.material = material;
+}
+
+void Mesh::updateInstance(InstanceID id, const glm::mat4& transform, CommandBuffer& commandBuffer) {
+  auto temp = std::make_unique<StagingBuffer>(device, std::format("Instance {} Transform Update Staging Buffer", id).c_str(), std::span{&transform, 1});
+
+  const InstanceReference& reference = instanceReferences.at(id);
+  const InstanceGroup& group = instanceGroups.at(reference.material);
+
+  VkBufferCopy copy {
+    .srcOffset = 0,
+    .dstOffset = reference.index * sizeof(glm::mat4),
+    .size = sizeof(glm::mat4)
+  };
+  commandBuffer.record<CommandBuffer::CopyBufferToBuffer>(temp.get(), group.transformInstanceBuffer.get(), std::span{&copy, 1});
+  commandBuffer.addCleanupResource(std::move(temp));
+}
+

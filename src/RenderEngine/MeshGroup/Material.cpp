@@ -1,18 +1,22 @@
 #include "Material.hpp"
 
 #include "src/RenderEngine/CommandBuffer.hpp"
+#include "src/RenderEngine/MeshGroup/Vertex.hpp"
+#include "src/RenderEngine/Pipeline/FragmentProcess.hpp"
+#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
 #include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Shader.hpp"
 
 #include "yyjson.h"
-#include "src/RenderEngine/MeshGroup/Vertex.hpp"
-#include "src/RenderEngine/Pipeline/Shader.hpp"
 
 #include <ranges>
 
 Material::Material(GraphicsDevice* device, yyjson_val* json) : device(device) {
-  static float globalID = 1.0f / static_cast<float>((1UL << 32U) - 1U);
+  // 1,056,964,609 different materials
+  static MaterialID globalID = std::numeric_limits<MaterialID>::min();
   id = globalID;
-  globalID += 1.0f / static_cast<float>((1UL << 32U) - 1U);
+  globalID = std::nextafter(globalID, 1.0f);
+
   name = yyjson_get_str(yyjson_obj_get(json, "name"));
   yyjson_val* val = yyjson_obj_get(json, "vertexProcess");
   vertexProcess = device->getJSONVertexProcess(yyjson_get_uint(val));

@@ -11,6 +11,7 @@ class GBufferRenderPass final : public RenderPass {
   struct PassData { glm::mat4 view_ViewProjectionMatrix; };
   std::unique_ptr<UniformBuffer<PassData>> uniformBuffer;
   FragmentProcess* fragmentProcessOverride;
+  std::unordered_map<Material*, Material*> materialRemap;
 
 public:
   explicit GBufferRenderPass(RenderGraph& graph);

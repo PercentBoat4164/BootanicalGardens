@@ -1,13 +1,10 @@
 #pragma once
 
 #include "src/RenderEngine/RenderGraph.hpp"
-#include "src/RenderEngine/Pipeline/FragmentProcess.hpp"
-#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
 
 #include <fastgltf/core.hpp>
 
 #include <map>
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -20,9 +17,13 @@ class Texture;
 class GraphicsDevice;
 class CommandBuffer;
 class DescriptorSetRequirer;
+struct VertexProcess;
+struct FragmentProcess;
 
 class Material {
 public:
+  using MaterialID = float;
+
   struct Binding {
     GraphicsDevice::ImageID id;
     VkDescriptorType type;
@@ -32,7 +33,7 @@ public:
 #endif
   };
 
-  float id;
+  MaterialID id;
 
   GraphicsDevice* device;
 

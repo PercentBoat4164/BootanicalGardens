@@ -79,7 +79,9 @@ public:
 
 private:
   std::deque<std::unique_ptr<Command>> commands;
-  plf::colony<Resource*> resources;
+  plf::colony<Resource*> rawResources;
+  plf::colony<std::shared_ptr<Resource>> sharedResources;
+  plf::colony<std::unique_ptr<Resource>> uniqueResources;
 
 public:
   using iterator = decltype(commands)::iterator;
@@ -125,7 +127,7 @@ public:
   };
 
   struct BindDescriptorSets final : Command {
-    explicit BindDescriptorSets(std::ranges::range auto&& descriptorSets, const uint32_t firstSet=0) :
+    explicit BindDescriptorSets(std::ranges::range auto&& descriptorSets, const std::uint32_t firstSet=0) :
         Command({}, StateChange),
         descriptorSets{std::ranges::to<std::vector>(descriptorSets)},
         firstSet(firstSet) {}
@@ -516,6 +518,8 @@ public:
     commands.emplace_back(std::move(command))->preprocess(state, flags);
   }
   void addCleanupResource(Resource* resource);
+  void addCleanupResource(const std::shared_ptr<Resource>& resource);
+  void addCleanupResource(std::unique_ptr<Resource>& resource);
 
   [[nodiscard]] std::string toString() const;
 

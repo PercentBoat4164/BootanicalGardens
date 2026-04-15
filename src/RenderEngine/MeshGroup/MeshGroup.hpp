@@ -7,12 +7,13 @@
 #include <yyjson.h>
 #include <plf_colony.h>
 
-struct MeshGroup : Component {
+class MeshGroup : public Component {
+public:
   GraphicsDevice* const device;
-  std::unordered_map<Mesh*, plf::colony<Mesh::InstanceReference>> meshes;
+  std::unordered_map<Mesh*, plf::colony<Mesh::InstanceID>> meshes;
 
   MeshGroup(std::uint64_t id, Entity& entity, GraphicsDevice* device, yyjson_val* val);
   ~MeshGroup() override;
 
-  void onTick() override;  // Move to an 'AnimationSystem'
+  void onTick() override {}
 };

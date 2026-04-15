@@ -41,6 +41,7 @@ public:
   std::unordered_map<std::uint64_t, Pipeline> pipelines;
   std::unordered_map<std::uint64_t, Material> overrideMaterials;
   std::unordered_map<std::uint64_t, Material> objectMaterials;
+  std::unordered_map<VertexProcess*, std::vector<Material*>> objectMaterialsByVertexProcess;
   std::unordered_map<std::uint64_t, Material> nonObjectMaterials;
   std::unordered_map<std::uint64_t, Mesh> meshes;
 
@@ -79,12 +80,12 @@ public:
 
   void update();
 
-  struct ImmediateExecutionContext {
+  struct CommandBufferExecutionContext {
     VkCommandBuffer commandBuffer;
     VkFence fence;
   };
 
-  [[nodiscard]] ImmediateExecutionContext executeCommandBufferAsync(const CommandBuffer& commandBuffer) const;
-  void waitForAsyncCommandBuffer(ImmediateExecutionContext context) const;
+  [[nodiscard]] CommandBufferExecutionContext executeCommandBufferAsync(const CommandBuffer& commandBuffer) const;
+  void waitForAsyncCommandBuffer(CommandBufferExecutionContext context) const;
   void executeCommandBufferImmediate(const CommandBuffer& commandBuffer) const;
 };

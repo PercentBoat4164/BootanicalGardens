@@ -489,10 +489,20 @@ void CommandBuffer::record(const Command& queuedCommand) {
     if (pipelineBarrier->memoryBarriers.empty() && pipelineBarrier->bufferMemoryBarriers.empty() && pipelineBarrier->imageMemoryBarriers.empty()) return;
     commands.emplace_back(std::move(pipelineBarrier))->preprocess(state, flags);
   }
+
+  /**@todo: Merge Copy*To* commands.*/
 }
 
 void CommandBuffer::addCleanupResource(Resource* resource) {
-  resources.insert(resource);
+  rawResources.insert(resource);
+}
+
+void CommandBuffer::addCleanupResource(const std::shared_ptr<Resource>& resource) {
+  sharedResources.insert(resource);
+}
+
+void CommandBuffer::addCleanupResource(std::unique_ptr<Resource>& resource) {
+  uniqueResources.insert(std::move(resource));
 }
 
 std::string CommandBuffer::toString() const {
@@ -509,11 +519,13 @@ void CommandBuffer::bake(VkCommandBuffer commandBuffer) const {
 }
 
 void CommandBuffer::clear() {
-  for (Resource* const& resource: resources) delete resource;
-  resources.clear();
+  for (Resource* const& resource: rawResources) delete resource;
+  rawResources.clear();
+  sharedResources.clear();
+  uniqueResources.clear();
   commands.clear();
 }
 
 CommandBuffer::~CommandBuffer() {
-  for (Resource* const& resource: resources) delete resource;
+  for (Resource* const& resource: rawResources) delete resource;
 }

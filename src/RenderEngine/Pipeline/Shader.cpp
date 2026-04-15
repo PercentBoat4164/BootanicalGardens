@@ -215,3 +215,4 @@ VkPipelineBindPoint Shader::getBindPoint() const { return bindPoint; }
 VkShaderModule Shader::getModule() const { return module; }
 std::string_view Shader::getEntryPoint() const { return entryPoint; }
 const spv_reflect::ShaderModule* Shader::getReflectedData() const { return &reflectionData; }
+bool Shader::usesDescriptorSet(const std::uint32_t set) const { return reflectionData.GetDescriptorSet(set) != nullptr; }

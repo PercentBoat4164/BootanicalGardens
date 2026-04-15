@@ -25,7 +25,6 @@ SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass::SubpixelMorphological
 
 void SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass::setup() {
   pipelines.clear();
-  materialRemap.clear();
 
   pipelines.emplace(material, nullptr);
 

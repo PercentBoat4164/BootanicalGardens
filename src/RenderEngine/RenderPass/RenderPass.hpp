@@ -19,7 +19,6 @@ protected:
   VkRenderPass renderPass{VK_NULL_HANDLE};
   std::unique_ptr<Framebuffer> framebuffer;
   std::unordered_map<Material*, Pipeline*> pipelines;
-  std::unordered_map<Material*, Material*> materialRemap;
   std::unordered_map<const Image*, VkImageLayout> imageLayoutsAfterExecution;
 
   template<typename L, typename R>

@@ -8,14 +8,21 @@
 #define VOLK_IMPLEMENTATION
 #include <volk/volk.h>
 #define VMA_IMPLEMENTATION
-#if !NDEBUG & BOOTANICAL_GARDENS_ENABLE_GPU_MEMORY_TRACING
+#if !NDEBUG
+  #define VMA_ASSERT(expr)                 \
+    if (!(expr)) {                           \
+      GraphicsInstance::showError("VMA Error: "#expr); \
+    }
+#if BOOTANICAL_GARDENS_ENABLE_GPU_MEMORY_TRACING
   /**@todo: Write a better debug log function once logging methods have been decided upon.*/
   #define VMA_DEBUG_LOG_FORMAT(format, ...)  \
-  do {                                       \
-    printf((format), __VA_ARGS__);           \
-    printf("\n");                            \
-  } while(false)
+    do {                                     \
+      printf((format), __VA_ARGS__);         \
+      printf("\n");                          \
+    } while(false)
 #endif
+#endif
+
 #include "src/Entity.hpp"
 
 #include <iostream>
@@ -114,6 +121,7 @@ void GraphicsInstance::destroy() {
 
 void GraphicsInstance::showError(const std::string& message) {
   if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", message.c_str(), nullptr)) std::cerr << "Error: " << message << std::endl;
+  std::cerr << cpptrace::generate_object_trace().resolve().to_string(true) << std::endl;
 }
 
 void GraphicsInstance::showSDLError() {

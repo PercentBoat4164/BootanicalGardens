@@ -26,6 +26,8 @@ class ShadeRenderPass : public RenderPass {
   VertexProcess* vertexProcessOverride;
   std::unique_ptr<Buffer> copyBuffer;
 
+  std::unordered_map<Material*, Material*> materialRemap;
+
 public:
   explicit ShadeRenderPass(RenderGraph& graph);
 

@@ -17,7 +17,7 @@ class Shader {
 
   std::filesystem::path sourcePath;
   std::vector<uint32_t> code;  /**@todo: Avoid keeping the shader code in memory.*/
-  VkShaderStageFlagBits stage{};
+  VkShaderStageFlagBits stage;
   VkPipelineBindPoint bindPoint{};
   VkShaderModule module{VK_NULL_HANDLE};
   std::string entryPoint;
@@ -37,4 +37,5 @@ public:
   [[nodiscard]] VkShaderModule getModule() const;
   [[nodiscard]] std::string_view getEntryPoint() const;
   [[nodiscard]] const spv_reflect::ShaderModule* getReflectedData() const;
+  [[nodiscard]] bool usesDescriptorSet(std::uint32_t set) const;
 };

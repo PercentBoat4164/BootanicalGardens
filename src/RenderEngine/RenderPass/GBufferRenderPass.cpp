@@ -2,14 +2,16 @@
 
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
-#include "src/RenderEngine/Pipeline/Pipeline.hpp"
-#include "src/RenderEngine/RenderGraph.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/MeshGroup/Material.hpp"
 #include "src/RenderEngine/MeshGroup/Mesh.hpp"
+#include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/Shader.hpp"
+#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
+#include "src/RenderEngine/RenderGraph.hpp"
 #include "src/RenderEngine/Resources/Buffer.hpp"
 #include "src/RenderEngine/Resources/Image.hpp"
 #include "src/RenderEngine/Resources/UniformBuffer.hpp"
-#include "src/RenderEngine/GraphicsInstance.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -55,12 +57,10 @@ GBufferRenderPass::GBufferRenderPass(RenderGraph& graph) : RenderPass(graph, Opa
 void GBufferRenderPass::setup() {
   pipelines.clear();
   materialRemap.clear();
-  for (const Mesh& mesh: graph.device->meshes | std::ranges::views::values) {
-    for (Material* material : mesh.instances | std::ranges::views::keys) {
-      Material* overriddenMaterial = material->getFragmentVariation(fragmentProcessOverride);
-      pipelines.emplace(overriddenMaterial, nullptr);
-      materialRemap.emplace(material, overriddenMaterial);
-    }
+  for (Material& material: graph.device->objectMaterials | std::ranges::views::values) {
+    Material* overriddenMaterial = material.getFragmentVariation(fragmentProcessOverride);
+    pipelines.emplace(overriddenMaterial, nullptr);
+    materialRemap.emplace(&material, overriddenMaterial);
   }
   RenderPass::setup(pipelines | std::ranges::views::keys);
 }
@@ -162,17 +162,43 @@ void GBufferRenderPass::update() {
 }
 
 void GBufferRenderPass::execute(CommandBuffer& commandBuffer) {
-  const std::uint64_t frameIndex = graph.getFrameIndex();
+const std::uint64_t frameIndex = graph.getFrameIndex();
+  VkDescriptorSet descriptorSet = getDescriptorSet(frameIndex);
   commandBuffer.record<CommandBuffer::BeginRenderPass>(this, clearValues);
-  for (const Mesh& mesh : graph.device->meshes | std::ranges::views::values) {
-    commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{mesh.positionsVertexBuffer.get(), mesh.textureCoordinatesVertexBuffer.get(), mesh.normalsVertexBuffer.get(), mesh.tangentsVertexBuffer.get()});
-    commandBuffer.record<CommandBuffer::BindIndexBuffer>(mesh.indexBuffer.get());
-    for (auto& [material, instanceData]: mesh.instances) {
-      const Pipeline* pipeline = pipelines.at(materialRemap.at(material));
-      commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
-      commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::array{getDescriptorSet(frameIndex)}, 1);
-      commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{instanceData.modelInstanceBuffer.get(), instanceData.materialInstanceBuffer.get()}, 4);
-      commandBuffer.record<CommandBuffer::DrawIndexed>(instanceData.perInstanceData.size());
+
+  // Iterate over materials, grouping them by their VertexProcess, and only binding the first pipeline but each descriptor set (if the VertexProcess uses per-material descriptor sets)
+  for (auto& [vertexProcess, materials] : graph.device->objectMaterialsByVertexProcess) {
+    const bool vertexShaderUsesMaterialData = vertexProcess->shader->usesDescriptorSet(2);
+    bool firstMaterialWithVertexProcess = true;
+    for (Material* material : materials) {
+      Pipeline* pipeline = pipelines.at(materialRemap.at(material));
+      auto pDescriptorSetsBegin = static_cast<VkDescriptorSet*>(alloca(sizeof(VkDescriptorSet) * 2));
+      VkDescriptorSet* pDescriptorSetsEnd = pDescriptorSetsBegin;
+      std::uint32_t firstSet = -1;
+      if (firstMaterialWithVertexProcess) {
+        commandBuffer.record<CommandBuffer::BindPipeline>(pipeline);
+        *pDescriptorSetsEnd = descriptorSet;
+        ++pDescriptorSetsEnd;
+        firstSet = 1;
+      }
+      if (vertexShaderUsesMaterialData) {
+        *pDescriptorSetsEnd = pipeline->getDescriptorSet(frameIndex);
+        ++pDescriptorSetsEnd;
+        if (firstSet == -1U) firstSet = 2;
+      }
+      if (firstSet != -1U) commandBuffer.record<CommandBuffer::BindDescriptorSets>(std::span{pDescriptorSetsBegin, pDescriptorSetsEnd}, firstSet);
+      firstMaterialWithVertexProcess = false;
+
+      // Draw all meshes that have this material.
+      for (const Mesh& mesh : graph.device->meshes | std::ranges::views::values) {
+        const auto it = mesh.instanceGroups.find(material);
+        if (it == mesh.instanceGroups.end()) continue;
+
+        const Mesh::InstanceGroup& group = it->second;
+        commandBuffer.record<CommandBuffer::BindVertexBuffers>(std::array{mesh.positionsVertexBuffer.get(), mesh.textureCoordinatesVertexBuffer.get(), mesh.normalsVertexBuffer.get(), mesh.tangentsVertexBuffer.get(), group.transformInstanceBuffer.get(), group.materialInstanceBuffer.get()});
+        commandBuffer.record<CommandBuffer::BindIndexBuffer>(mesh.indexBuffer.get());
+        commandBuffer.record<CommandBuffer::DrawIndexed>(group.instanceCount);
+      }
     }
   }
   commandBuffer.record<CommandBuffer::EndRenderPass>();

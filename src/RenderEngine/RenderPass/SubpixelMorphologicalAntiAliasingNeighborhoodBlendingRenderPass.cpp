@@ -26,7 +26,6 @@ SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass::SubpixelMorphol
 
 void SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass::setup() {
   pipelines.clear();
-  materialRemap.clear();
 
   pipelines.emplace(material, nullptr);
 

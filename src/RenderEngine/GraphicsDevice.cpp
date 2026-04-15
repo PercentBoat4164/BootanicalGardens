@@ -4,6 +4,8 @@
 #include "src/RenderEngine/CommandBuffer.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
 #include "src/RenderEngine/Pipeline/Pipeline.hpp"
+#include "src/RenderEngine/Pipeline/FragmentProcess.hpp"
+#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
 #include "src/RenderEngine/Pipeline/Shader.hpp"
 #include "src/RenderEngine/MeshGroup/Texture.hpp"
 #include "src/Tools/Hashing.hpp"
@@ -126,6 +128,8 @@ GraphicsDevice::~GraphicsDevice() {
   pipelines.clear();
   overrideMaterials.clear();
   objectMaterials.clear();
+  objectMaterialsByVertexProcess.clear();
+  nonObjectMaterials.clear();
   meshes.clear();
   vkDestroyCommandPool(device, commandPool, nullptr);
   descriptorSetAllocator.destroy();
@@ -224,7 +228,9 @@ Material* GraphicsDevice::getMaterial(const std::uint64_t id, const Material* ma
 Material* GraphicsDevice::getJSONObjectMaterial(const std::uint64_t id) {
   if (id >= JSONMaterialArrayCount) return nullptr;
   if (const auto it = objectMaterials.find(id); it != objectMaterials.end()) return &it->second;
-  return &objectMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id)}).first->second;
+  Material& material = objectMaterials.emplace(std::piecewise_construct, std::tuple{id}, std::tuple{this, yyjson_arr_get(JSONMaterialArray, id)}).first->second;
+  objectMaterialsByVertexProcess[material.vertexProcess].push_back(&material);
+  return &material;
 }
 
 Material* GraphicsDevice::getJSONNonObjectMaterial(std::uint64_t id) {
@@ -240,12 +246,12 @@ Mesh* GraphicsDevice::getJSONMesh(const std::uint64_t id) {
 }
 
 void GraphicsDevice::update() {
-  CommandBuffer commandBuffer;
-  for (Mesh& mesh: meshes | std::ranges::views::values) mesh.update(commandBuffer);
-  if (!commandBuffer.empty()) executeCommandBufferImmediate(commandBuffer);
+  // CommandBuffer commandBuffer;
+  // for (Mesh& mesh: meshes | std::ranges::views::values) mesh.update(commandBuffer);
+  // if (!commandBuffer.empty()) executeCommandBufferImmediate(commandBuffer);
 }
 
-GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferAsync(const CommandBuffer& commandBuffer) const {
+GraphicsDevice::CommandBufferExecutionContext GraphicsDevice::executeCommandBufferAsync(const CommandBuffer& commandBuffer) const {
   const VkCommandBufferAllocateInfo allocateInfo{
       .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext              = nullptr,
@@ -284,10 +290,13 @@ GraphicsDevice::ImmediateExecutionContext GraphicsDevice::executeCommandBufferAs
   VkFence fence;
   if (const VkResult result = vkCreateFence(device, &fenceCreateInfo, nullptr, &fence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to create VkFence");
   if (const VkResult result = vkQueueSubmit(globalQueue, 1, &submitInfo, fence); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed VkQueue submission");
-  return {vkCmdBuf, fence};
+  return {
+    .commandBuffer = vkCmdBuf,
+    .fence = fence
+  };
 }
 
-void GraphicsDevice::waitForAsyncCommandBuffer(const ImmediateExecutionContext context) const {
+void GraphicsDevice::waitForAsyncCommandBuffer(const CommandBufferExecutionContext context) const {
   if (const VkResult result = vkWaitForFences(device, 1, &context.fence, VK_TRUE, -1ULL); result != VK_SUCCESS) GraphicsInstance::showError(result, "failed to wait for VkFence");
   vkFreeCommandBuffers(device, commandPool, 1, &context.commandBuffer);
   vkDestroyFence(device, context.fence, nullptr);

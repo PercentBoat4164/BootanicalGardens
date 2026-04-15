@@ -1,14 +1,12 @@
 #include "Pipeline.hpp"
 
 #include "../Resources/UniformBuffer.hpp"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "src/RenderEngine/GraphicsInstance.hpp"
-#include "src/RenderEngine/RenderPass/RenderPass.hpp"
-#include "src/RenderEngine/MeshGroup/Material.hpp"
-#include "src/RenderEngine/MeshGroup/Texture.hpp"
-#include "src/RenderEngine/MeshGroup/Vertex.hpp"
 #include "Shader.hpp"
+#include "src/RenderEngine/GraphicsInstance.hpp"
+#include "src/RenderEngine/MeshGroup/Material.hpp"
+#include "src/RenderEngine/Pipeline/FragmentProcess.hpp"
+#include "src/RenderEngine/Pipeline/VertexProcess.hpp"
+#include "src/RenderEngine/RenderPass/RenderPass.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <volk/volk.h>

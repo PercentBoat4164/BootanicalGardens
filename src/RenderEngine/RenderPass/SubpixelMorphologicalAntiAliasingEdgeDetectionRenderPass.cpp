@@ -25,7 +25,6 @@ SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass::SubpixelMorphologicalA
 
 void SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass::setup() {
   pipelines.clear();
-  materialRemap.clear();
 
   pipelines.emplace(material, nullptr);
 

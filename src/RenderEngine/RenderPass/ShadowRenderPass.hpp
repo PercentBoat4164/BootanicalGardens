@@ -11,9 +11,10 @@ class ShadowRenderPass : public RenderPass {
     glm::mat4 light_ViewProjectionMatrix;
   };
   std::unique_ptr<UniformBuffer<PassData>> passData;
+  std::shared_ptr<Image> shadowMap;
 
   FragmentProcess* fragmentProcessOverride;
-  std::shared_ptr<Image> shadowMap;
+  std::unordered_map<Material*, Material*> materialRemap;
 
 public:
   explicit ShadowRenderPass(RenderGraph& graph);
