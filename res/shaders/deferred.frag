@@ -45,9 +45,9 @@ void main() {
      * Compute the world space position of the sample *
      **************************************************/
     float reverseDepth = subpassLoad(gBufferDepth).x;  // Fetch the depth value from the reversed Z-buffer.
-    const vec3 screenSpacePosition = vec3(gl_FragCoord.xy / viewData.resolution, reverseDepth);  // Builds the position of this sample in screen space. ([0, 1], [0, 1], [0, 1])
-    const vec3 clipSpacePosition = vec3(screenSpacePosition.xy * 2.0 - 1.0, screenSpacePosition.z);  // Transforms from screen space into clip space. ([-1, 1], [-1, 1], [0, 1])
-    const vec4 worldSpacePosition = viewData.inverseViewProjectionMatrix * vec4(clipSpacePosition, 1.0);  // Transform from clip space into world space.
+    vec2 screenSpacePosition = vec2(gl_FragCoord.xy / viewData.resolution);  // Builds the position of this sample in screen space. ([0, 1], [0, 1], [0, 1])
+    vec2 clipSpacePosition = vec2(screenSpacePosition.xy * 2.0 - 1.0);  // Transforms from screen space into clip space. ([-1, 1], [-1, 1], [0, 1])
+    vec4 worldSpacePosition = viewData.inverseViewProjectionMatrix * vec4(clipSpacePosition, reverseDepth, 1.0);  // Transform from clip space into world space.
 
     /**************************
      * Compute the TBN matrix *
@@ -65,10 +65,13 @@ void main() {
     const vec3 tangentSpaceFragmentPosition = TBN * worldSpacePosition.xyz;
     const vec3 tangentSpaceViewDirection = normalize(tangentSpaceViewPosition - tangentSpaceFragmentPosition);
 #if PARALLAX_MAPPING == 0
-    textureCoordinates = parallaxMapping(tangentSpaceViewDirection, textureCoordinates, displacement, 0.05);
+    const vec3 parallaxAdjusted = parallaxMapping(tangentSpaceViewDirection, textureCoordinates, displacement, 0.05);
 #elif PARALLAX_MAPPING == 1
-    textureCoordinates = parallaxMapping(tangentSpaceViewDirection, textureCoordinates, displacement, 0.15, 8, 32);
+    const vec3 parallaxAdjusted = parallaxMapping(tangentSpaceViewDirection, textureCoordinates, displacement, 0.1, 8, 32);
 #endif
+    textureCoordinates = parallaxAdjusted.xy;
+    reverseDepth += parallaxAdjusted.z;
+    worldSpacePosition = viewData.inverseViewProjectionMatrix * vec4(clipSpacePosition, reverseDepth, 1.0);
 #endif
 
     /**************************************************************************************************************
