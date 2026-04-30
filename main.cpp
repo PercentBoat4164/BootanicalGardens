@@ -23,8 +23,6 @@ int main() {
   {
     GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
-    Entity::registerComponentConstructor("MeshGroup", [&graphicsDevice](std::uint64_t id, Entity& entity, yyjson_val* json){ return std::make_shared<MeshGroup>(id, entity, &graphicsDevice, json); });
-
     // Declare the window
     Window window{&graphicsDevice};
 
@@ -38,7 +36,7 @@ int main() {
     // renderGraph.insert<SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass>();
     // renderGraph.insert<SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass>();
 
-    LevelParser::loadLevel("../res/levels/Level1.json");
+    //LevelParser::loadLevel("../res/levels/Level1.json");
 
     renderGraph.bake();
 

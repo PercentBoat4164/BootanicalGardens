@@ -5,14 +5,31 @@
 #include "src/Component.hpp"
 
 #include <yyjson.h>
-#include <plf_colony.h>
+#include <vector>
 
-struct MeshGroup : Component {
-  GraphicsDevice* const device;
-  std::unordered_map<Mesh*, plf::colony<Mesh::InstanceReference>> meshes;
+struct MeshGroup {
+  GraphicsDevice* device;
+  std::unordered_map<Mesh*, std::vector<Mesh::InstanceReference>> meshes;
 
-  MeshGroup(std::uint64_t id, Entity& entity, GraphicsDevice* device, yyjson_val* val);
-  ~MeshGroup() override;
+  MeshGroup(GraphicsDevice* device, yyjson_val* val) noexcept;
+  MeshGroup(MeshGroup&& other) noexcept : device(other.device), meshes(std::move(other.meshes)) {}
 
-  void onTick() override;  // Move to an 'AnimationSystem'
+  MeshGroup& operator=(MeshGroup&& other) noexcept {
+    device = other.device;
+    meshes = std::move(other.meshes);
+    return *this;
+  }
 };
+
+#include "src/EntityComponentSystem/AoSColumn.hpp"
+
+using MeshGroupColumn = AoSColumn<1514, MeshGroup>;
+
+void foo(GraphicsDevice* device, const std::vector<yyjson_val*>& val) {
+  std::vector<MeshGroup> groups;
+  groups.reserve(val.size());
+  for (yyjson_val* currVal : val) {
+    groups.emplace_back(device, currVal);
+  }
+  auto yay = std::make_unique<MeshGroupColumn>(std::move(groups));
+}
