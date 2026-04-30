@@ -25,11 +25,4 @@ struct MeshGroup {
 
 using MeshGroupColumn = AoSColumn<1514, MeshGroup>;
 
-void foo(GraphicsDevice* device, const std::vector<yyjson_val*>& val) {
-  std::vector<MeshGroup> groups;
-  groups.reserve(val.size());
-  for (yyjson_val* currVal : val) {
-    groups.emplace_back(device, currVal);
-  }
-  auto yay = std::make_unique<MeshGroupColumn>(std::move(groups));
-}
+void foo(GraphicsDevice* device, const std::vector<yyjson_val*>& val);

@@ -37,10 +37,10 @@ public:
         AoSColumn result;
         // go through backwards so that the order of elements not removed is preserved
         for (size_t i = start + size; i-- > start;) {
-            result.emplace_back(std::move((*this)[i]));
+            result.emplace_back(std::move(this->at(i)));
             this->remove(i);
         }
-        std::unique_ptr<ComponentColumn> out = std::make_unique<AoSColumn>(result);
+        std::unique_ptr<ComponentColumn> out = std::make_unique<AoSColumn>(std::move(result));
         return out;
     }
 

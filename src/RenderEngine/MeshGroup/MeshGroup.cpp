@@ -15,3 +15,12 @@ MeshGroup::MeshGroup(GraphicsDevice* const device, yyjson_val* val) noexcept : d
     meshes[mesh].emplace_back(mesh->addInstance(yyjson_get_uint(yyjson_arr_get(materialsArray, i)), Tools::jsonGet<glm::mat4>(yyjson_arr_get(transformationsArray, i))));
   }
 }
+
+void foo(GraphicsDevice* device, const std::vector<yyjson_val*>& val) {
+  std::vector<MeshGroup> groups;
+  groups.reserve(val.size());
+  for (yyjson_val* currVal: val) {
+    groups.emplace_back(device, currVal);
+  }
+  auto yay = std::make_unique<MeshGroupColumn>(std::move(groups));
+}
