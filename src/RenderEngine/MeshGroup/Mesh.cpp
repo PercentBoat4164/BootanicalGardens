@@ -218,7 +218,7 @@ Mesh::InstanceGroup& Mesh::getInstanceGroup(Material* const material) {
 Mesh::InstanceID Mesh::addInstance(Material* const material, const glm::mat4& transform, CommandBuffer& commandBuffer) {
   InstanceGroup& group = getInstanceGroup(material);
   if (group.instanceCount + 1 > group.reservedInstanceCount) {
-    const std::size_t startingPoint = std::max(group.reservedInstanceCount, 1UL);
+    const std::size_t startingPoint = std::max(group.reservedInstanceCount, static_cast<std::size_t>(1));
     group.reserveInstanceCount(startingPoint << 1, commandBuffer);
   }
   return group.addInstance(material->id, transform, commandBuffer);
