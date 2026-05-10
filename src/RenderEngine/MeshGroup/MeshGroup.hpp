@@ -20,9 +20,3 @@ struct MeshGroup {
     return *this;
   }
 };
-
-#include "src/EntityComponentSystem/AoSColumn.hpp"
-
-using MeshGroupColumn = AoSColumn<1514, MeshGroup>;
-
-void foo(GraphicsDevice* device, const std::vector<yyjson_val*>& val);

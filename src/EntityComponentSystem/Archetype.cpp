@@ -15,7 +15,7 @@ Archetype::EntityRecord Archetype::addEntity(std::vector<std::unique_ptr<Compone
     EntityId entityId) {
     for (int i = 0; i < entityComponents.size(); i++) {
         if (componentIds.contains(entityComponents.at(i)->getId())) {
-            componentTable[i]->add(entityComponents.at(i).get());
+            componentTable[i]->add(std::move(entityComponents.at(i)));
         }
     }
     entityIds.push_back(entityId);
@@ -26,7 +26,7 @@ std::vector<Archetype::EntityRecord> Archetype::addEntities(
     std::vector<std::unique_ptr<ComponentColumn>> &&entityComponents, const std::vector<EntityId> &entityId) {
     for (int i = 0; i < entityComponents.size(); i++) {
         if (componentIds.contains(entityComponents.at(i)->getId())) {
-            componentTable[i]->add(entityComponents.at(i).get());
+            componentTable[i]->add(std::move(entityComponents.at(i)));
         }
     }
     std::vector<EntityRecord> entityRecords;

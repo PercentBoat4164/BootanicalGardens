@@ -5,7 +5,11 @@
 #include "ComponentColumn.hpp"
 
 /**
- * A component is a specific set of data assigned to an entity
+ * An SoAColumn is a component comprised of a tuple of equal-sized vectors. This is less flexible than AoS components,
+ * but enables SIMD functionality.
+ *
+ * To create an SoAColumn, std::make_unique<SoAColumn<ComponentId, T...>>(std::move(tuple<vector<T>...>)). This pointer
+ * should be moved into an archetype and handed to the ECSRegistry for efficient access.
  *
  * @tparam T type of the data
  */
@@ -62,7 +66,7 @@ public:
         return std::get<0>(*this).size();
     }
 
-    void add(ComponentColumn* item) override {
+    void add(std::unique_ptr<ComponentColumn> item) override {
         pushTuple(*static_cast<SoAColumn*>(item));
     }
 

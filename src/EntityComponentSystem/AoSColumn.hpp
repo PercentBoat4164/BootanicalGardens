@@ -26,9 +26,10 @@ public:
      * @todo maybe add emplace(T...) to avoid creating and copying new column
      * @param column
      */
-    void add(ComponentColumn* column) override {
+    void add(std::unique_ptr<ComponentColumn> column) override {
         this->reserve(this->size() + column->getLength());
-        for (auto& i : *static_cast<AoSColumn*>(column)) {
+        AoSColumn downCastedColumn = std::move(*static_cast<AoSColumn*>(column.release()));
+        for (auto& i : downCastedColumn) {
             this->emplace_back(std::move(i));
         }
     }

@@ -23,7 +23,7 @@ public:
      *
      * @param column the items to be appended to this component column
      */
-    virtual void add(ComponentColumn* column) = 0;
+    virtual void add(std::unique_ptr<ComponentColumn> column) = 0;
 
     virtual std::unique_ptr<ComponentColumn> getRange(size_t start, size_t size) = 0;
 

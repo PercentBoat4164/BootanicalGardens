@@ -15,7 +15,7 @@ using EntityType = std::set<ComponentId>;
 
 /**
  * A table holding data for all entities of a specific EntityType. Each row represents an entity, and each column is a
- * specific component of that entity.
+ * specific component of entities in this table.
  */
 class Archetype {
 public:

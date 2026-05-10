@@ -10,12 +10,8 @@
   ],
   "components": {
     "0": [  //position
-      {
-        "vector": [0, 0, 0]
-      },
-      {
-        "vector": [1, 0, 0]
-      }
+      [0, 0, 0],
+      [1, 0, 0]
     ],
     "1": [  //meshgroup
       {

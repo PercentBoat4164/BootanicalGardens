@@ -12,6 +12,7 @@
 #include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.hpp"
 #include "src/RenderEngine/Window.hpp"
+#include "src/EntityComponentSystem/JsonParser.hpp"
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
@@ -36,6 +37,9 @@ int main() {
     // renderGraph.insert<SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass>();
     // renderGraph.insert<SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass>();
 
+    ECSRegistry ecs{};
+    JsonParser parser(graphicsDevice);
+    parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
     //LevelParser::loadLevel("../res/levels/Level1.json");
 
     renderGraph.bake();
