@@ -2,8 +2,6 @@
 
 #include "Mesh.hpp"
 
-#include "src/Component.hpp"
-
 #include <yyjson.h>
 #include <vector>
 

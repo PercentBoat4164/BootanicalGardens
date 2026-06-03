@@ -1,5 +1,5 @@
+#include "src/EntityComponentSystem/Components.hpp"
 #include "src/Game/Game.hpp"
-#include "src/Game/LevelParser.hpp"
 #include "src/InputEngine/Input.hpp"
 #include "src/RenderEngine/GraphicsDevice.hpp"
 #include "src/RenderEngine/GraphicsInstance.hpp"
@@ -41,6 +41,8 @@ int main() {
     JsonParser parser(graphicsDevice);
     parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
     //LevelParser::loadLevel("../res/levels/Level1.json");
+
+    Components::MeshGroupComponent *helmet = static_cast<Components::MeshGroupComponent*>(ecs.getComponent(0, Components::MeshGroupComponent::ID));
 
     renderGraph.bake();
 

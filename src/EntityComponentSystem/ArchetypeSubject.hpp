@@ -1,8 +1,12 @@
 #pragma once
-#include <vector>
 
 #include "Archetype.hpp"
 
+#include <vector>
+#include <functional>
+
+//todo: switch to more robust (std::function?)
+//using ECSUpdateCallBack2 = std::function<void (const EntityType &, const bool)>;
 typedef void (*ECSUpdateCallback)(const EntityType &, const bool); // a function called when the archetypeMap is updated
 
 /**

@@ -14,14 +14,16 @@
 class ECSRegistry
 {
     ArchetypeSubject archetypeSubject; // updates systems when the ArchetypeMap changes
-    std::uint32_t archetypeCount = 0;
-    std::uint32_t componentCount = 0;
+    std::size_t archetypeCount = 0;
+    std::size_t componentCount = 0;
     EntityId entityCount = 0;
 
     EntityId registerEntityFromArchetype(Archetype* archetype, const size_t row) {
         entityRecords.insert({entityCount, Archetype::EntityRecord{archetype, row}});
         return entityCount++;
     }
+
+    std::vector<Archetype*> getArchetypesContaining(const EntityType& entityType);
 
 public:
     /**
@@ -32,7 +34,7 @@ public:
      * all entities to be added must have an ID and the indices of entitiIds must match those of components.
      * @param expectedSize the expected number of entities in the archetype
      */
-    Archetype* registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components, const std::uint32_t expectedSize = 0, std::vector<EntityId> entityIds = {});
+    Archetype* registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components, const std::size_t expectedSize = 0, std::vector<EntityId> entityIds = {});
 
     using ArchetypeMap = std::unordered_map<Archetype*, size_t>; // used to get whether and in which row a component is stored by an archetype
     std::unordered_map<ComponentId, ArchetypeMap> componentIndex; // used to get all archetype locations of a given component
@@ -56,18 +58,30 @@ public:
     ComponentColumn* getComponent(EntityId entity, ComponentId component);
 
     /**
-     * Get the ComponentColumn for a given entity type.
+     * Get the ComponentColumn for a given EntityType.
      *
      * @return The component of a specific archetype
      */
     ComponentColumn* getComponent(const EntityType& entityType, ComponentId component);
 
     /**
-     * Gets all the ComponentColumns (and therefore all entity data) of the given EntityType
+     * Gets all the ComponentColumns (and therefore all entity data) of a given Archetype.
+     *
+     * @param entityType the EntityType to be gotten
      *
      * @return The components of a specific archetype
      */
-    std::vector<std::unique_ptr<ComponentColumn>>* getComponents(const EntityType& entityType);
+    std::vector<std::unique_ptr<ComponentColumn>>* getArchetype(const EntityType& entityType);
+
+    /**
+     * Gets all ComponentColumns holding entities with the given EntityType. The outer vector is by component type, and
+     * the inner vector is by Archetype.
+     *
+     * @param entityType ComponentIds of components to be gotten
+     *
+     * @return a table of pointers to ComponentColumns separated by ComponentId and Archetype
+     */
+    std::vector<std::vector<ComponentColumn*>> getComponents(const EntityType& entityType);
 
     /**
      * Registers entities of a single entityType, giving them ids and placing them into an archetype.
@@ -94,9 +108,17 @@ public:
     /**
      * Gets the IDs of every entity of a specific type
      *
-     * @param entityType the types of components stored by this entity
+     * @param entityType the types of components stored by these entities
      */
-    std::vector<EntityId> getEntityIds(const EntityType& entityType);
+    std::vector<EntityId> getEntitiesOfType(const EntityType& entityType);
+
+    /**
+     * Gets the IDs of every entity that contains the given components. Using this extensively is generally less
+     * efficient than getting ComponentColumns.
+     *
+     * @param entityType the non-exclusive types of components stored by these entities
+     */
+    std::vector<EntityId> getEntitiesWith(const EntityType& entityType);
 
     /**
      * Add a listener to update whenever the ArchetypeMap is updated. This can keep systems' entity info up to date in
@@ -120,7 +142,7 @@ public:
      * @param component The component to be added. Should include data for the entity being modified
      * @param expectedSize The number of elements to preallocate for the new archetype, if created
      */
-    void addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component, const std::uint32_t expectedSize = 1);
+    void addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component, const std::size_t expectedSize = 1);
 
     /**
      * Remove a specific component to an Entity. Moves the Entity to another Archetype, creating a new one if needed.
@@ -129,5 +151,5 @@ public:
      * @param component The component to be removed.
      * @param expectedSize The number of elements to preallocate for the new archetype, if created
      */
-    void removeComponent(const EntityId& entity, ComponentId component, const std::uint32_t expectedSize = 1);
+    void removeComponent(const EntityId& entity, ComponentId component, const std::size_t expectedSize = 1);
 };

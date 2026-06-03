@@ -2,10 +2,22 @@
 
 #include "ECSRegistry.hpp"
 
-Archetype * ECSRegistry::registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components,
-    const std::uint32_t expectedSize, std::vector<EntityId> entityIds) {
+#include <algorithm>
 
-    //std::vector<EntityId> entities(components.front()->getLength());
+std::vector<Archetype*> ECSRegistry::getArchetypesContaining(const EntityType& entityType) {
+    const ComponentId firstComponent = *entityType.begin();
+    const auto archetypes = componentIndex.find(firstComponent);
+    if (archetypes == componentIndex.end()) return {};
+    std::vector<Archetype*> result{};
+    for (const auto& [archetype, componentRow] : archetypes->second) {
+        if (std::ranges::includes(archetype->componentIds.begin(), archetype->componentIds.end(), entityType.begin(), entityType.end())) {
+            result.push_back(archetype);
+        }
+    }
+    return result;
+}
+
+Archetype * ECSRegistry::registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components, const std::size_t expectedSize, std::vector<EntityId> entityIds) {
     std::set<ComponentId> ids;
     for (const auto& component : components) {
         ids.insert(component->getId());
@@ -75,14 +87,29 @@ ComponentColumn * ECSRegistry::getComponent(const EntityType &entityType, Compon
     return &*archetype->second.componentTable[componentRow->second];
 }
 
-std::vector<std::unique_ptr<ComponentColumn>> * ECSRegistry::getComponents(const EntityType &entityType) {
+std::vector<std::unique_ptr<ComponentColumn>> * ECSRegistry::getArchetype(const EntityType &entityType) {
     const auto archetype = archetypeIndex.find(entityType);
     if (archetype == archetypeIndex.end()) return nullptr;
     return &archetype->second.componentTable;
 }
 
-void ECSRegistry::registerEntities(const EntityType &entityType,
-    std::vector<std::unique_ptr<ComponentColumn>> componentData) {
+// todo: consider way to make iterating over ComponentColumns of the same type easier
+std::vector<std::vector<ComponentColumn *>> ECSRegistry::getComponents(const EntityType &entityType) {
+    std::vector<Archetype*> archetypes = getArchetypesContaining(entityType); // get all archetypes containing the given components
+    std::vector<std::vector<ComponentColumn *>> result(entityType.size(), std::vector<ComponentColumn *>(archetypes.size()));
+    // for each archetype containing the desired ComponentColumns...
+    for (size_t archetype_i = 0; archetype_i < archetypes.size(); archetype_i++) {
+        // find the address of the given components within the archetype and append them to the result table
+        auto curComponentId = entityType.begin();
+        for (size_t j = 0; j < entityType.size(); j++) {
+            result[j][archetype_i] = archetypes[archetype_i]->getComponent(*curComponentId);
+            ++curComponentId;
+        }
+    }
+    return result;
+}
+
+void ECSRegistry::registerEntities(const EntityType &entityType, std::vector<std::unique_ptr<ComponentColumn>> componentData) {
     const auto archetypeIt = archetypeIndex.find(entityType);
 
     // if no archetype exists, create it
@@ -138,11 +165,26 @@ void ECSRegistry::deleteArchetype(EntityType type) {
     archetypeSubject.update(type, false);
 }
 
-std::vector<EntityId> ECSRegistry::getEntityIds(const EntityType &entityType) {
+std::vector<EntityId> ECSRegistry::getEntitiesOfType(const EntityType &entityType) {
     // find the correct archetype
     const auto archetype = archetypeIndex.find(entityType);
     if (archetype == archetypeIndex.end()) return {};
     return archetype->second.entityIds;
+}
+
+//todo: may be optimized by removing check for firstComponent
+std::vector<EntityId> ECSRegistry::getEntitiesWith(const EntityType& entityType) {
+    const ComponentId firstComponent = *entityType.begin();
+    const auto archetypes = componentIndex.find(firstComponent);
+    if (archetypes == componentIndex.end()) return {};
+    std::vector<EntityId> result;
+    result.reserve(archetypes->second.size());
+    for (const auto& [archetype, componentRow] : archetypes->second) {
+        if (std::ranges::includes(archetype->componentIds.begin(), archetype->componentIds.end(), entityType.begin(), entityType.end())) {
+            result.append_range(archetype->entityIds);
+        }
+    }
+    return result;
 }
 
 void ECSRegistry::addArchetypeListener(const ECSUpdateCallback updateFunction) {
@@ -153,20 +195,15 @@ void ECSRegistry::removeArchetypeListener(ECSUpdateCallback updateFunction) {
     archetypeSubject.removeListener(updateFunction);
 }
 
-void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component,
-    const std::uint32_t expectedSize) {
+void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component, const std::size_t expectedSize) {
     // get the source archetype
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return; // if the given entity doesn't exist, do nothing
     Archetype* archetype = entityRecord->second.archetype; // initially the source archetype, then reassigned to the target archetype when found
     assert(!archetype->componentIds.contains(component->getId())); // ensure we are not adding an already existing component
 
-    // create a buffer for the entity data
-    std::vector<std::unique_ptr<ComponentColumn>> entityBuf; // buffer for data to be moved to the target archetype
-    entityBuf.reserve(archetype->componentIds.size() + 1);
-
-    // get the entity data from the source archetype
-    entityBuf = archetype->pullEntity(entityRecord->second);
+    // get a buffer of the entity data from the source archetype
+    std::vector<std::unique_ptr<ComponentColumn>> entityBuf = archetype->pullEntity(entityRecord->second);
 
     // attempt to find the target archetype using the edge and add the entity to it
     if (archetype->getEdge(component->getId()) != nullptr) {
@@ -190,24 +227,20 @@ void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentC
     entityRecord->second.archetype->addEdge(archetype, component->getId());
 }
 
-void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component, const std::uint32_t expectedSize) {
+void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component, const std::size_t expectedSize) {
     // get the source archetype
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return; // if the given entity doesn't exist, do nothing
     Archetype* archetype = entityRecord->second.archetype; // initially the source archetype, then reassigned to the target archetype when found
     assert(archetype->componentIds.contains(component)); // ensure we are not removing a component that doesn't exist
 
-    // create a buffer for the entity data
-    std::vector<std::unique_ptr<ComponentColumn>> entityBuf; // buffer for data to be moved to the target archetype
-    entityBuf.reserve(archetype->componentIds.size());
-
-    // get the entity data from the source archetype.
-    entityBuf = std::move(archetype->pullEntity(entityRecord->second));
+    // get a buffer of the entity data from the source archetype
+    std::vector<std::unique_ptr<ComponentColumn>> entityBuf = std::move(archetype->pullEntity(entityRecord->second));
 
     // attempt to find the target archetype using the edge and add the entity to it
     if (archetype->getEdge(component) != nullptr) {
         archetype = archetype->getEdge(component);
-        archetype->addEntity(std::move(entityBuf), entity);
+        entityRecords[entity] = archetype->addEntity(std::move(entityBuf), entity);
         return;
     }
 
@@ -218,7 +251,7 @@ void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component,
     if (it != archetypeIndex.end()) {
         entityRecord->second.archetype->addEdge(&it->second, component);
         archetype = &it->second;
-        archetype->addEntity(std::move(entityBuf), entity);
+        entityRecords[entity] = archetype->addEntity(std::move(entityBuf), entity);
         return;
     }
 

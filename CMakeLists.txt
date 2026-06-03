@@ -36,12 +36,7 @@ set(OPENEXR_IS_SUBPROJECT ON)
 CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.4")
 
 add_executable(BootanicalGardens
-        src/Component.cpp
-        src/Entity.cpp
-        src/Game/Components/Plant.cpp
-        src/Game/Components/PlayerController.cpp
         src/Game/Game.cpp
-        src/Game/LevelParser.cpp
         src/InputEngine/Input.cpp
         src/RenderEngine/CommandBuffer.cpp
         src/RenderEngine/DescriptorSetAllocator.cpp
@@ -81,6 +76,8 @@ add_executable(BootanicalGardens
         src/EntityComponentSystem/ECSRegistry.cpp
         src/EntityComponentSystem/SoAColumn.cpp
         src/EntityComponentSystem/JsonParser.cpp
+        src/EntityComponentSystem/Components.cpp
+        src/EntityComponentSystem/Components.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
@@ -88,7 +85,7 @@ target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulka
 target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared glm::glm OpenEXR OpenEXRCore OpenEXRUtil yyjson fastgltf draco::draco cpptrace::cpptrace efsw)
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     target_compile_definitions(BootanicalGardens PRIVATE
-            BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer.
+            #BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer. Kills Windoze performance
             BOOTANICAL_GARDENS_ENABLE_VULKAN_DEBUG_UTILS                                               # provides names for Vulkan objects in graphics debuggers.
             BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION="BOOTANICAL_GARDENS_ENABLE_VULKAN_VALIDATION"  # enables vulkan validation if an environment variable matching this string is present.
             BOOTANICAL_GARDENS_ENABLE_READABLE_SHADER_VARIABLE_NAMES                                   # provides human readable names for each shader variable.

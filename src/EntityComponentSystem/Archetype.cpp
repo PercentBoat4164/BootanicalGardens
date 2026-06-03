@@ -11,8 +11,12 @@ Archetype::Archetype(const ArchetypeId archetypeId, const EntityType &entityType
     entityIds = entities;
 }
 
+ComponentColumn * Archetype::getComponent(const ComponentId &componentId) {
+    return componentTable[std::distance(componentIds.begin(), componentIds.find(componentId))].get();
+}
+
 Archetype::EntityRecord Archetype::addEntity(std::vector<std::unique_ptr<ComponentColumn>> &&entityComponents,
-    EntityId entityId) {
+                                             EntityId entityId) {
     for (int i = 0; i < entityComponents.size(); i++) {
         if (componentIds.contains(entityComponents.at(i)->getId())) {
             componentTable[i]->add(std::move(entityComponents.at(i)));

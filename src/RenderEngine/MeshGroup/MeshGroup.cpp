@@ -1,6 +1,5 @@
 #include "MeshGroup.hpp"
 
-#include "src/Entity.hpp"
 #include "src/Tools/Json/Json_glm.hpp"
 
 #include <src/RenderEngine/GraphicsDevice.hpp>

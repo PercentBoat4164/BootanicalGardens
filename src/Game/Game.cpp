@@ -2,7 +2,6 @@
 
 #include "src/InputEngine/Input.hpp"
 
-std::unordered_map<std::uint64_t, Entity> Game::entities{};
 double Game::time{};
 double Game::tickTime{};
 std::uint64_t Game::entityId{UINT64_MAX};
@@ -28,11 +27,11 @@ bool Game::tick() {
 
   //call onTick for every component in the game
   //todo: move to systems?
-  for (auto& entityPair : entities) {
-    for(std::shared_ptr component : entityPair.second.getComponents()) {
-      component->onTick();
-    }
-  }
+  //for (auto& entityPair : entities) {
+  //  for(std::shared_ptr component : entityPair.second.getComponents()) {
+  //    component->onTick();
+  //  }
+  //}
   return !shouldQuit;
 }
 

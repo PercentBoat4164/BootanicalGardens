@@ -21,7 +21,7 @@ class Archetype {
 public:
     // What row of which archetype an entity can be found
     struct EntityRecord {
-        Archetype* archetype;  // todo: Figure out if I should really be a pointer. Perhaps a reference is better
+        Archetype* archetype;
         size_t row;
     };
 
@@ -32,6 +32,16 @@ public:
     std::vector<EntityId> entityIds; // the ids of entities stored by this archetype
     std::vector<std::unique_ptr<ComponentColumn>> componentTable; // component data
     std::unordered_map<ComponentId, Archetype*> edges; // Archetypes reached by adding/removing one component to/from this entity
+
+    /**
+     * Get a pointer to a ComponentColumn stored by this Archetype. Returns nullptr if this archetype does not have the
+     * desired ComponentColumn.
+     *
+     * @param componentId The id of the component to be gotten
+     * @return A pointer to the desired component
+     * @todo consider changing componentIds to a presorted vector<ComponentId> to make this faster than linear time
+     */
+    ComponentColumn* getComponent(const ComponentId& componentId);
 
     /**
      * Stores an entity in this Archetype. Must have the same components as this Archetype!

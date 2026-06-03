@@ -2,10 +2,10 @@
   "archetypes": [ // entities. In format "component type" [component templates]
     {  // Helmets
       "type": [0, 1],  // Position, MeshGroup
-      "componentColumns": [
-        [0, 1], // positions
-        [0, 0] // meshGroups
-      ]
+      "componentColumns": {
+        "0": [0, 1], // positions
+        "1": [0, 0] // meshGroups
+      }
     }
   ],
   "components": {

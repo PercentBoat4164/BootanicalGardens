@@ -16,7 +16,6 @@
     printf("\n");                            \
   } while(false)
 #endif
-#include "src/Entity.hpp"
 
 #include <iostream>
 #include <vma/vk_mem_alloc.h>
