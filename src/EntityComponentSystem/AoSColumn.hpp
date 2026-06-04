@@ -9,9 +9,9 @@ class AoSColumn : public ComponentColumn, public std::vector<T> {
 public:
     static constexpr ComponentId ID = id;
 
-    // template<typename... Args>
-    // explicit AoSColumn(Args&&... args) : std::vector<T>(std::forward<Args>(args)...) {}
-    explicit AoSColumn(std::vector<T>&& vec) : std::vector<T>(std::move(vec)) {}
+    explicit AoSColumn(std::vector<T>&& vec) : ComponentColumn(), std::vector<T>(std::move(vec)) {
+    }
+
     AoSColumn() = default;
 
     ComponentId getId() override {
@@ -22,15 +22,11 @@ public:
         return this->size();
     }
 
-    /**
-     * @todo maybe add emplace(T...) to avoid creating and copying new column
-     * @param column
-     */
-    void add(std::unique_ptr<ComponentColumn> column) override {
+    void add(const std::unique_ptr<ComponentColumn> column) override {
         this->reserve(this->size() + column->getLength());
-        AoSColumn downCastedColumn = std::move(*static_cast<AoSColumn*>(column.release()));
-        for (auto& i : downCastedColumn) {
-            this->emplace_back(std::move(i));
+        AoSColumn* downCastedColumn = static_cast<AoSColumn*>(column.get());
+        for (T& i : *downCastedColumn) {
+            this->push_back(std::move(i));
         }
     }
 

@@ -13,8 +13,15 @@ using ComponentId = std::uint32_t;
  */
 class ComponentColumn
 {
+protected:
+    ComponentColumn() = default;
 public:
     virtual ~ComponentColumn() = default;
+    ComponentColumn(const ComponentColumn&) = delete;
+    ComponentColumn(ComponentColumn &&) noexcept = default;
+    ComponentColumn & operator=(const ComponentColumn &) = delete;
+    ComponentColumn & operator=(ComponentColumn &&) noexcept = default;
+
     virtual ComponentId getId() = 0;
     virtual std::size_t getLength() = 0;
 

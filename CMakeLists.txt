@@ -78,6 +78,10 @@ add_executable(BootanicalGardens
         src/EntityComponentSystem/JsonParser.cpp
         src/EntityComponentSystem/Components.cpp
         src/EntityComponentSystem/Components.hpp
+        src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp
+        src/RenderEngine/MeshGroup/MeshUpdatingSystem.cpp
+        src/Game/KeyboardPanSystem.cpp
+        src/Game/KeyboardPanSystem.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)

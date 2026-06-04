@@ -25,13 +25,6 @@ bool Game::tick() {
   time               = currentTime;
   Input::onTick();
 
-  //call onTick for every component in the game
-  //todo: move to systems?
-  //for (auto& entityPair : entities) {
-  //  for(std::shared_ptr component : entityPair.second.getComponents()) {
-  //    component->onTick();
-  //  }
-  //}
   return !shouldQuit;
 }
 

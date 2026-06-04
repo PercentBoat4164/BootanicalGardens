@@ -5,29 +5,27 @@
 #include <vector>
 #include <functional>
 
-//todo: switch to more robust (std::function?)
-//using ECSUpdateCallBack2 = std::function<void (const EntityType &, const bool)>;
-typedef void (*ECSUpdateCallback)(const EntityType &, const bool); // a function called when the archetypeMap is updated
+using ECSUpdateCallback = void (*)(const EntityType &, const bool, void*); // a function called when the archetypeMap is updated
 
 /**
  * Calls listener functions when an Archetype is created/filled or emptied/destroyed
  */
 struct ArchetypeSubject {
-    std::vector<ECSUpdateCallback> listeners{}; // the listener functions to be called when an update occurs
+    std::vector<std::pair<ECSUpdateCallback, void*>> listeners{}; // the listener functions to be called when an update occurs
 
     /**
      * Start listening to this subject
      *
      * @param updateFunction the function to be added
      */
-    void addListener(ECSUpdateCallback updateFunction);
+    void addListener(ECSUpdateCallback updateFunction, void* system);
 
     /**
      * Stop listening to this subject
      *
      * @param updateFunction the function to be removed
      */
-    void removeListener(ECSUpdateCallback updateFunction);
+    void removeListener(ECSUpdateCallback updateFunction, void* system);
 
     /**
      * run all the listener update functions

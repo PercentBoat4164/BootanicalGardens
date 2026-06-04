@@ -96,7 +96,7 @@ std::vector<std::unique_ptr<ComponentColumn>> * ECSRegistry::getArchetype(const 
 // todo: consider way to make iterating over ComponentColumns of the same type easier
 std::vector<std::vector<ComponentColumn *>> ECSRegistry::getComponents(const EntityType &entityType) {
     std::vector<Archetype*> archetypes = getArchetypesContaining(entityType); // get all archetypes containing the given components
-    std::vector<std::vector<ComponentColumn *>> result(entityType.size(), std::vector<ComponentColumn *>(archetypes.size()));
+    std::vector result(entityType.size(), std::vector<ComponentColumn *>(archetypes.size()));
     // for each archetype containing the desired ComponentColumns...
     for (size_t archetype_i = 0; archetype_i < archetypes.size(); archetype_i++) {
         // find the address of the given components within the archetype and append them to the result table
@@ -172,7 +172,6 @@ std::vector<EntityId> ECSRegistry::getEntitiesOfType(const EntityType &entityTyp
     return archetype->second.entityIds;
 }
 
-//todo: may be optimized by removing check for firstComponent
 std::vector<EntityId> ECSRegistry::getEntitiesWith(const EntityType& entityType) {
     const ComponentId firstComponent = *entityType.begin();
     const auto archetypes = componentIndex.find(firstComponent);
@@ -180,19 +179,19 @@ std::vector<EntityId> ECSRegistry::getEntitiesWith(const EntityType& entityType)
     std::vector<EntityId> result;
     result.reserve(archetypes->second.size());
     for (const auto& [archetype, componentRow] : archetypes->second) {
-        if (std::ranges::includes(archetype->componentIds.begin(), archetype->componentIds.end(), entityType.begin(), entityType.end())) {
+        if (std::ranges::includes(archetype->componentIds.begin(), archetype->componentIds.end(), entityType.begin()++, entityType.end())) {
             result.append_range(archetype->entityIds);
         }
     }
     return result;
 }
 
-void ECSRegistry::addArchetypeListener(const ECSUpdateCallback updateFunction) {
-    archetypeSubject.addListener(updateFunction);
+void ECSRegistry::addArchetypeListener(const ECSUpdateCallback updateFunction, void* system) {
+    archetypeSubject.addListener(updateFunction, system);
 }
 
-void ECSRegistry::removeArchetypeListener(ECSUpdateCallback updateFunction) {
-    archetypeSubject.removeListener(updateFunction);
+void ECSRegistry::removeArchetypeListener(ECSUpdateCallback updateFunction, void* system) {
+    archetypeSubject.removeListener(updateFunction, system);
 }
 
 void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component, const std::size_t expectedSize) {

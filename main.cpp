@@ -13,6 +13,8 @@
 #include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.hpp"
 #include "src/RenderEngine/Window.hpp"
 #include "src/EntityComponentSystem/JsonParser.hpp"
+#include "src/Game/KeyboardPanSystem.hpp"
+#include "src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp"
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
@@ -40,13 +42,16 @@ int main() {
     ECSRegistry ecs{};
     JsonParser parser(graphicsDevice);
     parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
+    MeshUpdatingSystem meshUpdatingSystem(&graphicsDevice, &ecs);
+    KeyboardPanSystem keyboardPanSystem(&ecs);
     //LevelParser::loadLevel("../res/levels/Level1.json");
 
     Components::MeshGroupComponent *helmet = static_cast<Components::MeshGroupComponent*>(ecs.getComponent(0, Components::MeshGroupComponent::ID));
-
     renderGraph.bake();
 
     do {
+      meshUpdatingSystem.onTick();
+      keyboardPanSystem.onTick();
       graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();

@@ -2,22 +2,21 @@
 
 #include "ArchetypeSubject.hpp"
 
-void ArchetypeSubject::addListener(const ECSUpdateCallback updateFunction) {
-    listeners.push_back(updateFunction);
+void ArchetypeSubject::addListener(const ECSUpdateCallback updateFunction, void* system) {
+    listeners.emplace_back(updateFunction, system);
 }
 
-void ArchetypeSubject::removeListener(const ECSUpdateCallback updateFunction) {
-    ECSUpdateCallback listener;
+void ArchetypeSubject::removeListener(const ECSUpdateCallback updateFunction, void* system) {
     for (int i = 0; i < listeners.size(); i++) {
-        listener = listeners[i];
-        if (listener == updateFunction) {
+        auto listener = listeners[i];
+        if (listener == std::pair{updateFunction, system}) {
             listeners.erase(listeners.begin() + i);
         }
     }
 }
 
 void ArchetypeSubject::update(const EntityType &archetype, const bool &created) const {
-    for (const ECSUpdateCallback listener : listeners) {
-        listener(archetype, created);
+    for (const auto listener : listeners) {
+        listener.first(archetype, created, listener.second);
     }
 }

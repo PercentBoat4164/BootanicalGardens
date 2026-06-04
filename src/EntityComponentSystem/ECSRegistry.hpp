@@ -126,14 +126,14 @@ public:
      *
      * @param updateFunction The function to be called whenever an Archetype is added or removed
      */
-    void addArchetypeListener(const ECSUpdateCallback updateFunction);
+    void addArchetypeListener(const ECSUpdateCallback updateFunction, void* system);
 
     /**
      * Remove a listener from the update function.
      *
      * @param updateFunction The function to no longer be called when an Archetype is added or removed
      */
-    void removeArchetypeListener(ECSUpdateCallback updateFunction);
+    void removeArchetypeListener(ECSUpdateCallback updateFunction, void* system);
 
     /**
      * Add a specific component to an Entity. Moves the Entity to another Archetype, creating a new one if needed.
