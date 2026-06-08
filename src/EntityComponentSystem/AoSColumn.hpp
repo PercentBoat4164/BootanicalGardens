@@ -9,8 +9,7 @@ class AoSColumn : public ComponentColumn, public std::vector<T> {
 public:
     static constexpr ComponentId ID = id;
 
-    explicit AoSColumn(std::vector<T>&& vec) : ComponentColumn(), std::vector<T>(std::move(vec)) {
-    }
+    explicit AoSColumn(std::vector<T>&& vec) : ComponentColumn(), std::vector<T>(std::move(vec)) {}
 
     AoSColumn() = default;
 

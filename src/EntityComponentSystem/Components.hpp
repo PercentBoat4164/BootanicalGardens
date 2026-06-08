@@ -2,6 +2,7 @@
 
 #include <glm/vec3.hpp>
 
+#include "TagComponent.hpp"
 #include "src/EntityComponentSystem/ComponentColumn.hpp"
 #include "src/EntityComponentSystem/AoSColumn.hpp"
 #include "src/RenderEngine/MeshGroup/MeshGroup.hpp"
@@ -14,6 +15,8 @@ class Components {
 public:
     using Position = AoSColumn<0, glm::vec3>;
     using MeshGroupComponent = AoSColumn<1, MeshGroup>;
+    using Visible = TagComponent<2>;
+
     /**
      * Creates an empty column for storing component data of the type of the given id.
      *

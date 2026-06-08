@@ -82,6 +82,8 @@ add_executable(BootanicalGardens
         src/RenderEngine/MeshGroup/MeshUpdatingSystem.cpp
         src/Game/KeyboardPanSystem.cpp
         src/Game/KeyboardPanSystem.hpp
+        src/EntityComponentSystem/TagComponent.cpp
+        src/EntityComponentSystem/TagComponent.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)

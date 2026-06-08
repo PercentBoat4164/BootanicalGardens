@@ -44,5 +44,14 @@ void KeyboardPanSystem::onTick() {
         if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
             curPos.x += movementSpeed * Game::getTickTime();
         }
+        if (Input::keyPressed(SDLK_V)) {
+            if (visibleToggle) {
+                ecs->removeComponent(0, Components::Visible::ID);
+                visibleToggle = false;
+            } else {
+                ecs->addComponent(0, std::make_unique<Components::Visible>(1));
+                visibleToggle = true;
+            }
+        }
     }
 }

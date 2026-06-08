@@ -22,7 +22,7 @@ Archetype::EntityRecord Archetype::addEntity(std::vector<std::unique_ptr<Compone
         }
     }
     entityIds.push_back(entityId);
-    return EntityRecord{this, this->componentTable[0]->getLength()};
+    return EntityRecord{this, this->componentTable[0]->getLength() - 1};
 }
 
 std::vector<Archetype::EntityRecord> Archetype::addEntities(

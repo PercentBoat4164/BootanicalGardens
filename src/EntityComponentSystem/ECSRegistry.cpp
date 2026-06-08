@@ -201,19 +201,20 @@ void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentC
     Archetype* archetype = entityRecord->second.archetype; // initially the source archetype, then reassigned to the target archetype when found
     assert(!archetype->componentIds.contains(component->getId())); // ensure we are not adding an already existing component
 
-    // get a buffer of the entity data from the source archetype
+    // get a buffer of the entity data from the source archetype and add the new component to it
     std::vector<std::unique_ptr<ComponentColumn>> entityBuf = archetype->pullEntity(entityRecord->second);
+    entityBuf.push_back(std::move(component));
 
     // attempt to find the target archetype using the edge and add the entity to it
-    if (archetype->getEdge(component->getId()) != nullptr) {
-        archetype = archetype->getEdge(component->getId());
+    if (archetype->getEdge(entityBuf.back()->getId()) != nullptr) {
+        archetype = archetype->getEdge(entityBuf.back()->getId());
         entityRecords[entity] = archetype->addEntity(std::move(entityBuf), entity);
         return;
     }
 
     //if not found, attempt to find it using the archetypeIndex
     EntityType entityType = archetype->componentIds;
-    entityType.insert(component->getId());
+    entityType.insert(entityBuf.back()->getId());
     auto it = archetypeIndex.find(entityType);
     if (it != archetypeIndex.end()) {
         archetype = &it->second;
@@ -222,8 +223,9 @@ void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentC
     }
 
     //otherwise, create the target archetype
+    const ComponentId id = entityBuf.back()->getId();
     registerArchetype(std::move(entityBuf), expectedSize, {entity});
-    entityRecord->second.archetype->addEdge(archetype, component->getId());
+    entityRecord->second.archetype->addEdge(archetype, id);
 }
 
 void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component, const std::size_t expectedSize) {

@@ -6,6 +6,7 @@ class KeyboardPanSystem {
     ECSRegistry* ecs;
     std::vector<Components::Position*> positions;
     float movementSpeed = 0.5f;
+    bool visibleToggle = false;
     void updateComponents();
 public:
     KeyboardPanSystem(ECSRegistry* ecs);

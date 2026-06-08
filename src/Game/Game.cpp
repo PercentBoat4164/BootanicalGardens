@@ -3,7 +3,7 @@
 #include "src/InputEngine/Input.hpp"
 
 double Game::time{};
-double Game::tickTime{};
+double Game::tickTime{std::numeric_limits<double>::infinity()};
 std::uint64_t Game::entityId{UINT64_MAX};
 
 const std::chrono::steady_clock::time_point Game::startTime{std::chrono::steady_clock::now()};

@@ -32,11 +32,19 @@ public:
      */
     virtual void add(std::unique_ptr<ComponentColumn> column) = 0;
 
+    /**
+     * Get a range of elements from this ComponentColumn. Moves the desired data out of this column into a new
+     * ComponentColumn.
+     *
+     * @param start The index of the first element to get
+     * @param size The number of elements to get
+     * @return A unique_ptr to a new ComponentColumn holding the gotten data
+     */
     virtual std::unique_ptr<ComponentColumn> getRange(size_t start, size_t size) = 0;
 
     /**
-     * Erases an element from the ComponentColumn, moving the last element to take its place. entityRecords should be updated
-     * after this is called.
+     * Erases an element from the ComponentColumn, moving the last element to take its place. entityRecords should be
+     * updated after this is called.
      */
     virtual void remove(size_t index) = 0;
 };
