@@ -6,13 +6,14 @@
 #include <ranges>
 
 void MeshUpdatingSystem::updateComponents() {
-    std::vector<std::vector<ComponentColumn*>> components = ecs->getComponents({Components::Position::ID, Components::MeshGroupComponent::ID});
+    std::vector<std::vector<ComponentColumn*>> components = ecs->getComponents({Components::Position::ID, Components::MeshGroupComponent::ID, Components::Visible::ID});
     positions.reserve(components[0].size());
     meshGroups.reserve(components[0].size());
     for (int i = 0; i < components[0].size(); ++i) {
         positions.push_back(static_cast<Components::Position*>(components[0][i]));
         meshGroups.push_back(static_cast<Components::MeshGroupComponent*>(components[1][i]));
     }
+
 }
 
 void MeshUpdatingSystem::transformMeshGroup(const MeshGroup& meshGroup, const glm::vec3& position) {
@@ -47,5 +48,5 @@ void MeshUpdatingSystem::onTick() {
 }
 
 void MeshUpdatingSystem::onECSChange(const EntityType & entityType, const bool created, void* system) {
-    if (entityType.contains(Components::Position::ID) && entityType.contains(Components::MeshGroupComponent::ID)) static_cast<MeshUpdatingSystem*>(system)->updateComponents();
+    if (entityType.contains(Components::Position::ID) && entityType.contains(Components::MeshGroupComponent::ID) && entityType.contains(Components::Visible::ID)) static_cast<MeshUpdatingSystem*>(system)->updateComponents();
 }

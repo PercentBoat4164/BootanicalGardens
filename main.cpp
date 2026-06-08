@@ -46,12 +46,23 @@ int main() {
     KeyboardPanSystem keyboardPanSystem(&ecs);
     //LevelParser::loadLevel("../res/levels/Level1.json");
 
-    Components::MeshGroupComponent *helmet = static_cast<Components::MeshGroupComponent*>(ecs.getComponent(0, Components::MeshGroupComponent::ID));
+    //Components::MeshGroupComponent *helmet = static_cast<Components::MeshGroupComponent*>(ecs.getComponent(0, Components::MeshGroupComponent::ID));
     renderGraph.bake();
-
+    bool visibleToggle = false;
     do {
       meshUpdatingSystem.onTick();
       keyboardPanSystem.onTick();
+
+      if (Input::keyPressed(SDLK_V)) {
+        if (visibleToggle) {
+          ecs.removeComponent(0, Components::Visible::ID);
+          visibleToggle = false;
+        } else {
+          ecs.addComponent(0, std::make_unique<Components::Visible>(1));
+          visibleToggle = true;
+        }
+      }
+
       graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();

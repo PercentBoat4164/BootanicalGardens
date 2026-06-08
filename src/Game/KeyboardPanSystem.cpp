@@ -17,6 +17,7 @@ void KeyboardPanSystem::updateComponents() {
 
 KeyboardPanSystem::KeyboardPanSystem(ECSRegistry* ecs) : ecs(ecs) {
     updateComponents();
+    ecs->addArchetypeListener(onECSChange, this);
 }
 template<typename T>
 std::vector<T> getAoSValues(std::vector<ComponentColumn*> componentColumns) {
@@ -44,14 +45,9 @@ void KeyboardPanSystem::onTick() {
         if (Input::keyDown(SDLK_RIGHT) > 0 || Input::keyDown(SDLK_D) > 0) {
             curPos.x += movementSpeed * Game::getTickTime();
         }
-        if (Input::keyPressed(SDLK_V)) {
-            if (visibleToggle) {
-                ecs->removeComponent(0, Components::Visible::ID);
-                visibleToggle = false;
-            } else {
-                ecs->addComponent(0, std::make_unique<Components::Visible>(1));
-                visibleToggle = true;
-            }
-        }
     }
+}
+
+void KeyboardPanSystem::onECSChange(const EntityType &entityType, bool created, void *system) {
+    if (entityType.contains(Components::Position::ID)) static_cast<KeyboardPanSystem*>(system)->updateComponents();
 }
