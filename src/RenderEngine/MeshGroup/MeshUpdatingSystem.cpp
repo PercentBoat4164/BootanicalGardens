@@ -1,5 +1,3 @@
-#pragma once
-
 #include "MeshUpdatingSystem.hpp"
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>

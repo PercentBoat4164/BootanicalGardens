@@ -3,6 +3,8 @@
 #include "src/Game/Game.hpp"
 
 #include <SDL3/SDL.h>
+
+#include <cmath>
 #include <ranges>
 
 std::unordered_map<SDL_Keycode, float> Input::keys{};

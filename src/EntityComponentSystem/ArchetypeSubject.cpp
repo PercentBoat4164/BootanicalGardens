@@ -1,5 +1,3 @@
-#pragma once
-
 #include "ArchetypeSubject.hpp"
 
 void ArchetypeSubject::addListener(const ECSUpdateCallback updateFunction, void* system) {

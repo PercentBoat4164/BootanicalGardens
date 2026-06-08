@@ -33,7 +33,7 @@ CPMAddPackage("gh:ibireme/yyjson#0.12.0")
 CPMAddPackage("gh:jeremy-rifkin/cpptrace#v1.0.4")
 CPMAddPackage("gh:SpartanJ/efsw#1.5.1")
 set(OPENEXR_IS_SUBPROJECT ON)
-CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.4")
+CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.11")
 
 add_executable(BootanicalGardens
         src/Game/Game.cpp

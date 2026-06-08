@@ -1,5 +1,3 @@
-#pragma once
-
 #include "ECSRegistry.hpp"
 
 #include <algorithm>
