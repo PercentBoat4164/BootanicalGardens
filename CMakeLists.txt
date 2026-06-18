@@ -67,7 +67,6 @@ add_executable(BootanicalGardens
         src/RenderEngine/Resources/StagingBuffer.cpp
         src/RenderEngine/Resources/UniformBuffer.cpp
         src/RenderEngine/Window.cpp
-
         src/Filesystem/UpdateListener.cpp
         src/EntityComponentSystem/Archetype.cpp
         src/EntityComponentSystem/ArchetypeSubject.cpp
