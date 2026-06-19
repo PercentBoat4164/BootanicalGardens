@@ -13,11 +13,11 @@ public:
 
     explicit TagComponent(size_t size) : columnSize(size) {}
 
-    ComponentId getId() override {
+    [[nodiscard]] ComponentId getId() const override {
         return ID;
     }
 
-    size_t getLength() override {
+    [[nodiscard]] size_t getLength() const override {
         return columnSize;
     }
 

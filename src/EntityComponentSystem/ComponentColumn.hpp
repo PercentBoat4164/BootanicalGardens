@@ -5,7 +5,7 @@
 #include <memory>
 
 // Every non-virtual child of ComponentColumn has a specific ID
-using ComponentId = std::uint32_t;
+using ComponentId = std::size_t;
 
 /**
  * A component stores data for entities. Each instance of ComponentColumn represents a column within an archetype, where each
@@ -22,8 +22,8 @@ public:
     ComponentColumn & operator=(const ComponentColumn &) = delete;
     ComponentColumn & operator=(ComponentColumn &&) noexcept = default;
 
-    virtual ComponentId getId() = 0;
-    virtual std::size_t getLength() = 0;
+    [[nodiscard]] virtual ComponentId getId() const = 0;
+    [[nodiscard]] virtual std::size_t getLength() const = 0;
 
     /**
      * add an element or elements to this component column

@@ -58,11 +58,11 @@ public:
     template<typename... Args>
     SoAColumn(Args&&... args) : std::tuple<std::vector<T>...>(std::forward<Args>(args)...) {}
 
-    ComponentId getId() override {
+    [[nodiscard]] ComponentId getId() const override {
         return ID;
     }
 
-    std::size_t getLength() override {
+    [[nodiscard]] std::size_t getLength() const override {
         return std::get<0>(*this).size();
     }
 

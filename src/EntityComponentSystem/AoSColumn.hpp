@@ -13,11 +13,11 @@ public:
 
     AoSColumn() = default;
 
-    ComponentId getId() override {
+    [[nodiscard]] ComponentId getId() const override {
         return ID;
     }
 
-    std::size_t getLength() override {
+    [[nodiscard]] std::size_t getLength() const override {
         return this->size();
     }
 
