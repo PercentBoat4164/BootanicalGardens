@@ -18,6 +18,11 @@ class ECSRegistry
     std::size_t componentCount = 0;
     EntityId entityCount = 0;
 
+    using ArchetypeMap = std::unordered_map<Archetype*, size_t>; // used to get whether and in which row a component is stored by an archetype
+    std::unordered_map<ComponentId, ArchetypeMap> componentIndex; // used to get all archetype locations of a given component
+    std::map<EntityType, Archetype> archetypeIndex; // used to get an archetype by its components
+    std::unordered_map<EntityId, Archetype::EntityRecord> entityRecords; // location of an entity within an archetype
+
     EntityId registerEntityFromArchetype(Archetype* archetype, const size_t row) {
         entityRecords.insert({entityCount, Archetype::EntityRecord{archetype, row}});
         return entityCount++;
@@ -35,11 +40,6 @@ public:
      * @param expectedSize the expected number of entities in the archetype
      */
     Archetype* registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components, const std::size_t expectedSize = 0, std::vector<EntityId> entityIds = {});
-
-    using ArchetypeMap = std::unordered_map<Archetype*, size_t>; // used to get whether and in which row a component is stored by an archetype
-    std::unordered_map<ComponentId, ArchetypeMap> componentIndex; // used to get all archetype locations of a given component
-    std::map<EntityType, Archetype> archetypeIndex; // used to get an archetype by its components
-    std::unordered_map<EntityId, Archetype::EntityRecord> entityRecords; // location of an entity within an archetype
 
     /**
      * Tells whether an entity has a specific component

@@ -13,25 +13,51 @@ using ArchetypeId = std::uint32_t;
 using EntityId = std::uint32_t;
 using EntityType = std::set<ComponentId>;
 
+class ECSRegistry; // forward declaration for friendship
+
 /**
  * A table holding data for all entities of a specific EntityType. Each row represents an entity, and each column is a
  * specific component of entities in this table.
  */
 class Archetype {
+private:
+    std::vector<EntityId> entityIds; // the ids of entities stored by this archetype
+    std::vector<std::unique_ptr<ComponentColumn>> componentTable; // component data
+    std::unordered_map<ComponentId, Archetype*> edges; // Archetypes reached by adding/removing one component to/from this entity
 public:
+    friend class ECSRegistry;
+
     // What row of which archetype an entity can be found
     struct EntityRecord {
         Archetype* archetype;
         size_t row;
     };
 
-    Archetype(const ArchetypeId archetypeId, const EntityType &entityType, const std::vector<EntityId> &entities, std::vector<std::unique_ptr<ComponentColumn>> components);
+    Archetype(const ArchetypeId &archetypeId, EntityType entityType, const std::vector<EntityId> &entities, std::vector<std::unique_ptr<ComponentColumn>> components);
 
-    ArchetypeId id; // Unique id
-    EntityType componentIds; // Ids of each component within this archetype
-    std::vector<EntityId> entityIds; // the ids of entities stored by this archetype
-    std::vector<std::unique_ptr<ComponentColumn>> componentTable; // component data
-    std::unordered_map<ComponentId, Archetype*> edges; // Archetypes reached by adding/removing one component to/from this entity
+    const ArchetypeId id; // Unique id
+    const EntityType componentIds; // Ids of each component within this archetype
+
+    /**
+     * Get which entities are stored by this archetype
+     *
+     * @return the vector of the ids of entities stored by this archetype
+     */
+    [[nodiscard]] const std::vector<EntityId>& getEntityIds() const;
+
+    /**
+     * Get a reference to the table of components and entities stored by this archetype.
+     *
+     * @return the vector of ComponentColumns stored by this archetype
+     */
+    [[nodiscard]] const std::vector<std::unique_ptr<ComponentColumn>>& getComponentTable() const;
+
+    /**
+     * Get archetypes found by adding or removing a component from this archetype. This map is populated lazily by
+     * the ECSRegistry, so it may not be complete. //todo: give user ability to add edges?
+     * @return the map of edges connected to this archetype
+     */
+    [[nodiscard]] const std::unordered_map<ComponentId, Archetype*>& getEdges() const;
 
     /**
      * Get a pointer to a ComponentColumn stored by this Archetype. Returns nullptr if this archetype does not have the
@@ -56,12 +82,12 @@ public:
      *
      * @param entityComponents the data table for the entities
      * @param entityId the ids of entities to be added
-     * @return
+     * @return a vector of EntityRecords for each new entity stored
      */
     std::vector<EntityRecord> addEntities(std::vector<std::unique_ptr<ComponentColumn>>&& entityComponents, const std::vector<EntityId> &entityId);
 
     /**
-     * Remove an entity from the archetype.
+     * Remove an entity from the archetype, destroying the data.
      *
      * @param entityRecord The location of the entity to be removed
      */

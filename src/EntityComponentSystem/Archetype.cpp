@@ -1,13 +1,23 @@
 #include "Archetype.hpp"
 
 #include <cassert>
+#include <utility>
 
-Archetype::Archetype(const ArchetypeId archetypeId, const EntityType &entityType, const std::vector<EntityId> &entities,
-                     std::vector<std::unique_ptr<ComponentColumn>> components) {
-    id = archetypeId;
-    componentIds = entityType;
+Archetype::Archetype(const ArchetypeId &archetypeId, EntityType  entityType, const std::vector<EntityId> &entities, std::vector<std::unique_ptr<ComponentColumn>> components) : id(archetypeId), componentIds(std::move(entityType)) {
     this->componentTable = std::move(components);
     entityIds = entities;
+}
+
+const std::vector<EntityId> & Archetype::getEntityIds() const {
+    return entityIds;
+}
+
+const std::vector<std::unique_ptr<ComponentColumn>> & Archetype::getComponentTable() const {
+    return componentTable;
+}
+
+const std::unordered_map<ComponentId, Archetype *> & Archetype::getEdges() const {
+    return edges;
 }
 
 ComponentColumn * Archetype::getComponent(const ComponentId &componentId) {

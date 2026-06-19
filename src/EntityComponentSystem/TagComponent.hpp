@@ -2,7 +2,7 @@
 #include "ComponentColumn.hpp"
 
 /**
- * a TagComponent is a ComponentColumn that does not store data for any components. It may be used for systems to query
+ * A TagComponent is a ComponentColumn that does not store data for any components. It may be used for systems to query
  * for components e.g. Visible or ChasingPlayer.
  */
 template<ComponentId id>
