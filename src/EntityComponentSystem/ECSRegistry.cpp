@@ -43,11 +43,18 @@ Archetype * ECSRegistry::registerArchetype(std::vector<std::unique_ptr<Component
     for (int i = 0; i < archetype.componentTable[0]->getLength(); i++) {
         entityRecords[entityIds[i]] = Archetype::EntityRecord{&archetype, static_cast<size_t>(i)};
     }
-    archetypeSubject.update(archetype.componentIds, true);
+    //archetypeSubject.update(archetype.componentIds, true);
     return &archetype;
 }
 
+std::vector<std::unique_ptr<ComponentColumn>> * ECSRegistry::getArchetype(const EntityType &entityType) {
+    const auto archetype = archetypeIndex.find(entityType);
+    if (archetype == archetypeIndex.end()) return nullptr;
+    return &archetype->second.componentTable;
+}
+
 bool ECSRegistry::hasComponent(const EntityId entity, const ComponentId component) {
+    std::shared_lock lock(archetypeMutex);
     const auto i = entityRecords.find(entity);
     if (i != entityRecords.end()) { return false; }
     const auto j = i->second.archetype->componentIds.find(component);
@@ -55,6 +62,7 @@ bool ECSRegistry::hasComponent(const EntityId entity, const ComponentId componen
 }
 
 ComponentColumn * ECSRegistry::getComponent(EntityId entity, ComponentId component) {
+    std::shared_lock lock(archetypeMutex);
     // find the location of the entity
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return nullptr;
@@ -71,6 +79,7 @@ ComponentColumn * ECSRegistry::getComponent(EntityId entity, ComponentId compone
 }
 
 ComponentColumn * ECSRegistry::getComponent(const EntityType &entityType, ComponentId component) {
+    std::shared_lock lock(archetypeMutex);
     // find the correct archetype
     const auto archetype = archetypeIndex.find(entityType);
     if (archetype == archetypeIndex.end()) return nullptr;
@@ -85,14 +94,9 @@ ComponentColumn * ECSRegistry::getComponent(const EntityType &entityType, Compon
     return &*archetype->second.componentTable[componentRow->second];
 }
 
-std::vector<std::unique_ptr<ComponentColumn>> * ECSRegistry::getArchetype(const EntityType &entityType) {
-    const auto archetype = archetypeIndex.find(entityType);
-    if (archetype == archetypeIndex.end()) return nullptr;
-    return &archetype->second.componentTable;
-}
-
 // todo: consider way to make iterating over ComponentColumns of the same type easier
 std::vector<std::vector<ComponentColumn *>> ECSRegistry::getComponents(const EntityType &entityType) {
+    std::shared_lock lock(archetypeMutex);
     std::vector<Archetype*> archetypes = getArchetypesContaining(entityType); // get all archetypes containing the given components
     std::vector result(entityType.size(), std::vector<ComponentColumn *>(archetypes.size()));
     // for each archetype containing the desired ComponentColumns...
@@ -108,11 +112,14 @@ std::vector<std::vector<ComponentColumn *>> ECSRegistry::getComponents(const Ent
 }
 
 void ECSRegistry::registerEntities(const EntityType &entityType, std::vector<std::unique_ptr<ComponentColumn>> componentData) {
+    std::unique_lock lock(archetypeMutex);
     const auto archetypeIt = archetypeIndex.find(entityType);
 
     // if no archetype exists, create it
     if (archetypeIt == archetypeIndex.end()) {
         registerArchetype(std::move(componentData));
+        lock.unlock();
+        archetypeSubject.update(entityType, true);
         return;
     }
 
@@ -131,6 +138,7 @@ void ECSRegistry::registerEntities(const EntityType &entityType, std::vector<std
 }
 
 void ECSRegistry::deleteEntity(EntityId entity) {
+    std::unique_lock lock(archetypeMutex);
     // find the location of the entity
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return;
@@ -138,7 +146,8 @@ void ECSRegistry::deleteEntity(EntityId entity) {
     entityRecords.erase(entity);
 }
 
-void ECSRegistry::deleteArchetype(EntityType type) {
+void ECSRegistry::deleteEntitiesOfType(EntityType type) {
+    std::unique_lock lock(archetypeMutex);
     // find the archetype to be deleted
     const auto archetype = archetypeIndex.find(type);
     if (archetype == archetypeIndex.end()) return; // if the archetype doesn't exist, do nothing
@@ -164,6 +173,7 @@ void ECSRegistry::deleteArchetype(EntityType type) {
 }
 
 std::vector<EntityId> ECSRegistry::getEntitiesOfType(const EntityType &entityType) {
+    std::shared_lock lock(archetypeMutex);
     // find the correct archetype
     const auto archetype = archetypeIndex.find(entityType);
     if (archetype == archetypeIndex.end()) return {};
@@ -171,6 +181,7 @@ std::vector<EntityId> ECSRegistry::getEntitiesOfType(const EntityType &entityTyp
 }
 
 std::vector<EntityId> ECSRegistry::getEntitiesWith(const EntityType& entityType) {
+    std::shared_lock lock(archetypeMutex);
     const ComponentId firstComponent = *entityType.begin();
     const auto archetypes = componentIndex.find(firstComponent);
     if (archetypes == componentIndex.end()) return {};
@@ -185,14 +196,17 @@ std::vector<EntityId> ECSRegistry::getEntitiesWith(const EntityType& entityType)
 }
 
 void ECSRegistry::addArchetypeListener(const ECSUpdateCallback updateFunction, void* system) {
+    std::unique_lock lock(listenerMutex);
     archetypeSubject.addListener(updateFunction, system);
 }
 
 void ECSRegistry::removeArchetypeListener(ECSUpdateCallback updateFunction, void* system) {
+    std::unique_lock lock(listenerMutex);
     archetypeSubject.removeListener(updateFunction, system);
 }
 
 void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentColumn> component, const std::size_t expectedSize) {
+    std::unique_lock lock(archetypeMutex);
     // get the source archetype
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return; // if the given entity doesn't exist, do nothing
@@ -224,9 +238,12 @@ void ECSRegistry::addComponent(const EntityId entity, std::unique_ptr<ComponentC
     const ComponentId id = entityBuf.back()->getId();
     registerArchetype(std::move(entityBuf), expectedSize, {entity});
     entityRecord->second.archetype->addEdge(archetype, id);
+    lock.unlock();
+    archetypeSubject.update(entityType, true);
 }
 
 void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component, const std::size_t expectedSize) {
+    std::unique_lock lock(listenerMutex);
     // get the source archetype
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return; // if the given entity doesn't exist, do nothing
@@ -261,6 +278,8 @@ void ECSRegistry::removeComponent(const EntityId &entity, ComponentId component,
             entityBuf.erase(entityBuf.begin() + i);
         }
     }
-    registerArchetype(std::move(entityBuf), expectedSize, {entity});
     archetype->addEdge(entityRecords.find(entity)->second.archetype, component);
+    lock.unlock();
+    registerArchetype(std::move(entityBuf), expectedSize, {entity});
+
 }

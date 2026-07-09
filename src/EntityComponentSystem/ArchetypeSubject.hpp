@@ -5,7 +5,7 @@
 #include <vector>
 #include <functional>
 
-using ECSUpdateCallback = void (*)(const EntityType &, const bool, void*); // a function called when the archetypeMap is updated
+using ECSUpdateCallback = void (*)(const EntityType &, bool, void*); // a function called when the archetypeMap is updated
 
 /**
  * Calls listener functions when an Archetype is created/filled or emptied/destroyed

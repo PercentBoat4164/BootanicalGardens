@@ -13,10 +13,15 @@
  */
 class ECSRegistry
 {
+    friend class JsonParser; // loads json archetype data into the ECSRegistry
+
     ArchetypeSubject archetypeSubject; // updates systems when the ArchetypeMap changes
-    std::size_t archetypeCount = 0;
+    std::size_t archetypeCount = 0; // todo: store ids of removed archetypes, components, and entities for reuse
     std::size_t componentCount = 0;
     EntityId entityCount = 0;
+
+    std::shared_mutex archetypeMutex; // prevents the archetypeIndex and entityRecords indices from being read and written at the same time
+    std::shared_mutex listenerMutex; // prevents two threads from accessing the archetypeSubject at once
 
     using ArchetypeMap = std::unordered_map<Archetype*, size_t>; // used to get whether and in which row a component is stored by an archetype
     std::unordered_map<ComponentId, ArchetypeMap> componentIndex; // used to get all archetype locations of a given component
@@ -30,7 +35,6 @@ class ECSRegistry
 
     std::vector<Archetype*> getArchetypesContaining(const EntityType& entityType);
 
-public:
     /**
      * Create a new Archetype from the component data given
      *
@@ -41,6 +45,16 @@ public:
      */
     Archetype* registerArchetype(std::vector<std::unique_ptr<ComponentColumn>> components, const std::size_t expectedSize = 0, std::vector<EntityId> entityIds = {});
 
+    /**
+     * Gets all the ComponentColumns (and therefore all entity data) of a given Archetype.
+     *
+     * @param entityType the EntityType to be gotten
+     *
+     * @return The components of a specific archetype
+     */
+    std::vector<std::unique_ptr<ComponentColumn>>* getArchetype(const EntityType& entityType);
+
+public:
     /**
      * Tells whether an entity has a specific component
      *
@@ -63,15 +77,6 @@ public:
      * @return The component of a specific archetype
      */
     ComponentColumn* getComponent(const EntityType& entityType, ComponentId component);
-
-    /**
-     * Gets all the ComponentColumns (and therefore all entity data) of a given Archetype.
-     *
-     * @param entityType the EntityType to be gotten
-     *
-     * @return The components of a specific archetype
-     */
-    std::vector<std::unique_ptr<ComponentColumn>>* getArchetype(const EntityType& entityType);
 
     /**
      * Gets all ComponentColumns holding entities with the given EntityType. The outer vector is by component type, and
@@ -103,7 +108,7 @@ public:
      *
      * @param type the EntityType of the archetype to be deleted
      */
-    void deleteArchetype(EntityType type);
+    void deleteEntitiesOfType(EntityType type);
 
     /**
      * Gets the IDs of every entity of a specific type

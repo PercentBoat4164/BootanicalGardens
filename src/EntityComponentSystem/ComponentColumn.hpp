@@ -3,6 +3,7 @@
 #include <any>
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 
 // Every non-virtual child of ComponentColumn has a specific ID
 using ComponentId = std::size_t;
@@ -11,8 +12,7 @@ using ComponentId = std::size_t;
  * A component stores data for entities. Each instance of ComponentColumn represents a column within an archetype, where each
  * row contains data for a single entity.
  */
-class ComponentColumn
-{
+class ComponentColumn {
 protected:
     ComponentColumn() = default;
 public:

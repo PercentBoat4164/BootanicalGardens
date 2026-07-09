@@ -49,6 +49,7 @@ void JsonParser::readAndLoadLevel(const std::filesystem::path& path, ECSRegistry
 }
 
 void JsonParser::loadLevel(ECSRegistry& ecs) const {
+    std::unique_lock lock(ecs.archetypeMutex);
     yyjson_arr_iter archetypeIt = yyjson_arr_iter_with(archetypes);
     while (yyjson_val* curArchetype = yyjson_arr_iter_next(&archetypeIt)) {
         loadArchetype(curArchetype, ecs);
