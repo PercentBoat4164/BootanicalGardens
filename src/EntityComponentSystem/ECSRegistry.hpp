@@ -17,7 +17,7 @@ class ECSRegistry
     friend class JsonParser; // loads json archetype data into the ECSRegistry
     using EcsId = std::uint32_t;
     ArchetypeSubject archetypeSubject; // updates systems when the ArchetypeMap changes
-    EcsId archetypeCount = 0; // todo: store ids of removed archetypes, components, and entities for reuse
+    EcsId archetypeCount = 0;
     EntityId entityCount = 0;
     std::queue<EcsId> removedArchetypes{};
     std::queue<EntityId> removedEntities{};
