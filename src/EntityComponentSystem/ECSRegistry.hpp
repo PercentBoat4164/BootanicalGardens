@@ -2,6 +2,7 @@
 #include <map>
 #include <vector>
 #include <cassert>
+#include <queue>
 #include <unordered_map>
 #include <ranges>
 
@@ -14,11 +15,12 @@
 class ECSRegistry
 {
     friend class JsonParser; // loads json archetype data into the ECSRegistry
-
+    using EcsId = std::uint32_t;
     ArchetypeSubject archetypeSubject; // updates systems when the ArchetypeMap changes
-    std::size_t archetypeCount = 0; // todo: store ids of removed archetypes, components, and entities for reuse
-    std::size_t componentCount = 0;
+    EcsId archetypeCount = 0; // todo: store ids of removed archetypes, components, and entities for reuse
     EntityId entityCount = 0;
+    std::queue<EcsId> removedArchetypes{};
+    std::queue<EntityId> removedEntities{};
 
     std::shared_mutex archetypeMutex; // prevents the archetypeIndex and entityRecords indices from being read and written at the same time
     std::shared_mutex listenerMutex; // prevents two threads from accessing the archetypeSubject at once
@@ -28,9 +30,28 @@ class ECSRegistry
     std::map<EntityType, Archetype> archetypeIndex; // used to get an archetype by its components
     std::unordered_map<EntityId, Archetype::EntityRecord> entityRecords; // location of an entity within an archetype
 
-    EntityId registerEntityFromArchetype(Archetype* archetype, const size_t row) {
-        entityRecords.insert({entityCount, Archetype::EntityRecord{archetype, row}});
+    EcsId getNewArchetypeId() {
+        if (!removedArchetypes.empty()) {
+            EcsId out = removedArchetypes.front();
+            removedArchetypes.pop();
+            return out;
+        }
+        return archetypeCount++;
+    }
+
+    EntityId getNewEntityId() {
+        if (!removedEntities.empty()) {
+            EntityId out = removedEntities.front();
+            removedEntities.pop();
+            return out;
+        }
         return entityCount++;
+    }
+
+    EntityId registerEntityFromArchetype(Archetype* archetype, const size_t row) {
+        EntityId id = getNewEntityId();
+        entityRecords.insert({id, Archetype::EntityRecord{archetype, row}});
+        return id;
     }
 
     std::vector<Archetype*> getArchetypesContaining(const EntityType& entityType);
@@ -53,7 +74,6 @@ class ECSRegistry
      * @return The components of a specific archetype
      */
     std::vector<std::unique_ptr<ComponentColumn>>* getArchetype(const EntityType& entityType);
-
 public:
     /**
      * Tells whether an entity has a specific component

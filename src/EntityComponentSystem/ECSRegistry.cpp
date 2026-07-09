@@ -27,17 +27,16 @@ Archetype * ECSRegistry::registerArchetype(std::vector<std::unique_ptr<Component
     } else {
         entityIds.reserve(components.front()->getLength());
         for (int i = 0; i < components.front()->getLength(); i++) {
-            entityIds.push_back(entityCount + i);
+            entityIds.push_back(getNewEntityId());
         }
-        entityCount += entityIds.size();
     }
 
     // create the archetype and add it to archetypeIndex
-    Archetype& archetype = archetypeIndex.emplace(std::piecewise_construct, std::forward_as_tuple(ids), std::forward_as_tuple(archetypeCount, ids, entityIds, std::move(components))).first->second;
+    EcsId archetypeId = getNewArchetypeId();
+    Archetype& archetype = archetypeIndex.emplace(std::piecewise_construct, std::forward_as_tuple(ids), std::forward_as_tuple(archetypeId, ids, entityIds, std::move(components))).first->second;
     for (int i = 0; i < archetype.componentTable.size(); i++) {
         componentIndex[archetype.componentTable[i]->getId()].insert({&archetype, i});
     }
-    ++archetypeCount;
 
     // register entities given with the archetype
     for (int i = 0; i < archetype.componentTable[0]->getLength(); i++) {
@@ -127,7 +126,7 @@ void ECSRegistry::registerEntities(const EntityType &entityType, std::vector<std
     std::vector<EntityId> entityIds;
     entityIds.reserve(componentData.front()->getLength());
     for (size_t i = 0; i < componentData.front()->getLength(); i++) {
-        entityIds[i] = entityCount++;
+        entityIds[i] = getNewEntityId();
     }
     const std::vector<Archetype::EntityRecord> record = archetypeIt->second.addEntities(std::move(componentData), entityIds);
 
@@ -144,6 +143,7 @@ void ECSRegistry::deleteEntity(EntityId entity) {
     if (entityRecord == entityRecords.end()) return;
     entityRecord->second.archetype->removeEntity(entityRecord->second);
     entityRecords.erase(entity);
+    removedEntities.push(entity);
 }
 
 void ECSRegistry::deleteEntitiesOfType(EntityType type) {
@@ -160,14 +160,15 @@ void ECSRegistry::deleteEntitiesOfType(EntityType type) {
     // remove entities from register
     for (auto entity : archetype->second.entityIds) {
         entityRecords.erase(entity);
+        removedEntities.push(entity);
     }
 
     // delete the archetype and remove it from the registry
     for (auto component : archetype->second.componentIds) {
         componentIndex.find(component)->second.erase(&archetype->second);
     }
+    removedArchetypes.push(archetype->second.id);
     archetypeIndex.erase(archetype); // where the archetype is actually stored (and therefore deleted)
-
     // tell the archetype listeners the tale of destruction
     archetypeSubject.update(type, false);
 }
