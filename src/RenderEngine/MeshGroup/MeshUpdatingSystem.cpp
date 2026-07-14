@@ -11,7 +11,6 @@ void MeshUpdatingSystem::updateComponents() {
         positions.push_back(static_cast<Components::Position*>(components[0][i]));
         meshGroups.push_back(static_cast<Components::MeshGroupComponent*>(components[1][i]));
     }
-
 }
 
 void MeshUpdatingSystem::transformMeshGroup(const MeshGroup& meshGroup, const glm::vec3& position) {

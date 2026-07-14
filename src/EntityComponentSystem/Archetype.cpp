@@ -1,7 +1,6 @@
 #include "Archetype.hpp"
 
-#include <cassert>
-#include <utility>
+
 
 Archetype::Archetype(const ArchetypeId &archetypeId, EntityType  entityType, const std::vector<EntityId> &entities, std::vector<std::unique_ptr<ComponentColumn>> components) : id(archetypeId), componentIds(std::move(entityType)) {
     this->componentTable = std::move(components);
@@ -34,32 +33,35 @@ Archetype::EntityRecord Archetype::addEntity(std::vector<std::unique_ptr<Compone
     return EntityRecord{this, this->componentTable[0]->getLength() - 1};
 }
 
-std::vector<Archetype::EntityRecord> Archetype::addEntities(
-    std::vector<std::unique_ptr<ComponentColumn>> &&entityComponents, const std::vector<EntityId> &entityId) {
+std::vector<Archetype::EntityRecord> Archetype::addEntities(std::vector<std::unique_ptr<ComponentColumn>> &&entityComponents, const std::vector<EntityId> &entityId) {
     for (int i = 0; i < entityComponents.size(); i++) {
         if (componentIds.contains(entityComponents.at(i)->getId())) {
             componentTable[i]->add(std::move(entityComponents.at(i)));
         }
     }
     std::vector<EntityRecord> entityRecords;
-    for (EntityId i : entityIds) {
-        entityIds.push_back(entityId[i]);
-        entityRecords.push_back(EntityRecord{this, this->componentTable[0]->getLength()});
+    for (int i = 0; i < entityId.size(); i++) {
+        //entityIds.push_back(i);
+        entityRecords.push_back(EntityRecord{this, this->componentTable[0]->getLength() - entityId.size() + i});
     }
+    entityIds.append_range(entityId);
     return entityRecords;
 }
 
-void Archetype::removeEntity(const EntityRecord &entityRecord) {
-    if (entityRecord.archetype != this) return;
+std::optional<Archetype::EntityRecord> Archetype::removeEntity(const EntityRecord &entityRecord) {
+    if (entityRecord.archetype != this) return {};
     for (const auto & component : componentTable) {
         component->remove(entityRecord.row);
     }
     entityIds[entityRecord.row] = entityIds.back();
     entityIds.pop_back();
+    if (entityRecord.row == componentTable[0]->getLength() - 1) return  {};
+    return EntityRecord{this, entityRecord.row};
 }
 
-std::vector<std::unique_ptr<ComponentColumn>> Archetype::pullEntity(const EntityRecord &entityRecord) {
+std::pair<std::vector<std::unique_ptr<ComponentColumn>>, std::optional<Archetype::EntityRecord>> Archetype::pullEntity(const EntityRecord &entityRecord) {
     assert(entityRecord.archetype == this);
+    assert(entityRecord.row < componentTable[0]->getLength());
     std::vector<std::unique_ptr<ComponentColumn>> entity;
     entity.reserve(componentTable.size());
     for (const auto & component : componentTable) {
@@ -67,7 +69,9 @@ std::vector<std::unique_ptr<ComponentColumn>> Archetype::pullEntity(const Entity
     }
     entityIds[entityRecord.row] = entityIds.back();
     entityIds.pop_back();
-    return entity;
+    if (entityRecord.row == entityIds.size()) return {std::move(entity), {}};
+    EntityRecord record{this, entityRecord.row};
+    return {std::move(entity), record};
 }
 
 Archetype * Archetype::getEdge(const ComponentId component) {

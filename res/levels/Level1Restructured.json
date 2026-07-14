@@ -3,8 +3,8 @@
     {  // Helmets
       "type": [0, 1],  // Position, MeshGroup
       "componentColumns": {
-        "0": [0, 1], // positions
-        "1": [0, 0] // meshGroups
+        "0": [0], // positions
+        "1": [0] // meshGroups
       }
     }
   ],

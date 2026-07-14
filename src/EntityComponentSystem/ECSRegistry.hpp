@@ -14,7 +14,7 @@
  */
 class ECSRegistry
 {
-    friend class JsonParser; // loads json archetype data into the ECSRegistry
+    //friend class JsonParser; // loads json archetype data into the ECSRegistry
     using EcsId = std::uint32_t;
     ArchetypeSubject archetypeSubject; // updates systems when the ArchetypeMap changes
     EcsId archetypeCount = 0;

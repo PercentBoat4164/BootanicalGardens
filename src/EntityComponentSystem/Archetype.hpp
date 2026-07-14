@@ -1,10 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <set>
 #include <unordered_map>
 #include <vector>
-#include <ranges>
+#include <cassert>
 
 #include "ComponentColumn.hpp"
 
@@ -91,14 +92,15 @@ public:
      *
      * @param entityRecord The location of the entity to be removed
      */
-    void removeEntity(const EntityRecord& entityRecord);
+    std::optional<EntityRecord> removeEntity(const EntityRecord &entityRecord);
 
     /**
      * Remove an entity from the archetype.
      *
      * @param entityRecord The location of the entity to be removed
+     * @return a pair containing the entity and the EntityRecord of an entity that was moved to its place.
      */
-     std::vector<std::unique_ptr<ComponentColumn>> pullEntity(const EntityRecord& entityRecord);
+     std::pair<std::vector<std::unique_ptr<ComponentColumn>>, std::optional<Archetype::EntityRecord>> pullEntity(const EntityRecord& entityRecord);
 
     /**
      * Gets the archetype with a single component added or created. If the component is not already in the archetype,

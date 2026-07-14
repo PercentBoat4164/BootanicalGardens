@@ -13,7 +13,7 @@
 #include <chrono>
 
 Window::Window(GraphicsDevice* const device) : device{device} {
-  window = SDL_CreateWindow("Bootanical Gardens", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
+  window = SDL_CreateWindow("Bootanical Gardens", 1080, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_CAPTURE);
   if (window == nullptr) GraphicsInstance::showSDLError();
   if (!SDL_Vulkan_CreateSurface(window, GraphicsInstance::instance, nullptr, &surface)) GraphicsInstance::showSDLError();
   vkb::SwapchainBuilder builder{device->device, surface};

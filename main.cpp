@@ -16,6 +16,8 @@
 #include "src/Game/KeyboardPanSystem.hpp"
 #include "src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp"
 
+//todo: easier way to add components
+
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
   GraphicsInstance::create({
@@ -44,7 +46,7 @@ int main() {
     parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
     MeshUpdatingSystem meshUpdatingSystem(&graphicsDevice, &ecs);
     KeyboardPanSystem keyboardPanSystem(&ecs);
-
+    std::vector<EntityId> toggleableEntities = {0};
     renderGraph.bake();
     bool visibleToggle = false;
     do {
@@ -53,11 +55,27 @@ int main() {
 
       if (Input::keyPressed(SDLK_V)) {
         if (visibleToggle) {
-          ecs.removeComponent(0, Components::Visible::ID);
+          for (EntityId curEntity : toggleableEntities) {
+            ecs.removeComponent(curEntity, Components::Visible::ID);
+          }
           visibleToggle = false;
         } else {
-          ecs.addComponent(0, std::make_unique<Components::Visible>(1));
+          for (EntityId curEntity : toggleableEntities) {
+            ecs.addComponent(curEntity, std::make_unique<Components::Visible>(1));
+          }
           visibleToggle = true;
+        }
+      }
+      if (Input::keyPressed(SDLK_C)) {
+        parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
+        if (visibleToggle) {
+          ecs.addComponent(ecs.getEntitiesOfType({0, 1}).back(), std::make_unique<Components::Visible>(1));
+        }
+      }
+      if (Input::keyPressed(SDLK_Z)) {
+        if (!toggleableEntities.empty()) {
+          ecs.deleteEntity(toggleableEntities.back());
+          toggleableEntities.pop_back();
         }
       }
 

@@ -21,11 +21,13 @@ void JsonParser::loadArchetype(yyjson_val *archetype, ECSRegistry &ecs) const {
 
     size_t idx, max;
     yyjson_val *curComponentType;
+    EntityType entityType;
     yyjson_arr_foreach(componentTypes, idx, max, curComponentType) {
         ComponentId type = yyjson_get_uint(curComponentType);
         components.emplace_back(loadComponentColumn(type, yyjson_obj_get(componentIndicesByType, std::to_string(type).c_str())));
+        entityType.emplace(type);
     }
-    ecs.registerArchetype(std::move(components));
+    ecs.registerEntities(entityType, std::move(components));
 }
 
 yyjson_val * JsonParser::locateComponent(const ComponentId type, const size_t index) const {
@@ -49,7 +51,6 @@ void JsonParser::readAndLoadLevel(const std::filesystem::path& path, ECSRegistry
 }
 
 void JsonParser::loadLevel(ECSRegistry& ecs) const {
-    std::unique_lock lock(ecs.archetypeMutex);
     yyjson_arr_iter archetypeIt = yyjson_arr_iter_with(archetypes);
     while (yyjson_val* curArchetype = yyjson_arr_iter_next(&archetypeIt)) {
         loadArchetype(curArchetype, ecs);
