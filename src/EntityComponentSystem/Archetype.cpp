@@ -49,13 +49,13 @@ std::vector<Archetype::EntityRecord> Archetype::addEntities(std::vector<std::uni
 }
 
 std::optional<Archetype::EntityRecord> Archetype::removeEntity(const EntityRecord &entityRecord) {
-    if (entityRecord.archetype != this) return {};
+    if (entityRecord.archetype != this) return std::nullopt;
     for (const auto & component : componentTable) {
         component->remove(entityRecord.row);
     }
     entityIds[entityRecord.row] = entityIds.back();
     entityIds.pop_back();
-    if (entityRecord.row == componentTable[0]->getLength() - 1) return  {};
+    if (entityRecord.row == componentTable[0]->getLength()) return std::nullopt;
     return EntityRecord{this, entityRecord.row};
 }
 

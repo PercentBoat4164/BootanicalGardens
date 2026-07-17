@@ -15,6 +15,7 @@
 #include "src/EntityComponentSystem/JsonParser.hpp"
 #include "src/Game/KeyboardPanSystem.hpp"
 #include "src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp"
+#include "src/EntityComponentSystem/Components.hpp"
 
 //todo: easier way to add components
 
@@ -46,21 +47,21 @@ int main() {
     parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
     MeshUpdatingSystem meshUpdatingSystem(&graphicsDevice, &ecs);
     KeyboardPanSystem keyboardPanSystem(&ecs);
-    std::vector<EntityId> toggleableEntities = {0};
     renderGraph.bake();
     bool visibleToggle = false;
+    std::deque<EntityId> helmetInstances{};
+    helmetInstances.push_back(ecs.getEntitiesOfType({0, 1}).back());
     do {
       meshUpdatingSystem.onTick();
       keyboardPanSystem.onTick();
-
       if (Input::keyPressed(SDLK_V)) {
         if (visibleToggle) {
-          for (EntityId curEntity : toggleableEntities) {
+          for (EntityId curEntity : ecs.getEntitiesOfType({0, 1, 2})) {
             ecs.removeComponent(curEntity, Components::Visible::ID);
           }
           visibleToggle = false;
         } else {
-          for (EntityId curEntity : toggleableEntities) {
+          for (EntityId curEntity : ecs.getEntitiesOfType({0, 1})) {
             ecs.addComponent(curEntity, std::make_unique<Components::Visible>(1));
           }
           visibleToggle = true;
@@ -68,14 +69,19 @@ int main() {
       }
       if (Input::keyPressed(SDLK_C)) {
         parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
+        helmetInstances.push_back(ecs.getEntitiesOfType({0, 1}).back());
         if (visibleToggle) {
           ecs.addComponent(ecs.getEntitiesOfType({0, 1}).back(), std::make_unique<Components::Visible>(1));
         }
       }
       if (Input::keyPressed(SDLK_Z)) {
-        if (!toggleableEntities.empty()) {
-          ecs.deleteEntity(toggleableEntities.back());
-          toggleableEntities.pop_back();
+        if (visibleToggle && !ecs.getEntitiesOfType({0, 1, 2}).empty()) {
+          if (auto column = ecs.getComponentLocation(helmetInstances.front(), Components::MeshGroupComponent::ID)) {
+            auto* meshGroup = static_cast<Components::MeshGroupComponent*>(column->second);
+            meshGroup->at(column->first).removeInstance();
+            ecs.deleteEntity(helmetInstances.front());
+            helmetInstances.pop_front();
+          }
         }
       }
 

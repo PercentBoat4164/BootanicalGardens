@@ -98,6 +98,8 @@ public:
      */
     ComponentColumn* getComponent(const EntityType& entityType, ComponentId component);
 
+    std::optional<std::pair<EntityId, ComponentColumn *>> getComponentLocation(EntityId entity, ComponentId component);
+
     /**
      * Gets all ComponentColumns holding entities with the given EntityType. The outer vector is by component type, and
      * the inner vector is by Archetype.

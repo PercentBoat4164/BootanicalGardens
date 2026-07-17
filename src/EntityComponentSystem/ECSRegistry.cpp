@@ -93,6 +93,23 @@ ComponentColumn * ECSRegistry::getComponent(const EntityType &entityType, Compon
     return &*archetype->second.componentTable[componentRow->second];
 }
 
+std::optional<std::pair<EntityId, ComponentColumn *>> ECSRegistry::getComponentLocation(EntityId entity, ComponentId component) {
+    std::shared_lock lock(archetypeMutex);
+    // find the location of the entity
+    const auto entityRecord = entityRecords.find(entity);
+    if (entityRecord == entityRecords.end()) return std::nullopt;
+
+    // find the location of the component
+    const auto archetypeMap = componentIndex.find(component);
+    if (archetypeMap == componentIndex.end()) return std::nullopt;
+
+    // find the component record in the correct entity
+    const auto componentRecord = archetypeMap->second.find(entityRecord->second.archetype);
+    if (componentRecord == archetypeMap->second.end()) return std::nullopt;
+
+    return std::pair{entityRecord->second.row, entityRecord->second.archetype->componentTable[componentRecord->second].get()};
+}
+
 // todo: consider way to make iterating over ComponentColumns of the same type easier
 std::vector<std::vector<ComponentColumn *>> ECSRegistry::getComponents(const EntityType &entityType) {
     std::shared_lock lock(archetypeMutex);
@@ -141,7 +158,9 @@ void ECSRegistry::deleteEntity(EntityId entity) {
     // find the location of the entity
     const auto entityRecord = entityRecords.find(entity);
     if (entityRecord == entityRecords.end()) return;
-    entityRecord->second.archetype->removeEntity(entityRecord->second);
+    if (std::optional<Archetype::EntityRecord> record = entityRecord->second.archetype->removeEntity(entityRecord->second)) {
+        entityRecords[entityRecord->second.archetype->entityIds.at(record->row)] = *record;
+    }
     entityRecords.erase(entity);
     removedEntities.push(entity);
 }

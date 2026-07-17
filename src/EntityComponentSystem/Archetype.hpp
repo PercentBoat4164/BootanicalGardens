@@ -91,6 +91,7 @@ public:
      * Remove an entity from the archetype, destroying the data.
      *
      * @param entityRecord The location of the entity to be removed
+     * @return a vector of EntityRecords that have changed. May be empty.
      */
     std::optional<EntityRecord> removeEntity(const EntityRecord &entityRecord);
 

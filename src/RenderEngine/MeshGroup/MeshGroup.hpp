@@ -17,4 +17,10 @@ struct MeshGroup {
     meshes = std::move(other.meshes);
     return *this;
   }
+
+  void removeInstance() {
+    for (auto& [mesh, instances] : meshes) {
+      for (auto& instance : instances) mesh->removeInstance(std::move(instance));
+    }
+  }
 };
