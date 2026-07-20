@@ -8,16 +8,11 @@
 #include "src/RenderEngine/RenderPass/GBufferRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/ShadeRenderPass.hpp"
 #include "src/RenderEngine/RenderPass/ShadowRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingBlendingWeightRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingEdgeDetectionRenderPass.hpp"
-#include "src/RenderEngine/RenderPass/SubpixelMorphologicalAntiAliasingNeighborhoodBlendingRenderPass.hpp"
 #include "src/RenderEngine/Window.hpp"
 #include "src/EntityComponentSystem/JsonParser.hpp"
 #include "src/Game/KeyboardPanSystem.hpp"
 #include "src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp"
-#include "src/EntityComponentSystem/Components.hpp"
-
-//todo: easier way to add components
+#include <taskflow.hpp>
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
@@ -27,6 +22,7 @@ int main() {
 #endif
   });
   {
+    tf::Executor executor;
     GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
     // Declare the window

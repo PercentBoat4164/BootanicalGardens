@@ -15,6 +15,7 @@ set(SPIRV_REFLECT_STATIC_LIB ON)
 CPMAddPackage("gh:KhronosGroup/SPIRV-Reflect#vulkan-sdk-1.4.341.0")
 CPMAddPackage("gh:libsdl-org/SDL#release-3.4.0")
 CPMAddPackage("gh:Neargye/magic_enum#v0.9.7")
+
 set(FASTGLTF_DOWNLOAD_SIMDJSON ON)
 set(FASTGLTF_ENABLE_TESTS OFF)
 set(FASTGLTF_ENABLE_EXAMPLES OFF)
@@ -34,6 +35,7 @@ CPMAddPackage("gh:jeremy-rifkin/cpptrace#v1.0.4")
 CPMAddPackage("gh:SpartanJ/efsw#1.5.1")
 set(OPENEXR_IS_SUBPROJECT ON)
 CPMAddPackage("gh:AcademySoftwareFoundation/openexr@3.4.11")
+CPMAddPackage("gh:taskflow/taskflow@4.1.0")
 
 add_executable(BootanicalGardens
         src/Game/Game.cpp
@@ -86,8 +88,8 @@ add_executable(BootanicalGardens
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)
-target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${openexr_SOURCE_DIR}/src/lib ${SDL_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${draco_SOURCE_DIR}/src ${CMAKE_BINARY_DIR} ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR})
-target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared glm::glm OpenEXR OpenEXRCore OpenEXRUtil yyjson fastgltf draco::draco cpptrace::cpptrace efsw)
+target_include_directories(BootanicalGardens PRIVATE ${CMAKE_SOURCE_DIR} ${Vulkan_INCLUDE_DIRS} ${vk-bootstrap_SOURCE_DIR}/src ${openexr_SOURCE_DIR}/src/lib ${SDL_SOURCE_DIR}/include ${magic_enum_SOURCE_DIR}/include ${draco_SOURCE_DIR}/src ${CMAKE_BINARY_DIR} ${SPIRV-Reflect_SOURCE_DIR} ${plf_colony_SOURCE_DIR} ${taskflow_SOURCE_DIR}/taskflow)
+target_link_libraries(BootanicalGardens PRIVATE Vulkan::shaderc_combined spirv-reflect-static vk-bootstrap::vk-bootstrap SDL3::SDL3-shared glm::glm OpenEXR OpenEXRCore OpenEXRUtil yyjson fastgltf draco::draco cpptrace::cpptrace efsw Taskflow::Taskflow)
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     target_compile_definitions(BootanicalGardens PRIVATE
             #BOOTANICAL_GARDENS_ENABLE_COMMAND_BUFFER_TRACING                                           # provides a full stacktrace for each command added to a command buffer. Kills Windoze performance
