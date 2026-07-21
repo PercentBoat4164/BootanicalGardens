@@ -85,6 +85,8 @@ add_executable(BootanicalGardens
         src/Game/KeyboardPanSystem.hpp
         src/EntityComponentSystem/TagComponent.cpp
         src/EntityComponentSystem/TagComponent.hpp
+        src/Game/HelmetManager.cpp
+        src/Game/HelmetManager.hpp
 )
 target_sources(BootanicalGardens PRIVATE main.cpp)
 target_compile_definitions(BootanicalGardens PRIVATE VK_NO_PROTOTYPES)

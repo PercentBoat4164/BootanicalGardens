@@ -1,3 +1,6 @@
+#pragma once
+#include <core/taskflow.hpp>
+
 #include "src/EntityComponentSystem/Components.hpp"
 #include "src/Game/Game.hpp"
 #include "src/InputEngine/Input.hpp"
@@ -12,7 +15,7 @@
 #include "src/EntityComponentSystem/JsonParser.hpp"
 #include "src/Game/KeyboardPanSystem.hpp"
 #include "src/RenderEngine/MeshGroup/MeshUpdatingSystem.hpp"
-#include <taskflow.hpp>
+#include "src/Game/HelmetManager.hpp"
 
 int main() {
   if (!Input::initialize()) GraphicsInstance::showSDLError();
@@ -22,7 +25,6 @@ int main() {
 #endif
   });
   {
-    tf::Executor executor;
     GraphicsDevice graphicsDevice{std::filesystem::canonical("../res/graphicsData.json")};
 
     // Declare the window
@@ -40,47 +42,12 @@ int main() {
 
     ECSRegistry ecs{};
     JsonParser parser(graphicsDevice);
-    parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
     MeshUpdatingSystem meshUpdatingSystem(&graphicsDevice, &ecs);
     KeyboardPanSystem keyboardPanSystem(&ecs);
+    HelmetManager helmetManager(&ecs, &parser);
+    helmetManager.loadHelmet();
     renderGraph.bake();
-    bool visibleToggle = false;
-    std::deque<EntityId> helmetInstances{};
-    helmetInstances.push_back(ecs.getEntitiesOfType({0, 1}).back());
-    do {
-      meshUpdatingSystem.onTick();
-      keyboardPanSystem.onTick();
-      if (Input::keyPressed(SDLK_V)) {
-        if (visibleToggle) {
-          for (EntityId curEntity : ecs.getEntitiesOfType({0, 1, 2})) {
-            ecs.removeComponent(curEntity, Components::Visible::ID);
-          }
-          visibleToggle = false;
-        } else {
-          for (EntityId curEntity : ecs.getEntitiesOfType({0, 1})) {
-            ecs.addComponent(curEntity, std::make_unique<Components::Visible>(1));
-          }
-          visibleToggle = true;
-        }
-      }
-      if (Input::keyPressed(SDLK_C)) {
-        parser.readAndLoadLevel("../res/levels/Level1Restructured.json", ecs);
-        helmetInstances.push_back(ecs.getEntitiesOfType({0, 1}).back());
-        if (visibleToggle) {
-          ecs.addComponent(ecs.getEntitiesOfType({0, 1}).back(), std::make_unique<Components::Visible>(1));
-        }
-      }
-      if (Input::keyPressed(SDLK_Z)) {
-        if (visibleToggle && !ecs.getEntitiesOfType({0, 1, 2}).empty()) {
-          if (auto column = ecs.getComponentLocation(helmetInstances.front(), Components::MeshGroupComponent::ID)) {
-            auto* meshGroup = static_cast<Components::MeshGroupComponent*>(column->second);
-            meshGroup->at(column->first).removeInstance();
-            ecs.deleteEntity(helmetInstances.front());
-            helmetInstances.pop_front();
-          }
-        }
-      }
-
+    std::function<void()> renderTick = [&graphicsDevice, &renderGraph, &window] () {
       graphicsDevice.update();
       // Make sure that the CPU is not getting too far ahead of the GPU
       VkSemaphore frameDataSemaphore = renderGraph.waitForNextFrameData();
@@ -91,7 +58,17 @@ int main() {
       renderGraph.execute(swapchainImage, window.getSemaphore());
       // Tell the GPU to show the final image when it has finished rendering this frame
       window.present();
-    } while (Game::tick());
+    };
+    auto [ updateMesh, pan, manageHelmets, render] = Game::tickGraph.emplace (
+    [&meshUpdatingSystem] () { meshUpdatingSystem.onTick(); },
+    [&keyboardPanSystem] () { keyboardPanSystem.onTick(); },
+    [&helmetManager] () { helmetManager.onTick(); },
+    renderTick
+    );
+    render.succeed(updateMesh, pan, manageHelmets);
+    manageHelmets.succeed(updateMesh, pan);
+    pan.succeed(updateMesh);
+    while (Game::tick());
   }
   GraphicsInstance::destroy();
   return 0;

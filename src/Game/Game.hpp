@@ -1,21 +1,21 @@
 #pragma once
 
 #include <chrono>
-#include <memory>
-#include <unordered_map>
-#include <utility>
+
+namespace tf { class Executor; class Taskflow; };
 
 class Game {
-  //static std::unordered_map<std::uint64_t, Entity> entities;
   static double time;
   static double tickTime;
   static std::uint64_t entityId;
+  static tf::Executor executor;
 
 public:
   static const std::chrono::steady_clock::time_point startTime;
+  static tf::Taskflow tickGraph;
 
   /**
-   * Move the game state forward one tick.
+   * Move the game state forward one tick. First poll SDL events, then run the tickGraph, then render the scene.
    */
   static bool tick();
 

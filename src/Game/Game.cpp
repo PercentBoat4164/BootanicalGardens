@@ -1,10 +1,13 @@
 #include "Game.hpp"
 
 #include "src/InputEngine/Input.hpp"
+#include <taskflow.hpp>
 
 double Game::time{};
 double Game::tickTime{std::numeric_limits<double>::infinity()};
 std::uint64_t Game::entityId{UINT64_MAX};
+tf::Executor Game::executor{};
+tf::Taskflow Game::tickGraph{};
 
 const std::chrono::steady_clock::time_point Game::startTime{std::chrono::steady_clock::now()};
 
@@ -24,7 +27,7 @@ bool Game::tick() {
   tickTime           = currentTime - time;
   time               = currentTime;
   Input::onTick();
-
+  executor.run(tickGraph).wait();
   return !shouldQuit;
 }
 
